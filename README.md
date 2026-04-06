@@ -1,2 +1,2 @@
-# recall
-Embedded vector search for local-first apps ΓÇö on-device embeddings, zero cloud, zero config.
+# Recall
+Local-first agent memory — from raw logs to distilled wisdom, with semantic search over all of it.
