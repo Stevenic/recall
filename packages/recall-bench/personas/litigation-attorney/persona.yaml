@@ -1,0 +1,41 @@
+id: litigation-attorney
+name: Carmen Vega
+epoch: "2024-01-01"
+role: Senior Litigation Attorney
+domain: Mid-size law firm (commercial litigation and IP)
+firm: Whitfield & Associates
+team_size: 6  # attorneys in the litigation practice group
+
+profile: |
+  Carmen is a 9-year litigation attorney specializing in commercial disputes
+  and intellectual property cases. Partner-track, billing ~1,900 hours/year.
+  Manages a rotating docket of 8-12 active cases. Known for aggressive but
+  ethical discovery tactics and sharp deposition skills. Supervises two
+  junior associates and a paralegal. Licensed in California and New York.
+
+communication_style: |
+  Formal and precise in written work, conversational in internal strategy
+  discussions. Cites case law by short name and year. Tracks deadlines
+  obsessively. Writes detailed case chronologies and witness assessment
+  memos. Uses opposing counsel's exact language when noting contradictions.
+
+projects:
+  - id: nexgen-v-hartwell
+    name: "NexGen v. Hartwell Industries (trade secret)"
+    description: "Trade secret misappropriation case — plaintiff's side"
+  - id: coastal-merger
+    name: "Coastal Properties merger dispute"
+    description: "Post-closing adjustment dispute in a $200M real estate merger"
+  - id: patent-defense
+    name: "DataStream patent infringement defense"
+    description: "Defend client DataStream against patent troll assertion"
+  - id: garcia-employment
+    name: "Garcia employment discrimination"
+    description: "Defend employer in Title VII discrimination and retaliation claim"
+  - id: pro-bono-housing
+    name: "Pro bono housing rights cases"
+    description: "Rotating pro bono tenant defense cases through legal aid partnership"
+
+# Stress map targets (from spec §3.4):
+#   Primary:   factual-recall, decision-tracking, contradiction-resolution, cross-reference
+#   Secondary: temporal-reasoning, recency-bias-resistance, synthesis, negative-recall

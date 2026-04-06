@@ -1,0 +1,43 @@
+id: research-scientist
+name: Kenji Nakamura
+epoch: "2024-01-01"
+role: Assistant Professor / Principal Investigator
+domain: University biology lab (synthetic biology and gene regulation)
+institution: Pacific State University, Dept. of Molecular Biology
+team_size: 7  # 2 postdocs, 3 PhD students, 1 lab manager, 1 undergrad
+
+profile: |
+  Kenji runs a mid-size synthetic biology lab in his 3rd year as PI. His
+  research focuses on CRISPR-based gene regulatory circuits in mammalian
+  cells. Balances benchwork supervision, grant writing, teaching one
+  course per semester, and committee service. Published 18 papers (4 as
+  corresponding author since starting the lab). Technically deep — still
+  reviews raw sequencing data and troubleshoots experiments personally.
+
+communication_style: |
+  Methodical and hypothesis-driven. Documents experimental rationale before
+  results. Uses precise measurement units, statistical tests, and reagent
+  catalog numbers. Writes in a lab-notebook style with explicit controls
+  and expected vs. observed outcomes. More verbose in grant drafts,
+  terse in lab meeting notes.
+
+projects:
+  - id: crispr-circuit
+    name: "CRISPR toggle switch circuit"
+    description: "Engineer a bistable gene switch using dCas9-based activators and repressors"
+  - id: r01-grant
+    name: "R01 grant application and renewal"
+    description: "NIH R01 application for the gene circuit project — submission, review, revision"
+  - id: rnaseq-pipeline
+    name: "RNA-seq analysis pipeline rebuild"
+    description: "Rebuild the lab's bioinformatics pipeline from legacy Perl scripts to Nextflow/nf-core"
+  - id: collab-drug-delivery
+    name: "Drug delivery collaboration with Chen Lab"
+    description: "Cross-lab collaboration on lipid nanoparticle delivery of CRISPR components"
+  - id: teaching-mol-bio
+    name: "Molecular Biology 301 course"
+    description: "Teaching and curriculum development for the undergraduate molecular biology course"
+
+# Stress map targets (from spec §3.4):
+#   Primary:   temporal-reasoning, contradiction-resolution, cross-reference, synthesis
+#   Secondary: factual-recall, decision-tracking, recency-bias-resistance, negative-recall

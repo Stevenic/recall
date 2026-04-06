@@ -1,0 +1,270 @@
+# Research Scientist — Story Arcs
+# 21 arcs across 1,000 days. Designed to stress temporal reasoning,
+# contradiction resolution, cross-reference, and synthesis. Lab work
+# creates rich hypothesis→experiment→result→revision cycles where
+# earlier beliefs are frequently overturned by data.
+#
+# Max concurrent arcs: 4
+# Quiet periods: ~days 355-370 (winter break), ~days 720-735 (sabbatical travel)
+# Academic calendar rhythm: semesters, grant deadlines, conference seasons
+
+arcs:
+
+  # ── Projects ───────────────────────────────────────────────────────────────
+
+  - id: crispr-circuit
+    type: project
+    title: "CRISPR toggle switch circuit engineering"
+    description: |
+      Core research project spanning most of the timeline. Engineer a
+      bistable gene switch using dCas9 activators/repressors. Involves
+      guide RNA design, plasmid construction, cell line testing, and
+      characterization. Multiple iterations: v1 fails (insufficient
+      dynamic range), v2 works in HEK293T but not in target cells, v3
+      succeeds with modified promoter. Each version has specific
+      sequences, plasmid IDs, and measurement results that form
+      factual recall and temporal reasoning targets.
+    startDay: 1
+    endDay: 800
+
+  - id: r01-grant
+    type: project
+    title: "NIH R01 grant application"
+    description: |
+      First R01 submission (day 60), study section review (day 180),
+      score received (day 200 — scored but not funded, 25th percentile),
+      revision submitted (day 400), second review (day 520), funded
+      (day 540). Specific aims, budget numbers, reviewer critiques,
+      and revision strategies. The aims evolve across submissions —
+      tracks decision-making and contradiction (original vs. revised
+      hypotheses).
+    startDay: 40
+    endDay: 550
+
+  - id: rnaseq-pipeline
+    type: project
+    title: "RNA-seq pipeline rebuild"
+    description: |
+      Replace legacy Perl-based analysis scripts with Nextflow/nf-core.
+      Involves tool selection (STAR vs HISAT2, DESeq2 vs edgeR),
+      validation against old pipeline results, and lab-wide adoption.
+      Specific pipeline parameters and version numbers established
+      early become recency-bias targets.
+    startDay: 120
+    endDay: 300
+
+  - id: collab-drug-delivery
+    type: project
+    title: "Lipid nanoparticle collaboration with Chen Lab"
+    description: |
+      Cross-lab collaboration to deliver CRISPR components via LNPs
+      instead of electroporation. Kenji provides the gene circuits,
+      Chen Lab provides the LNP formulations. Involves material transfer
+      agreements, shared protocols, and joint experiments. Results from
+      this collaboration feed back into the main circuit project —
+      strong cross-reference target.
+    startDay: 350
+    endDay: 650
+
+  - id: teaching-mol-bio
+    type: project
+    title: "Molecular Biology 301"
+    description: |
+      Teaching responsibilities: Fall and Spring semesters. Involves
+      lecture prep, exam writing, office hours, and student project
+      mentorship. Specific exam questions, student research topics,
+      and curriculum changes documented. Creates temporal reasoning
+      challenges (which semester had which content).
+    startDay: 1
+    endDay: 1000
+
+  # ── Incidents ──────────────────────────────────────────────────────────────
+
+  - id: incident-contamination
+    type: incident
+    title: "Cell culture contamination event"
+    description: |
+      Mycoplasma contamination discovered in the lab's HEK293T stocks
+      on day 150. Investigation reveals contamination dates back ~3
+      weeks. All experiments using those cells in the window (days
+      130-150) must be repeated. Specific experiment IDs and plate
+      numbers invalidated. Cross-references CRISPR circuit project
+      (v1 results partly invalidated).
+    startDay: 148
+    endDay: 175
+
+  - id: incident-freezer-failure
+    type: incident
+    title: "-80°C freezer failure"
+    description: |
+      Backup freezer fails over a weekend (day 510). Samples partially
+      thawed. Inventory audit required. Some plasmid stocks lost,
+      requiring re-transformation. Specific plasmid IDs and sample
+      locations documented. Impacts both circuit project and the
+      collaboration.
+    startDay: 510
+    endDay: 530
+
+  - id: incident-data-integrity
+    type: incident
+    title: "Sequencing data integrity concern"
+    description: |
+      Postdoc discovers suspicious read distributions in older RNA-seq
+      datasets (day 680). Investigation determines the legacy pipeline
+      had a bug in adapter trimming that affected ~15% of samples.
+      Retroactive re-analysis required. Cross-references pipeline
+      rebuild (the new pipeline caught the issue).
+    startDay: 678
+    endDay: 710
+
+  # ── Decisions ──────────────────────────────────────────────────────────────
+
+  - id: decision-cell-line
+    type: decision
+    title: "Target cell line selection"
+    description: |
+      Choose between CHO, HEK293T, and iPSC-derived neurons as the
+      primary cell line for the circuit project. Initial choice (day 30):
+      HEK293T for ease. Day 250: results show the circuit doesn't
+      translate to neurons. Day 400: switch to iPSC-derived cardiomyocytes
+      based on collaboration results. Rationale shifts with data.
+    startDay: 20
+    endDay: 420
+
+  - id: decision-statistical-method
+    type: decision
+    title: "Statistical analysis methodology"
+    description: |
+      Lab debates frequentist vs. Bayesian approaches for gene expression
+      analysis. Kenji initially mandates DESeq2 (frequentist, day 130).
+      Postdoc presents Bayesian alternative at lab meeting (day 280).
+      After reviewer 2 on the R01 critiques statistical rigor, lab
+      adopts Bayesian framework for key analyses (day 450).
+    startDay: 130
+    endDay: 460
+
+  - id: decision-open-science
+    type: decision
+    title: "Open science and preprint policy"
+    description: |
+      Kenji debates whether to post preprints before peer review.
+      Initial stance (day 100): wait for peer review (scooping risk).
+      After a competitor publishes similar results (day 500), reverses
+      to preprint-first policy. Specific journal names, preprint
+      servers, and competitor paper details.
+    startDay: 100
+    endDay: 520
+
+  # ── Learning ───────────────────────────────────────────────────────────────
+
+  - id: learning-machine-learning
+    type: learning
+    title: "Machine learning for sequence design"
+    description: |
+      Kenji starts learning ML to predict guide RNA efficiency.
+      Progresses from basic Python/scikit-learn (day 200) to deep
+      learning with PyTorch (day 350) to fine-tuning a transformer
+      model on lab data (day 550). Specific model architectures,
+      hyperparameters, and validation metrics documented at each stage.
+    startDay: 200
+    endDay: 600
+
+  - id: learning-grant-management
+    type: learning
+    title: "PI grant management and lab leadership"
+    description: |
+      First-time PI learning curve: budget management, personnel
+      decisions, conflict resolution, mentorship strategies. Early
+      lessons about post-doc hiring criteria (day 50) and budget
+      allocation priorities (day 80) are not revisited later —
+      recency bias resistance targets.
+    startDay: 30
+    endDay: 250
+
+  # ── Relationships ──────────────────────────────────────────────────────────
+
+  - id: relationship-postdoc-sarah
+    type: relationship
+    title: "Mentoring postdoc Sarah Kim"
+    description: |
+      Sarah is the senior postdoc driving the CRISPR circuit work.
+      Kenji and Sarah have weekly 1:1s covering experimental design,
+      career development, and manuscript preparation. Sarah's
+      independent ideas sometimes conflict with Kenji's direction —
+      their resolution process creates decision-tracking material.
+      Sarah leaves for her own faculty position around day 750.
+    startDay: 1
+    endDay: 750
+
+  - id: relationship-chen-pi
+    type: relationship
+    title: "Collaboration with PI Dr. Chen"
+    description: |
+      Dr. Wei Chen leads the LNP delivery lab. Kenji and Chen have
+      monthly check-ins on the collaboration, negotiate authorship
+      order, and resolve data-sharing disputes. Their working
+      relationship cools after a disagreement about IP on day 550
+      but recovers by day 650.
+    startDay: 300
+    endDay: 700
+
+  - id: relationship-dept-chair
+    type: relationship
+    title: "Department chair mentorship and tenure prep"
+    description: |
+      Department chair provides tenure guidance at annual reviews.
+      Specific publication targets, teaching evaluation thresholds,
+      and committee service expectations documented. Metrics evolve
+      across reviews (year 1 → year 2 → year 3).
+    startDay: 50
+    endDay: 950
+
+  # ── Corrections ────────────────────────────────────────────────────────────
+
+  - id: correction-promoter-strength
+    type: correction
+    title: "CMV promoter strength in target cells"
+    description: |
+      Day 30: Kenji documents CMV as a "strong constitutive promoter
+      in mammalian cells" (textbook knowledge). Day 320: experiments
+      show CMV is silenced in iPSC-derived cardiomyocytes. Switches
+      to EF1α promoter. The incorrect assumption influenced 6 months
+      of experimental design.
+    startDay: 30
+    endDay: 320
+    wrongDay: 30
+    correctedDay: 320
+    wrongBelief: "CMV is a strong constitutive promoter suitable for all mammalian cell types"
+    correctedBelief: "CMV is silenced in iPSC-derived cardiomyocytes — EF1α required"
+
+  - id: correction-guide-efficiency
+    type: correction
+    title: "Guide RNA efficiency prediction model"
+    description: |
+      Day 220: Kenji reports their ML model achieves 85% accuracy for
+      predicting guide RNA on-target efficiency. Day 450: external
+      validation on new cell types reveals actual accuracy is 62% due
+      to overfitting on the training cell line. Model retrained with
+      cross-cell-type validation.
+    startDay: 220
+    endDay: 460
+    wrongDay: 220
+    correctedDay: 450
+    wrongBelief: "Guide RNA efficiency prediction model has 85% accuracy"
+    correctedBelief: "Actual cross-cell-type accuracy is 62% — model was overfit to training cell line"
+
+  - id: correction-lnp-toxicity
+    type: correction
+    title: "LNP formulation cytotoxicity"
+    description: |
+      Day 380: Chen Lab reports their LNP formulation LNP-4 has <5%
+      cytotoxicity at therapeutic doses. Day 580: Kenji's lab
+      independently measures 22% cytotoxicity using a more sensitive
+      assay (LDH release vs. MTT). Discrepancy traced to assay
+      sensitivity difference. Revised formulation LNP-7 developed.
+    startDay: 380
+    endDay: 600
+    wrongDay: 380
+    correctedDay: 580
+    wrongBelief: "LNP-4 formulation has <5% cytotoxicity at therapeutic doses"
+    correctedBelief: "LNP-4 cytotoxicity is 22% (LDH assay); switched to LNP-7 formulation"

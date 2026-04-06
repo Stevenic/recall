@@ -1,0 +1,311 @@
+# Financial Advisor — Story Arcs
+# 22 arcs across 1,000 days. Designed to stress decision tracking,
+# contradiction resolution, recency bias resistance, and negative recall.
+# Client portfolio management creates long-running relationships where
+# advice evolves, market assumptions get corrected, and scope boundaries
+# (things NOT recommended) are important.
+#
+# Max concurrent arcs: 4
+# Quiet periods: ~days 360-372 (holiday break), ~days 730-745 (vacation)
+# Rhythm: quarterly reviews, annual tax planning, market event responses
+
+arcs:
+
+  # ── Projects ───────────────────────────────────────────────────────────────
+
+  - id: model-portfolio-redesign
+    type: project
+    title: "Model portfolio redesign: 60/40 → factor-based"
+    description: |
+      Overhaul the firm's 5 model portfolios from traditional stock/bond
+      allocation to multi-factor approach (value, momentum, quality, low-vol).
+      Involves backtesting, investment committee approval, client communication,
+      and phased transition. Specific allocation percentages, fund tickers,
+      and expense ratios documented at each stage — some change during
+      implementation. Tests decision-tracking and contradiction resolution.
+    startDay: 30
+    endDay: 250
+
+  - id: tax-strategy
+    type: project
+    title: "Tax-efficient investing overhaul"
+    description: |
+      Implement systematic tax-loss harvesting (TLH), Roth conversion
+      ladders, and asset location optimization across client accounts.
+      Involves setting TLH thresholds, wash sale monitoring, and client-
+      specific Roth conversion modeling. Specific dollar thresholds and
+      tax bracket targets established early (day 60-80) and not revisited
+      after month 6 — recency bias resistance targets.
+    startDay: 50
+    endDay: 350
+
+  - id: estate-planning
+    type: project
+    title: "Estate planning initiative"
+    description: |
+      Proactive estate planning reviews for clients with $5M+ estates.
+      Covers trust structures, gifting strategies, beneficiary reviews,
+      and charitable planning. Specific client estate values, trust types
+      (revocable, irrevocable, SLAT, GRAT), and gifting amounts documented.
+      Negative recall targets: things Priya explicitly recommends AGAINST
+      for specific clients (e.g., "do NOT recommend GRAT for client X
+      because of Y").
+    startDay: 300
+    endDay: 600
+
+  - id: crm-migration
+    type: project
+    title: "CRM platform migration"
+    description: |
+      Migrate from legacy CRM (Redtail) to Salesforce Financial Services
+      Cloud. Data migration, workflow customization, team training.
+      Specific field mappings, workflow rules, and integration configs
+      documented early and become stale quickly as the platform evolves.
+    startDay: 450
+    endDay: 580
+
+  - id: compliance-reg-bi
+    type: project
+    title: "Reg BI compliance overhaul"
+    description: |
+      Implement Regulation Best Interest requirements: care obligation
+      documentation, conflict-of-interest disclosures, client relationship
+      summaries. Involves updating every client's documentation and
+      creating new review workflows. Specific disclosure language and
+      form versions tracked.
+    startDay: 700
+    endDay: 900
+
+  # ── Incidents ──────────────────────────────────────────────────────────────
+
+  - id: incident-market-correction
+    type: incident
+    title: "Q2 market correction — client panic management"
+    description: |
+      15% equity market drawdown over 3 weeks starting day 160. Priya
+      manages client calls, rebalancing decisions, and communication
+      cadence. Specific client reactions, portfolio impacts (dollar
+      values), and rebalancing trades documented. Some clients want
+      to sell everything; Priya talks them through it. Tests factual
+      recall of specific client conversations and decisions.
+    startDay: 160
+    endDay: 195
+
+  - id: incident-client-fraud
+    type: incident
+    title: "Client identity theft and unauthorized transfers"
+    description: |
+      Client discovers unauthorized wire transfers. Priya coordinates
+      with custodian, files SAR, works with client's attorney. Specific
+      amounts, dates, account numbers, and resolution timeline documented.
+      Cross-references CRM migration (during parallel run, records are
+      in two systems).
+    startDay: 520
+    endDay: 545
+
+  - id: incident-regulatory-exam
+    type: incident
+    title: "SEC examination"
+    description: |
+      Surprise SEC exam on day 820. Priya pulls documentation on
+      recommendation rationale, fee disclosures, and best execution
+      analysis. Examiner questions specific historical decisions —
+      tests whether memory system can retrieve old rationale accurately.
+      Resolved with no material findings on day 850.
+    startDay: 820
+    endDay: 855
+
+  # ── Decisions ──────────────────────────────────────────────────────────────
+
+  - id: decision-alternative-investments
+    type: decision
+    title: "Alternative investments allocation"
+    description: |
+      Should the firm add alternatives (private equity, hedge funds,
+      real assets) to model portfolios? Day 100: Priya recommends 10%
+      alternatives sleeve. Day 180: after the market correction, clients
+      push for more alternatives (25%). Day 200: Priya holds at 15%
+      citing liquidity concerns. Day 400: reduces to 10% after one
+      PE fund disappoints. Each shift has specific rationale and numbers.
+    startDay: 80
+    endDay: 420
+
+  - id: decision-fee-structure
+    type: decision
+    title: "Fee structure redesign"
+    description: |
+      Firm debates moving from AUM-based fees (1% blended) to tiered
+      or flat-fee model. Priya initially supports flat fee (day 250).
+      After analysis shows revenue impact, pivots to tiered AUM with
+      breakpoints (day 310). Final structure adopted day 350. Specific
+      basis points at each tier level.
+    startDay: 250
+    endDay: 360
+
+  - id: decision-custodian-change
+    type: decision
+    title: "Custodian evaluation and potential switch"
+    description: |
+      Evaluate switching from current custodian (Schwab) to Fidelity
+      after Schwab acquisition of TD Ameritrade causes service issues.
+      Day 500: begin evaluation. Day 600: decision to stay with Schwab
+      after they resolve issues and offer fee concessions. Specific
+      platform features, fee comparisons, and transition cost estimates
+      documented.
+    startDay: 500
+    endDay: 610
+
+  - id: decision-crypto-policy
+    type: decision
+    title: "Cryptocurrency recommendation policy"
+    description: |
+      Firm needs an official stance on crypto allocation. Day 380:
+      Priya drafts policy recommending 0% allocation (too volatile,
+      regulatory uncertainty). Day 650: revises to allow up to 3%
+      in Bitcoin-only ETF after ETF approval. Day 800: client requests
+      5% — Priya maintains 3% cap. Negative recall: Priya never
+      recommends altcoins, DeFi, or direct crypto custody.
+    startDay: 380
+    endDay: 820
+
+  # ── Learning ───────────────────────────────────────────────────────────────
+
+  - id: learning-direct-indexing
+    type: learning
+    title: "Direct indexing and tax alpha"
+    description: |
+      Priya studies direct indexing platforms (Parametric, Aperio, custom).
+      Evaluates tax alpha potential, tracking error, and minimum account
+      sizes. Early research (days 100-150) documents specific platform
+      capabilities and fee structures that aren't revisited — recency
+      bias targets. Eventually implements for 8 clients.
+    startDay: 90
+    endDay: 300
+
+  - id: learning-behavioral-finance
+    type: learning
+    title: "Behavioral finance and client communication"
+    description: |
+      After the market correction reveals gaps in client communication,
+      Priya studies behavioral finance. Reads Kahneman, attends a
+      Kitces summit (day 230), develops a "client communication playbook."
+      Specific behavioral biases and counterstrategies documented.
+    startDay: 200
+    endDay: 380
+
+  - id: learning-estate-tax-law
+    type: learning
+    title: "Estate and gift tax law changes"
+    description: |
+      2025/2026 estate tax exemption sunset creates urgency. Priya
+      studies current law ($12.92M exemption), sunset provisions
+      (revert to ~$6M), and planning strategies. Specific dollar
+      figures and strategy details documented early and updated as
+      legislation evolves.
+    startDay: 280
+    endDay: 500
+
+  # ── Relationships ──────────────────────────────────────────────────────────
+
+  - id: relationship-client-harrison
+    type: relationship
+    title: "Key client: the Harrison family ($18M)"
+    description: |
+      Multi-generational client relationship. Parents (retiring), adult
+      children (inheriting), family business sale proceeds. Quarterly
+      reviews with evolving goals. Specific portfolio values, allocation
+      changes, and trust distributions tracked across meetings.
+      Provides rich factual-recall and temporal-reasoning material.
+    startDay: 1
+    endDay: 950
+
+  - id: relationship-client-oconnor
+    type: relationship
+    title: "Key client: Dr. O'Connor ($6M, physician)"
+    description: |
+      High-income physician client focused on tax optimization and
+      early retirement. Specific income figures, 401k/403b limits,
+      backdoor Roth amounts, and projected retirement dates tracked.
+      Goals shift as market conditions change. Negative recall target:
+      O'Connor explicitly declined long-term care insurance on day 200
+      — Priya documents this but does NOT recommend it again.
+    startDay: 30
+    endDay: 800
+
+  - id: relationship-analyst-marco
+    type: relationship
+    title: "Working with analyst Marco"
+    description: |
+      Marco prepares portfolio reports, runs Monte Carlo simulations,
+      and drafts rebalancing proposals. Priya reviews and approves.
+      Their workflow evolves: initially Priya reviews everything (day 1),
+      later delegates routine rebalances (day 300), catches an error
+      in Marco's tax-loss harvesting logic (day 450), updates review
+      process.
+    startDay: 1
+    endDay: 900
+
+  # ── Corrections ────────────────────────────────────────────────────────────
+
+  - id: correction-bond-duration
+    type: correction
+    title: "Bond portfolio duration assumption"
+    description: |
+      Day 40: Priya documents the firm's aggregate bond portfolio
+      duration as 4.2 years. Day 280: reanalysis after adding new
+      positions reveals effective duration is actually 6.1 years
+      (callable bonds had longer duration than quoted). Triggers
+      portfolio rebalancing.
+    startDay: 40
+    endDay: 280
+    wrongDay: 40
+    correctedDay: 280
+    wrongBelief: "Firm aggregate bond portfolio duration: 4.2 years"
+    correctedBelief: "Effective duration is 6.1 years (callable bonds understated)"
+
+  - id: correction-tax-bracket
+    type: correction
+    title: "Harrison family marginal tax bracket"
+    description: |
+      Day 120: Priya plans Roth conversions assuming the Harrisons are
+      in the 32% marginal bracket. Day 350: tax return review reveals
+      they hit 35% due to capital gains from business sale proceeds
+      Priya wasn't initially informed about. Conversion strategy
+      requires revision.
+    startDay: 120
+    endDay: 360
+    wrongDay: 120
+    correctedDay: 350
+    wrongBelief: "Harrison family marginal federal tax rate: 32%"
+    correctedBelief: "Actual marginal rate: 35% (capital gains from undisclosed business sale proceeds)"
+
+  - id: correction-fund-expense
+    type: correction
+    title: "International equity fund expense ratio"
+    description: |
+      Day 60: Priya documents VXUS expense ratio as 0.07% in the
+      model portfolio. Day 500: annual review catches that the share
+      class used in smaller accounts (Investor shares vs. Admiral)
+      actually charges 0.11%. Corrects account-level implementation.
+    startDay: 60
+    endDay: 500
+    wrongDay: 60
+    correctedDay: 500
+    wrongBelief: "International equity allocation (VXUS) expense ratio: 0.07%"
+    correctedBelief: "Investor share class in smaller accounts charges 0.11% — Admiral shares require $10K minimum"
+
+  - id: correction-social-security
+    type: correction
+    title: "O'Connor Social Security claiming strategy"
+    description: |
+      Day 150: Priya recommends Dr. O'Connor delay Social Security
+      to age 70 for maximum benefit, projecting a breakeven at age 82.
+      Day 650: updated longevity analysis and O'Connor's new health
+      concerns shift recommendation to claim at 67. Breakeven
+      recalculated to age 84 under revised assumptions.
+    startDay: 150
+    endDay: 660
+    wrongDay: 150
+    correctedDay: 650
+    wrongBelief: "Recommend delay Social Security to age 70 (breakeven age 82)"
+    correctedBelief: "Revise to claim at age 67 due to health concerns (breakeven age 84 under new assumptions)"

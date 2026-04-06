@@ -1,0 +1,19 @@
+{
+  "name": "recall-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=packages/core && npm run build --workspace=packages/recall-bench",
+    "test": "npm test --workspace=packages/core && npm test --workspace=packages/recall-bench",
+    "lint": "npm run lint --workspace=packages/core && npm run lint --workspace=packages/recall-bench",
+    "clean": "npm run clean --workspace=packages/core && npm run clean --workspace=packages/recall-bench"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "vectra": "^0.14.0"
+  }
+}

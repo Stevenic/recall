@@ -1,0 +1,274 @@
+# ER Physician — Story Arcs
+# 22 arcs across 1,000 days. Designed to stress factual recall,
+# temporal reasoning, and recency bias resistance. Shift-based work
+# creates natural episodic memory patterns with specific clinical details.
+#
+# Max concurrent arcs: 4
+# Quiet periods: ~days 200-210 (vacation), ~days 560-575 (conference travel),
+#                ~days 880-890 (personal leave)
+# Note: "quiet" for an ER doc still means shifts happen — just fewer arcs active
+
+arcs:
+
+  # ── Projects ───────────────────────────────────────────────────────────────
+
+  - id: sepsis-protocol
+    type: project
+    title: "Sepsis screening protocol overhaul"
+    description: |
+      QI committee identifies missed sepsis cases. Jordan leads protocol
+      redesign: new qSOFA-based screening trigger, 1-hour bundle compliance
+      tracking, nurse-initiated lactate draws. Pilot phase, data review,
+      full rollout. Specific threshold values (lactate >2, MAP <65) are
+      established early and tested — key factual recall targets.
+    startDay: 30
+    endDay: 180
+
+  - id: trauma-renovation
+    type: project
+    title: "Trauma bay renovation"
+    description: |
+      Physical renovation forces temporary trauma workflow changes. New
+      equipment arrives in phases. Jordan documents adapted protocols for
+      each phase. Specific room numbers, equipment locations, and temporary
+      diversion criteria change multiple times — tests temporal reasoning
+      about which config was active when.
+    startDay: 220
+    endDay: 420
+
+  - id: ehr-migration
+    type: project
+    title: "EHR system migration"
+    description: |
+      Hospital migrates from legacy EHR to new platform. Jordan customizes
+      ED order sets, templates, and alert rules. Parallel charting period
+      (days 500-530). Post-migration issues with medication reconciliation.
+      Specific order set names and alert thresholds documented early become
+      recency-bias-resistance targets.
+    startDay: 450
+    endDay: 600
+
+  - id: tox-service
+    type: project
+    title: "Toxicology consult service expansion"
+    description: |
+      Expand tox consult from weekday-only to 24/7 coverage. Involves
+      hiring, call schedule design, regional poison center MOU, and
+      protocol development for common toxidromes. Specific antidote
+      dosing protocols established early.
+    startDay: 650
+    endDay: 820
+
+  - id: resident-curriculum
+    type: project
+    title: "Resident curriculum redesign"
+    description: |
+      Overhaul EM rotation curriculum. New simulation lab scenarios,
+      updated procedure requirements, competency milestones. Jordan
+      designs the toxicology and resuscitation modules.
+    startDay: 850
+    endDay: 980
+
+  # ── Incidents ──────────────────────────────────────────────────────────────
+
+  - id: incident-mass-casualty
+    type: incident
+    title: "Multi-vehicle pileup mass casualty event"
+    description: |
+      18-patient MCI from highway pileup. Jordan is attending on shift.
+      Triage decisions, resource allocation, mutual aid activation.
+      Specific patient details (injuries, dispositions, timestamps) are
+      dense factual recall targets. Cross-references trauma renovation
+      (temporary bay layout complicates flow).
+    startDay: 310
+    endDay: 320
+
+  - id: incident-contamination
+    type: incident
+    title: "Chemical exposure in ED"
+    description: |
+      Patient arrives with unknown chemical exposure, secondary
+      contamination affects two nurses. Decon protocol activation,
+      toxicology consultation, HAZMAT coordination. Specific chemicals
+      identified over investigation days.
+    startDay: 700
+    endDay: 712
+
+  - id: incident-med-error
+    type: incident
+    title: "Near-miss medication error"
+    description: |
+      Pharmacy flags a near-miss: wrong concentration of epinephrine
+      drawn for a pediatric patient. Root cause analysis reveals EHR
+      dosing calculator bug in the new system. Connects to ehr-migration
+      arc. Triggers order set revision.
+    startDay: 580
+    endDay: 595
+
+  # ── Decisions ──────────────────────────────────────────────────────────────
+
+  - id: decision-intubation-protocol
+    type: decision
+    title: "RSI medication protocol update"
+    description: |
+      Debate between ketamine-only vs ketamine+rocuronium for RSI in
+      the ED. Jordan reviews literature, presents at M&M conference.
+      Initial recommendation (day 90) is ketamine-only for hemodynamically
+      unstable patients. Revised after new evidence (day 380) to include
+      roc for all RSI with specific dosing.
+    startDay: 80
+    endDay: 400
+
+  - id: decision-boarding-policy
+    type: decision
+    title: "ED boarding and hallway medicine policy"
+    description: |
+      Hospital administration proposes hallway beds to reduce LWBS rates.
+      Jordan and EM faculty push back on safety grounds. Negotiation
+      produces a compromise: hallway beds allowed only with specific
+      nurse ratios and acuity limits. Cross-references trauma renovation
+      capacity constraints.
+    startDay: 280
+    endDay: 340
+
+  - id: decision-triage-algorithm
+    type: decision
+    title: "ESI triage algorithm modification"
+    description: |
+      QI data shows over-triage of ESI-2 patients. Jordan proposes
+      modified criteria with specific vital sign thresholds. Pilot tested,
+      adjusted, and adopted. Original thresholds (day 130) differ from
+      final adopted values (day 170) — contradiction resolution target.
+    startDay: 120
+    endDay: 175
+
+  # ── Learning ───────────────────────────────────────────────────────────────
+
+  - id: learning-pocus
+    type: learning
+    title: "Point-of-care ultrasound (POCUS) advanced applications"
+    description: |
+      Jordan pursues advanced POCUS certification. Progresses from basic
+      FAST exam proficiency to cardiac, lung, and procedural guidance
+      applications. Specific probe types, machine settings, and landmark
+      measurements documented early (days 10-40) become recency-bias
+      targets as they're not revisited after month 3.
+    startDay: 10
+    endDay: 250
+
+  - id: learning-disaster-med
+    type: learning
+    title: "Disaster medicine certification"
+    description: |
+      After the MCI event, Jordan pursues FEMA disaster medicine training.
+      Completes ICS courses, SALT triage certification, and hospital
+      emergency preparedness committee role.
+    startDay: 340
+    endDay: 520
+
+  - id: learning-pediatric-em
+    type: learning
+    title: "Pediatric emergency refresher"
+    description: |
+      Annual pediatric refresher with updated Broselow tape colors, weight-
+      based dosing charts, and new PALS guidelines. Specific dosages
+      documented on day 750 and not revisited — recency bias target.
+    startDay: 740
+    endDay: 790
+
+  # ── Relationships ──────────────────────────────────────────────────────────
+
+  - id: relationship-charge-nurse
+    type: relationship
+    title: "Partnership with charge nurse Marta"
+    description: |
+      Marta is the most experienced charge nurse. She and Jordan develop
+      efficient shift communication patterns. Marta identifies the boarding
+      safety concerns, flags the med error, and co-designs the sepsis
+      nursing workflow. Cross-references multiple arcs.
+    startDay: 1
+    endDay: 700
+
+  - id: relationship-trauma-surgeon
+    type: relationship
+    title: "Trauma activation calls with Dr. Kwon"
+    description: |
+      Dr. Kwon is the trauma surgery attending Jordan works with most
+      frequently. They develop shared protocols for damage-control
+      resuscitation. Specific blood product ratios and massive transfusion
+      thresholds documented in their early collaborations.
+    startDay: 50
+    endDay: 500
+
+  - id: relationship-resident-mentee
+    type: relationship
+    title: "Mentoring resident Dr. Patel"
+    description: |
+      PGY-2 resident assigned to Jordan for longitudinal mentorship.
+      Tracks Patel's procedural milestones, feedback on clinical
+      decision-making, and preparation for boards. Specific procedures
+      (central lines, chest tubes, intubations) with dates and patient
+      contexts.
+    startDay: 400
+    endDay: 800
+
+  # ── Corrections ────────────────────────────────────────────────────────────
+
+  - id: correction-drug-interaction
+    type: correction
+    title: "Methadone-fluconazole interaction severity"
+    description: |
+      Jordan documents methadone-fluconazole interaction as "minor,
+      monitor QTc" on day 60 based on older guidelines. Updated
+      pharmacology bulletin on day 350 reclassifies it as
+      "significant — avoid concurrent use or mandate telemetry."
+    startDay: 60
+    endDay: 350
+    wrongDay: 60
+    correctedDay: 350
+    wrongBelief: "Methadone-fluconazole interaction is minor — monitor QTc"
+    correctedBelief: "Reclassified as significant — avoid concurrent use or mandate telemetry"
+
+  - id: correction-stroke-window
+    type: correction
+    title: "tPA treatment window expansion"
+    description: |
+      Jordan documents tPA window as 3 hours on day 25 (standard at
+      the time). Hospital adopts extended 4.5-hour window per updated
+      AHA guidelines on day 180. Early documentation reflects old window.
+    startDay: 25
+    endDay: 180
+    wrongDay: 25
+    correctedDay: 180
+    wrongBelief: "tPA treatment window for ischemic stroke is 3 hours from symptom onset"
+    correctedBelief: "Extended to 4.5 hours per updated AHA/ASA guidelines"
+
+  - id: correction-trauma-level
+    type: correction
+    title: "Trauma activation criteria threshold"
+    description: |
+      Day 100: Jordan documents GCS ≤13 as the threshold for full
+      trauma activation. Day 480: criteria updated to GCS ≤12 with
+      additional mechanism-based triggers. Old threshold used in
+      multiple handoff notes between days 100-480.
+    startDay: 100
+    endDay: 480
+    wrongDay: 100
+    correctedDay: 480
+    wrongBelief: "Full trauma activation threshold: GCS ≤ 13"
+    correctedBelief: "Updated to GCS ≤ 12 with additional mechanism-based activation criteria"
+
+  - id: correction-allergy-protocol
+    type: correction
+    title: "Contrast allergy premedication timing"
+    description: |
+      Day 40: Jordan notes steroid premedication requires 12 hours
+      before contrast administration. Day 600: radiology updates
+      protocol to accept a 6-hour accelerated prep with higher-dose
+      methylprednisolone for emergent cases.
+    startDay: 40
+    endDay: 600
+    wrongDay: 40
+    correctedDay: 600
+    wrongBelief: "Contrast allergy premedication requires minimum 12-hour lead time"
+    correctedBelief: "Accelerated 6-hour prep with methylprednisolone 40mg IV accepted for emergent cases"

@@ -1,0 +1,42 @@
+id: financial-advisor
+name: Priya Mehta
+epoch: "2024-01-01"
+role: Senior Financial Advisor / Wealth Manager
+domain: Wealth management firm (high-net-worth individuals)
+firm: Clearwater Wealth Partners
+team_size: 4  # 2 advisors, 1 analyst, 1 operations specialist
+
+profile: |
+  Priya is a CFP® and CFA® charterholder with 11 years in wealth management.
+  Manages ~45 client households with combined AUM of $380M. Specializes in
+  retirement planning, tax-efficient investing, and intergenerational wealth
+  transfer. Known for disciplined portfolio construction and resisting
+  reactive market timing. Reviews every client portfolio quarterly.
+
+communication_style: |
+  Professional but warm. Translates complex financial concepts into plain
+  language for clients. Internally uses precise financial terminology —
+  basis points, Sharpe ratios, tax-loss harvesting. Documents client
+  meetings with detailed notes on goals, risk tolerance changes, and
+  action items. Compliance-conscious in all written communications.
+
+projects:
+  - id: model-portfolio-redesign
+    name: "Model portfolio redesign"
+    description: "Overhaul the firm's model portfolios from 60/40 to factor-based approach"
+  - id: tax-strategy-overhaul
+    name: "Tax-efficient strategy overhaul"
+    description: "Implement systematic tax-loss harvesting and Roth conversion ladders"
+  - id: estate-planning-initiative
+    name: "Estate planning cross-sell initiative"
+    description: "Proactive estate planning reviews for clients with $5M+ estates"
+  - id: crm-migration
+    name: "CRM platform migration"
+    description: "Migrate from legacy CRM to Salesforce Financial Services Cloud"
+  - id: compliance-reg-bi
+    name: "Reg BI compliance overhaul"
+    description: "Implement Regulation Best Interest documentation and disclosure requirements"
+
+# Stress map targets (from spec §3.4):
+#   Primary:   decision-tracking, contradiction-resolution, recency-bias-resistance, negative-recall
+#   Secondary: factual-recall, temporal-reasoning, cross-reference, synthesis

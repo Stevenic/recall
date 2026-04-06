@@ -1,0 +1,256 @@
+# Backend Engineer — Story Arcs
+# 20 arcs across 1,000 days. Designed to stress decision tracking,
+# cross-reference, and synthesis while providing secondary coverage
+# for all other categories.
+#
+# Max concurrent arcs: 4 (by design; see §4.2 constraint)
+# Quiet periods: ~days 370-380 (holiday break), ~days 730-745 (sabbatical)
+
+arcs:
+
+  # ── Projects ───────────────────────────────────────────────────────────────
+
+  - id: auth-migration
+    type: project
+    title: "Auth migration: sessions → JWT"
+    description: |
+      Replace legacy Express-session auth with JWT access/refresh tokens.
+      Involves token rotation, session invalidation, backward-compat shim
+      for mobile clients, and a phased rollout (internal → beta → GA).
+      Cross-references the caching decision (shared Redis dependency).
+    startDay: 15
+    endDay: 145
+
+  - id: payments-v2
+    type: project
+    title: "Payment processing v2"
+    description: |
+      Rebuild the payment pipeline from a single-currency Stripe integration
+      to multi-currency support with subscription billing. Includes webhook
+      reliability work. Shares infrastructure concerns with auth (token
+      storage) and later the GraphQL layer (API surface).
+    startDay: 180
+    endDay: 380
+
+  - id: graphql-layer
+    type: project
+    title: "GraphQL API gateway"
+    description: |
+      Introduce an Apollo-based GraphQL gateway that federates existing REST
+      microservices. Triggers the API versioning decision. Overlaps with
+      payments-v2 during the transition period. Uses the DDD patterns River
+      is learning.
+    startDay: 320
+    endDay: 520
+
+  - id: multi-tenant
+    type: project
+    title: "Multi-tenant data isolation"
+    description: |
+      Migrate from shared-schema Postgres to schema-per-tenant for enterprise
+      tier. Involves connection pooling changes (echoes the earlier pool
+      incident), migration tooling, and a phased rollback plan. Shares the
+      observability stack with event-driven migration.
+    startDay: 500
+    endDay: 750
+
+  - id: event-driven
+    type: project
+    title: "Event-driven architecture migration"
+    description: |
+      Replace synchronous REST calls between core services with NATS-based
+      event bus. Motivation: reduce cascading failures seen in incidents.
+      Reuses patterns from DDD learning arc. Final major project in timeline.
+    startDay: 700
+    endDay: 950
+
+  # ── Incidents ──────────────────────────────────────────────────────────────
+
+  - id: incident-db-pool
+    type: incident
+    title: "Database connection pool exhaustion"
+    description: |
+      Production outage on day 85. Investigation reveals leaked connections
+      from the auth migration's backward-compat shim. Root cause confirmed
+      day 90, fix deployed day 93. Post-mortem on day 95. Cross-references
+      auth-migration arc.
+    startDay: 85
+    endDay: 95
+
+  - id: incident-webhooks
+    type: incident
+    title: "Payment webhook delivery failures"
+    description: |
+      Stripe webhooks silently failing for 48 hours. Discovered via customer
+      complaint, not monitoring. Root cause: payload signature verification
+      broke after a Stripe API version bump. Leads to the observability
+      decision later.
+    startDay: 475
+    endDay: 490
+
+  - id: incident-memory-leak
+    type: incident
+    title: "Worker process memory leak"
+    description: |
+      Gradual memory growth in the background job worker. Investigation
+      traces it to unbounded cache in the tenant resolution middleware
+      (related to multi-tenant project). Fix involves switching to LRU
+      with TTL. Cross-references the caching decision from earlier.
+    startDay: 620
+    endDay: 640
+
+  # ── Decisions ──────────────────────────────────────────────────────────────
+
+  - id: decision-caching
+    type: decision
+    title: "Caching layer: Redis → Postgres materialized views"
+    description: |
+      Initially chose Redis for query caching (day ~140). Benchmarks on
+      day 158 show Postgres materialized views outperform Redis 3x for
+      the read-heavy workload while eliminating an infra dependency.
+      Decision reversed on day 161. Key decision-tracking arc.
+    startDay: 140
+    endDay: 200
+
+  - id: decision-monorepo
+    type: decision
+    title: "Monorepo vs polyrepo"
+    description: |
+      Team debates repo structure as service count grows. River advocates
+      monorepo; teammate Alex argues polyrepo for CI isolation. Team
+      compromises on monorepo with Turborepo. Decision revisited briefly
+      around day 510 when CI times spike but upheld.
+    startDay: 350
+    endDay: 410
+
+  - id: decision-api-versioning
+    type: decision
+    title: "API versioning strategy"
+    description: |
+      GraphQL layer needs a versioning approach. Options: URL-based,
+      header-based, schema evolution. After evaluating client impact,
+      team picks schema evolution with deprecated field annotations.
+      Cross-references the GraphQL project.
+    startDay: 550
+    endDay: 590
+
+  - id: decision-observability
+    type: decision
+    title: "Observability stack selection"
+    description: |
+      Prompted by the webhook incident's late detection. Evaluate
+      Datadog vs Grafana+Loki vs OpenTelemetry collector. Choose OTEL
+      with Grafana backends. Budget constraint drives the decision away
+      from Datadog despite team familiarity.
+    startDay: 800
+    endDay: 845
+
+  # ── Learning ───────────────────────────────────────────────────────────────
+
+  - id: learning-k8s-operators
+    type: learning
+    title: "Kubernetes operators"
+    description: |
+      River starts learning operator patterns after the team moves to K8s.
+      Progresses from reading docs (day 50), to writing a first operator
+      for config management (day 120), to debugging CRD versioning issues
+      (day 200), to mentoring a junior on operators (day 250). Early
+      learnings about resource limits are important and not revisited —
+      tests recency bias resistance.
+    startDay: 50
+    endDay: 280
+
+  - id: learning-ddd
+    type: learning
+    title: "Domain-driven design"
+    description: |
+      Prompted by growing service boundaries confusion. River reads Evans'
+      book, attends a workshop (day 420), applies bounded contexts to
+      the GraphQL federation design, and later uses aggregates pattern
+      in the event-driven migration.
+    startDay: 400
+    endDay: 600
+
+  - id: learning-rust
+    type: learning
+    title: "Rust for performance-critical services"
+    description: |
+      Experiments with Rust for a hot-path data transformation service.
+      Starts with basic ownership/borrowing (day 650), writes a prototype
+      (day 720), benchmarks it against Go version (day 780), team decides
+      to keep Go but River continues learning for personal growth.
+    startDay: 650
+    endDay: 950
+
+  # ── Relationships ──────────────────────────────────────────────────────────
+
+  - id: relationship-alex
+    type: relationship
+    title: "Code reviews and pairing with Alex"
+    description: |
+      Alex is a mid-level engineer River mentors. Their interactions span
+      code reviews, design discussions, and the monorepo debate. Alex
+      eventually leads the event-driven migration's consumer implementation.
+      Provides cross-reference material across many arcs.
+    startDay: 30
+    endDay: 850
+
+  - id: relationship-pm-dana
+    type: relationship
+    title: "Product manager Dana syncs"
+    description: |
+      Weekly syncs with PM Dana cover roadmap priorities, customer escalations,
+      and scope negotiations. Dana pushes for faster multi-tenant delivery;
+      River advocates for quality. Their disagreement on day 580 about
+      skipping schema validation is resolved in River's favor after an
+      incident proves the point.
+    startDay: 100
+    endDay: 700
+
+  # ── Corrections ────────────────────────────────────────────────────────────
+
+  - id: correction-rate-limit
+    type: correction
+    title: "API rate limit: believed 100rps, actually 1000rps"
+    description: |
+      River documents the external vendor API as rate-limited to 100rps
+      on day 50 (based on outdated docs). Corrected on day 200 when
+      load testing reveals the actual limit is 1000rps. The wrong value
+      influenced early caching decisions.
+    startDay: 50
+    endDay: 200
+    wrongDay: 50
+    correctedDay: 200
+    wrongBelief: "Vendor API rate-limited to 100 requests/second"
+    correctedBelief: "Actual rate limit is 1000 requests/second (docs were outdated)"
+
+  - id: correction-config-drift
+    type: correction
+    title: "Staging/production config divergence"
+    description: |
+      Team assumes staging mirrors production config (stated day 300).
+      Incident investigation on day 450 reveals 14 config differences
+      including different connection pool sizes and feature flags.
+      Leads to config-as-code initiative.
+    startDay: 300
+    endDay: 450
+    wrongDay: 300
+    correctedDay: 450
+    wrongBelief: "Staging environment mirrors production configuration"
+    correctedBelief: "14 config differences found including pool sizes and feature flags"
+
+  - id: correction-redis-tls
+    type: correction
+    title: "Redis TLS configuration"
+    description: |
+      During multi-tenant security review (day 500), team flags Redis
+      as lacking TLS. Day 580: ops team confirms TLS was configured at
+      the infrastructure level since initial setup — the application
+      config just didn't surface it. False alarm, but it prompted a
+      useful security audit.
+    startDay: 500
+    endDay: 580
+    wrongDay: 500
+    correctedDay: 580
+    wrongBelief: "Redis connections are not encrypted (no TLS)"
+    correctedBelief: "TLS was configured at infrastructure level since initial deployment"

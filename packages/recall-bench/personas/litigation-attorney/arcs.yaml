@@ -1,0 +1,273 @@
+# Litigation Attorney — Story Arcs
+# 22 arcs across 1,000 days. Designed to stress factual recall,
+# decision tracking, contradiction resolution, and cross-reference.
+# Legal cases create natural multi-phase timelines with deadlines,
+# strategy pivots, and conflicting witness accounts.
+#
+# Max concurrent arcs: 4
+# Quiet periods: ~days 365-375 (holiday recess), ~days 730-740 (bar trip)
+
+arcs:
+
+  # ── Projects (Cases) ───────────────────────────────────────────────────────
+
+  - id: nexgen-v-hartwell
+    type: project
+    title: "NexGen v. Hartwell — trade secret misappropriation"
+    description: |
+      Carmen's anchor case for the first year. NexGen alleges former VP
+      took proprietary manufacturing specs to competitor Hartwell. Complex
+      discovery over source code repositories, email forensics, and
+      non-compete enforceability. Key witnesses contradict each other on
+      when the data was accessed. Specific dates, exhibit numbers, and
+      deposition testimony are dense factual recall targets.
+    startDay: 1
+    endDay: 350
+
+  - id: coastal-merger
+    type: project
+    title: "Coastal Properties merger dispute"
+    description: |
+      $200M real estate merger with contested post-closing adjustment.
+      Both sides dispute the working capital calculation. Carmen represents
+      the buyer. Involves forensic accounting, earn-out milestones, and
+      competing expert valuations. Numbers (valuations, adjustment amounts)
+      change across phases — tests contradiction resolution.
+    startDay: 150
+    endDay: 500
+
+  - id: patent-defense
+    type: project
+    title: "DataStream patent infringement defense"
+    description: |
+      Patent troll asserts three patents against client DataStream (a
+      data analytics company). Carmen challenges validity via prior art
+      search and claim construction arguments. IPR petition filed.
+      Specific patent numbers, claim language, and prior art references
+      are important factual details. Cross-references NexGen case for
+      shared IP law principles.
+    startDay: 380
+    endDay: 700
+
+  - id: garcia-employment
+    type: project
+    title: "Garcia employment discrimination defense"
+    description: |
+      Title VII discrimination and retaliation claim. Carmen defends the
+      employer. Case involves personnel file review, timeline of adverse
+      actions, and multiple employee witnesses with conflicting accounts
+      of workplace events. Witness credibility assessments evolve as
+      depositions reveal new information.
+    startDay: 550
+    endDay: 850
+
+  - id: pro-bono-housing
+    type: project
+    title: "Pro bono housing rights cases"
+    description: |
+      Rotating tenant defense cases through legal aid. Carmen handles
+      2-3 per year, each lasting 30-60 days. Different tenants, different
+      landlords, different legal issues (habitability, retaliatory eviction,
+      rent stabilization). Tests cross-reference between similar but
+      distinct cases.
+    startDay: 100
+    endDay: 950
+
+  # ── Incidents ──────────────────────────────────────────────────────────────
+
+  - id: incident-sanctions-motion
+    type: incident
+    title: "Sanctions motion in NexGen case"
+    description: |
+      Opposing counsel moves for sanctions alleging Carmen's team failed
+      to preserve Slack messages during litigation hold. Emergency response:
+      forensic review, privilege log audit, declarations from IT. Motion
+      denied on day 240 but requires 15 days of intense work. Specific
+      Slack channel names, date ranges, and custodian names.
+    startDay: 225
+    endDay: 245
+
+  - id: incident-expert-disqualified
+    type: incident
+    title: "Expert witness disqualified in Coastal merger"
+    description: |
+      Carmen's forensic accounting expert is disqualified for undisclosed
+      conflict of interest (prior consulting engagement with opposing
+      party's subsidiary). Must find replacement expert, re-do expert
+      report, and adjust deposition schedule. Specific dollar amounts
+      from the original report must be verified against replacement.
+    startDay: 380
+    endDay: 400
+
+  - id: incident-client-data-breach
+    type: incident
+    title: "DataStream client data breach during litigation"
+    description: |
+      DataStream suffers a data breach mid-patent-case. Raises privilege
+      concerns about breached documents, potential relevance to damages
+      calculation, and notification obligations. Carmen navigates dual
+      obligations (litigation defense + breach response counsel).
+    startDay: 580
+    endDay: 600
+
+  # ── Decisions ──────────────────────────────────────────────────────────────
+
+  - id: decision-venue
+    type: decision
+    title: "Venue strategy for NexGen case"
+    description: |
+      NexGen filed in California state court. Carmen considers removal
+      to federal court (diversity jurisdiction) vs. staying in state.
+      Initial strategy (day 20): stay in state for favorable jury pool.
+      Day 80: discovery of additional defendants in different states
+      changes calculus. Day 95: motion to remove filed. Decision tracking
+      across three phases with shifting rationale.
+    startDay: 15
+    endDay: 100
+
+  - id: decision-settlement-authority
+    type: decision
+    title: "Settlement authority in Coastal merger"
+    description: |
+      Client initially authorizes settlement at $8M (day 200). After
+      expert disqualification, authority reduced to $5M (day 410).
+      After favorable summary judgment ruling, client increases to
+      $12M (day 470). Each change has specific rationale tied to
+      case developments.
+    startDay: 200
+    endDay: 480
+
+  - id: decision-ipr-strategy
+    type: decision
+    title: "IPR vs. district court invalidity defense"
+    description: |
+      For the patent case: pursue inter partes review at PTAB, raise
+      invalidity in district court, or both? Carmen initially recommends
+      IPR-only (cheaper). After claim construction goes poorly (day 500),
+      pivots to parallel strategy. Budget implications force a choice
+      on day 560: IPR for two patents, district court for the third.
+    startDay: 400
+    endDay: 570
+
+  - id: decision-trial-strategy
+    type: decision
+    title: "Bench trial vs. jury trial election in Garcia"
+    description: |
+      Carmen weighs bench vs. jury trial. Initial assessment (day 600):
+      bench trial favored due to complex employment law issues. Day 720:
+      after favorable rulings on motions in limine that exclude
+      inflammatory evidence, switches recommendation to jury trial for
+      potential lower damages. Client accepts jury trial on day 730.
+    startDay: 600
+    endDay: 740
+
+  # ── Learning ───────────────────────────────────────────────────────────────
+
+  - id: learning-eDiscovery
+    type: learning
+    title: "Advanced eDiscovery and TAR"
+    description: |
+      Carmen upskills on technology-assisted review (TAR) for large
+      document productions. Specific TAR platform names, recall/precision
+      thresholds, and validation protocols learned early (days 50-80).
+      These technical details are not revisited after month 4 — recency
+      bias resistance targets. Applied in every major case.
+    startDay: 40
+    endDay: 200
+
+  - id: learning-patent-law
+    type: learning
+    title: "Patent litigation specialization"
+    description: |
+      Carmen's first patent case requires rapid study. Learns claim
+      construction, Markman hearing procedures, IPR processes, and
+      patent damages models. Early notes on patent claim terminology
+      become foundational but unrevisited.
+    startDay: 380
+    endDay: 550
+
+  # ── Relationships ──────────────────────────────────────────────────────────
+
+  - id: relationship-associate-james
+    type: relationship
+    title: "Supervising junior associate James Park"
+    description: |
+      James is a 2nd-year associate Carmen mentors and supervises.
+      Carmen delegates research memos, deposition preparation, and
+      discovery review. Tracks James's development, gives feedback on
+      his legal writing, and gradually increases his courtroom
+      responsibilities. James's research memos are referenced across
+      multiple cases — cross-reference material.
+    startDay: 1
+    endDay: 800
+
+  - id: relationship-opposing-counsel-warren
+    type: relationship
+    title: "Recurring opposing counsel (Warren Liu)"
+    description: |
+      Warren Liu represents Hartwell in NexGen and later appears as
+      co-counsel in an unrelated matter touching the patent case.
+      Carmen notes his litigation style, tendencies in depositions,
+      and negotiation patterns. Cross-reference between the two
+      engagements tests memory linking.
+    startDay: 1
+    endDay: 600
+
+  - id: relationship-managing-partner
+    type: relationship
+    title: "Partner-track reviews with managing partner"
+    description: |
+      Quarterly reviews with managing partner Helen Whitfield covering
+      billable hours, business development, client satisfaction, and
+      partnership criteria. Specific metrics (hours, origination credits,
+      case outcomes) documented at each review.
+    startDay: 80
+    endDay: 950
+
+  # ── Corrections ────────────────────────────────────────────────────────────
+
+  - id: correction-witness-testimony
+    type: correction
+    title: "Hartwell VP's access date contradiction"
+    description: |
+      Key witness (former VP) testifies in deposition on day 120 that
+      they last accessed the trade secret database on March 15. Email
+      forensics obtained on day 250 prove access continued through
+      June 30. Carmen documents the contradiction explicitly.
+    startDay: 120
+    endDay: 260
+    wrongDay: 120
+    correctedDay: 250
+    wrongBelief: "VP last accessed trade secret database on March 15"
+    correctedBelief: "Email forensics prove access continued through June 30"
+
+  - id: correction-damages-calculation
+    type: correction
+    title: "Coastal merger working capital baseline"
+    description: |
+      Initial expert report (day 200) uses $42.3M as the working capital
+      baseline. Replacement expert (day 410) recalculates using different
+      methodology and arrives at $38.7M. The $3.6M difference becomes a
+      central dispute point.
+    startDay: 200
+    endDay: 420
+    wrongDay: 200
+    correctedDay: 410
+    wrongBelief: "Working capital baseline for post-closing adjustment: $42.3M"
+    correctedBelief: "Recalculated baseline: $38.7M (different methodology, $3.6M variance)"
+
+  - id: correction-statute-of-limitations
+    type: correction
+    title: "Garcia retaliation claim timeliness"
+    description: |
+      Carmen initially assesses (day 560) that one of Garcia's retaliation
+      claims is time-barred (filed outside 180-day EEOC window). Day 680:
+      plaintiff produces evidence of equitable tolling (employer concealed
+      the adverse action). Carmen revises assessment — claim is likely
+      timely.
+    startDay: 560
+    endDay: 690
+    wrongDay: 560
+    correctedDay: 680
+    wrongBelief: "Garcia's second retaliation claim is time-barred (outside 180-day window)"
+    correctedBelief: "Equitable tolling likely applies — employer concealed adverse action"

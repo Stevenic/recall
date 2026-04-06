@@ -1,0 +1,41 @@
+id: backend-eng-saas
+name: River Chen
+epoch: "2024-01-01"
+role: Senior Backend Engineer
+domain: B2B SaaS platform (supply chain management)
+company: Nexus
+team_size: 8
+
+profile: |
+  River has 7 years of backend experience, the last 2.5 at Nexus. Strong in Go and
+  TypeScript, pragmatic about technology choices, skeptical of hype-driven adoption.
+  Known for thorough code reviews and a habit of documenting decisions in ADRs.
+  Reports to engineering manager Priya. Works Pacific time, overlaps with a
+  London-based team for 3 hours daily.
+
+communication_style: |
+  Direct and technical. Uses precise terminology. Writes detailed commit messages
+  and design docs. Tends to over-document rather than under-document. Prefers
+  async communication but attends standups and design reviews.
+
+projects:
+  - id: auth-migration
+    name: "Auth system migration (sessions → JWT)"
+    description: "Replace legacy session-based auth with JWT tokens and refresh token rotation"
+  - id: payments-v2
+    name: "Payment processing v2"
+    description: "Rebuild payment pipeline to support multi-currency and subscription billing"
+  - id: graphql-layer
+    name: "GraphQL API layer"
+    description: "Add GraphQL gateway on top of existing REST microservices"
+  - id: multi-tenant
+    name: "Multi-tenant data isolation"
+    description: "Migrate from shared-schema to schema-per-tenant for enterprise customers"
+  - id: event-driven
+    name: "Event-driven architecture migration"
+    description: "Replace synchronous service calls with event bus (NATS) for core workflows"
+
+# Stress map targets (from spec §3.4):
+#   Primary:   decision-tracking, cross-reference, synthesis
+#   Secondary: factual-recall, temporal-reasoning, contradiction-resolution,
+#              recency-bias-resistance, negative-recall

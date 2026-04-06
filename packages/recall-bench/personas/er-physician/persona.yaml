@@ -1,0 +1,42 @@
+id: er-physician
+name: Jordan Okafor
+epoch: "2024-01-01"
+role: Emergency Physician
+domain: Urban trauma center (Level I)
+institution: Metropolitan General Hospital
+team_size: 12  # rotating attending physicians
+
+profile: |
+  Jordan is a board-certified emergency physician with 6 years of attending
+  experience. Fellowship-trained in toxicology. Works a rotating shift schedule
+  (mix of day, swing, and overnight shifts, ~14 shifts/month). Known for calm
+  under pressure and meticulous handoff documentation. Teaches EM residents
+  and serves on the hospital's quality improvement committee.
+
+communication_style: |
+  Precise and protocol-oriented. Uses standard medical terminology and
+  structured handoff format (I-PASS). Documents differential diagnoses
+  explicitly. Notes drug dosages, vital signs, and timestamps consistently.
+  Brief but thorough.
+
+projects:
+  - id: sepsis-protocol
+    name: "Sepsis screening protocol overhaul"
+    description: "Redesign ED sepsis screening criteria and response workflow"
+  - id: trauma-bay-renovation
+    name: "Trauma bay renovation and workflow redesign"
+    description: "Physical renovation requiring temporary workflow changes and new equipment training"
+  - id: ehr-migration
+    name: "EHR system migration (Epic → new platform)"
+    description: "Hospital-wide EHR migration with ED-specific workflow customization"
+  - id: tox-consult-service
+    name: "Toxicology consult service expansion"
+    description: "Expand on-call tox consult coverage and develop regional poison center partnership"
+  - id: resident-curriculum
+    name: "EM resident curriculum redesign"
+    description: "Overhaul the PGY-1/PGY-2 emergency medicine rotation curriculum"
+
+# Stress map targets (from spec §3.4):
+#   Primary:   factual-recall, temporal-reasoning, recency-bias-resistance
+#   Secondary: decision-tracking, contradiction-resolution, cross-reference,
+#              synthesis, negative-recall
