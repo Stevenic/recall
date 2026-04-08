@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-06
+Last compacted: 2026-04-07
 
 ---
 
@@ -48,6 +48,12 @@ Draft --> resolve open questions --> apply feedback is a reliable cadence. Each 
 
 **Audit open questions before handoff**
 Cross-reference implementation checklists against resolved decisions. What looks answered in prose may still have gaps that block execution -- scaffolding metadata, optional tooling, and product-level decisions are commonly overlooked.
+
+**Design data schemas for the full pipeline**
+When defining data files (YAML, JSON) consumed by multiple pipeline stages, include fields needed by downstream stages even if the current consumer ignores them. Retrofitting schema after data generation is expensive; unused fields are free.
+
+**Start with cost-conscious defaults, document the upgrade path**
+When a design parameter trades cost against quality (context window size, model tier, batch size), pick the cheaper default and document the conditions under which to escalate. This avoids premature optimization while keeping the door open.
 
 ## Process
 

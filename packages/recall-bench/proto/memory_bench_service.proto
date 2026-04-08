@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package recall.bench;
+
+// MemoryBenchService — the minimal contract a memory system must implement
+// to be benchmarked by recall-bench. Maps 1:1 to the MemorySystemAdapter
+// TypeScript interface.
+
+service MemoryBenchService {
+    // Initialize the memory system to a clean state.
+    rpc Setup(SetupRequest) returns (SetupResponse);
+
+    // Ingest a single day's memory. Called in chronological order.
+    rpc IngestDay(IngestDayRequest) returns (IngestDayResponse);
+
+    // Signal that ingestion is complete. System may do final processing.
+    rpc FinalizeIngestion(FinalizeIngestionRequest) returns (FinalizeIngestionResponse);
+
+    // Ask a question and get an answer from the memory system.
+    rpc Query(QueryRequest) returns (QueryResponse);
+
+    // Clean up resources.
+    rpc Teardown(TeardownRequest) returns (TeardownResponse);
+
+    // Health check — verify the server is alive.
+    rpc Healthcheck(HealthcheckRequest) returns (HealthcheckResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+message SetupRequest {}
+
+message SetupResponse {}
+
+// ---------------------------------------------------------------------------
+// IngestDay
+// ---------------------------------------------------------------------------
+
+message IngestDayRequest {
+    // Day number within the persona's memory stream (1-1000).
+    int32 day_number = 1;
+
+    // The markdown content of the day's memory log.
+    string content = 2;
+
+    // Metadata about this day.
+    DayMetadata metadata = 3;
+}
+
+message DayMetadata {
+    // Day number (same as IngestDayRequest.day_number).
+    int32 day_number = 1;
+
+    // Synthetic calendar date (ISO 8601, e.g. "2024-03-15").
+    string date = 2;
+
+    // Persona ID this day belongs to.
+    string persona_id = 3;
+
+    // IDs of narrative arcs active on this day.
+    repeated string active_arcs = 4;
+}
+
+message IngestDayResponse {}
+
+// ---------------------------------------------------------------------------
+// FinalizeIngestion
+// ---------------------------------------------------------------------------
+
+message FinalizeIngestionRequest {}
+
+message FinalizeIngestionResponse {}
+
+// ---------------------------------------------------------------------------
+// Query
+// ---------------------------------------------------------------------------
+
+message QueryRequest {
+    // The question to pose to the memory system.
+    string question = 1;
+}
+
+message QueryResponse {
+    // The memory system's answer.
+    string answer = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Teardown
+// ---------------------------------------------------------------------------
+
+message TeardownRequest {}
+
+message TeardownResponse {}
+
+// ---------------------------------------------------------------------------
+// Healthcheck
+// ---------------------------------------------------------------------------
+
+message HealthcheckRequest {}
+
+message HealthcheckResponse {
+    // Human-readable name of the memory system.
+    string name = 1;
+
+    // Whether the system is ready to accept requests.
+    bool ready = 2;
+}

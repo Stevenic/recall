@@ -18,10 +18,13 @@
     "build": "tsc",
     "clean": "rimraf dist",
     "lint": "eslint src/ --fix",
+    "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
     "commander": "^12.0.0",
     "gray-matter": "^4.0.3",
     "yaml": "^2.4.0"

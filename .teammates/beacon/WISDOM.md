@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-06
+Last compacted: 2026-04-07
 
 ---
 
@@ -16,6 +16,9 @@ Prefer narrower interfaces, fewer flags, and obvious data flow. If a helper only
 
 **Tests prove the contract**
 Add or update tests for the observable behavior you changed. Happy path only is not enough when the bug is in state transitions, error handling, or edge conditions.
+
+**Export pure functions for testability**
+Extract state-computation logic as pure exported functions alongside stateful classes. Pure functions are trivially testable without mocks, and they keep the class focused on orchestration. (e.g., DayGenerator exports `computePhase`, `computeDensity`, etc.)
 
 **Ship verified code**
 Build the package, run the relevant tests, and call out any verification gap plainly if the environment blocks it.
@@ -35,10 +38,16 @@ Operations that mutate or delete data (compaction, migrations, bulk updates) sho
 ## Architecture
 
 **Verify spec assumptions against actual dependencies**
-Specs may claim a library exports interfaces it doesn't have (e.g., Vectra and FileStorage). Before designing around a re-export, check the actual package types. Building your own narrow abstraction is often better than depending on upstream's shape.
+Specs may claim a library exports interfaces it doesn't have. Before designing around a re-export, check the actual package types. Building your own narrow abstraction is often better than depending on upstream's shape — but when upstream catches up (e.g., Vectra 0.14.0), adopt it to reduce maintenance.
 
 **Compaction prompts are product surface, not placeholders**
 Compaction prompt constants drive the quality of wisdom distillation. Treat them as first-class: low temperature (0.2) for summarization, structured output sections, and explicit MERGE/ADD/DROP semantics for wisdom updates.
+
+**Keep sibling packages self-contained**
+When a new package (e.g., recall-bench) needs a similar abstraction to core (e.g., `GeneratorModel` vs `MemoryModel`), implement it independently rather than creating a cross-package dependency. Coupling packages that evolve at different rates creates upgrade friction.
+
+**Prefer dynamic proto loading over codegen**
+Use `@grpc/proto-loader` for runtime proto loading instead of build-time `protoc` codegen. Avoids adding a protoc build step, keeps the proto file as the single source of truth, and simplifies contributor setup.
 
 ## Cross-Platform
 

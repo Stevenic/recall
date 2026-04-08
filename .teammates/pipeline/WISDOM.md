@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-06
+Last compacted: 2026-04-07
 
 ---
 
@@ -21,7 +21,7 @@ Standard `paths-ignore` set: `.teammates/**`, `specs/**`, `docs/**`, `*.md`, `LI
 Default: `npm audit --audit-level=high`. Only relax for unfixable transitive issues, and treat the downgrade as temporary debt.
 
 **Fail loud and early**
-Builds, tests, and deploy checks should stop on the first meaningful problem with output that tells the user what broke.
+Builds, tests, and deploy checks should stop on the first meaningful problem with output that tells the developer what broke.
 
 ## Release & Deployment
 

@@ -10,6 +10,7 @@
 - [x] Draft benchmark spec v0.1 — personas, Q&A framework, scoring, adapter interface
 - [ ] Resolve open questions with stevenic (v0.2)
 - [x] Define persona story arcs for all 5 v1 personas (107 arcs total)
+- [x] Spec day-generator prompt structure (Pass 1 of two-pass pipeline)
 - [ ] Create sample persona (1 of 5) for validation — generate day memories + Q&A pairs
 - [ ] Q&A generation and validation pipeline
 
