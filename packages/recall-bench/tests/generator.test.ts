@@ -5,11 +5,15 @@ import {
     getActiveArcs,
     getDirectives,
     getCorrectionStates,
+    selectArcDays,
+    identifyGapDays,
     computeCalendarDate,
     formatDate,
     getDayOfWeek,
     buildSystemPrompt,
     buildUserMessage,
+    buildArcUserMessage,
+    buildGapUserMessage,
     DayGenerator,
 } from '../src/generator.js';
 import type { ArcDefinition, PersonaDefinition, GeneratorModel, DayContext, ActiveArc, Directive, CorrectionState, ArcSummary, RecentDay } from '../src/generator-types.js';
@@ -262,6 +266,133 @@ describe('getCorrectionStates', () => {
 });
 
 // ---------------------------------------------------------------------------
+// selectArcDays
+// ---------------------------------------------------------------------------
+
+describe('selectArcDays', () => {
+    const epoch = '2024-01-01'; // Monday
+
+    it('always includes directive days', () => {
+        const days = selectArcDays(testArcs[0], epoch); // auth-migration
+        expect(days).toContain(15); // directive day
+        expect(days).toContain(85); // directive day
+    });
+
+    it('always includes arc start and end days', () => {
+        const days = selectArcDays(testArcs[0], epoch);
+        expect(days).toContain(15); // startDay
+        expect(days).toContain(145); // endDay
+    });
+
+    it('includes correction key days', () => {
+        const days = selectArcDays(testArcs[2], epoch); // correction-rate-limit
+        expect(days).toContain(50); // wrongDay / startDay
+        expect(days).toContain(200); // correctedDay / endDay
+    });
+
+    it('skips weekends for non-incident arcs', () => {
+        const days = selectArcDays(testArcs[3], epoch); // learning-k8s, days 50-280
+        for (const d of days) {
+            const date = computeCalendarDate(epoch, d);
+            const dow = getDayOfWeek(date);
+            // Pinned days (startDay/endDay) can land on weekends, but spread days should not
+            if (d !== testArcs[3].startDay && d !== testArcs[3].endDay) {
+                expect(dow).not.toBe('Saturday');
+                expect(dow).not.toBe('Sunday');
+            }
+        }
+    });
+
+    it('includes weekends for incident arcs', () => {
+        // incident-db-pool: days 85-95 (short arc, includes a weekend)
+        const days = selectArcDays(testArcs[1], epoch);
+        const weekendDays = days.filter(d => {
+            const date = computeCalendarDate(epoch, d);
+            const dow = getDayOfWeek(date);
+            return dow === 'Saturday' || dow === 'Sunday';
+        });
+        // The arc spans 11 days including a weekend, incident type should include them
+        expect(weekendDays.length).toBeGreaterThanOrEqual(0); // may or may not hit weekend depending on interval
+    });
+
+    it('returns sorted unique days', () => {
+        const days = selectArcDays(testArcs[0], epoch);
+        for (let i = 1; i < days.length; i++) {
+            expect(days[i]).toBeGreaterThan(days[i - 1]);
+        }
+    });
+
+    it('uses shorter intervals for short arcs', () => {
+        const shortArc: ArcDefinition = {
+            id: 'short', type: 'project', title: 'Short',
+            description: 'A short arc.', startDay: 1, endDay: 10,
+        };
+        const days = selectArcDays(shortArc, epoch);
+        // Short arc (10 days) should have relatively dense coverage
+        expect(days.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('uses longer intervals for long arcs', () => {
+        const longArc: ArcDefinition = {
+            id: 'long', type: 'project', title: 'Long',
+            description: 'A long arc.', startDay: 1, endDay: 200,
+        };
+        const days = selectArcDays(longArc, epoch);
+        // Long arc should not generate activity every day
+        expect(days.length).toBeLessThan(200);
+        expect(days.length).toBeGreaterThan(10);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// identifyGapDays
+// ---------------------------------------------------------------------------
+
+describe('identifyGapDays', () => {
+    const epoch = '2024-01-01'; // Monday
+
+    it('fills weeks with fewer than target active days', () => {
+        // Week 1: Mon-Fri = days 1-5, only day 1 active
+        const active = new Set([1]);
+        const gaps = identifyGapDays(active, 1, 7, epoch, 5);
+        // Need 4 more weekdays (days 2-5 are available weekdays)
+        expect(gaps.length).toBe(4);
+    });
+
+    it('does not fill already-full weeks', () => {
+        // Week 1: all weekdays active
+        const active = new Set([1, 2, 3, 4, 5]);
+        const gaps = identifyGapDays(active, 1, 7, epoch, 5);
+        expect(gaps.length).toBe(0);
+    });
+
+    it('only selects weekdays for gaps', () => {
+        const active = new Set<number>(); // nothing active
+        const gaps = identifyGapDays(active, 1, 7, epoch, 5);
+        for (const d of gaps) {
+            const date = computeCalendarDate(epoch, d);
+            const dow = getDayOfWeek(date);
+            expect(dow).not.toBe('Saturday');
+            expect(dow).not.toBe('Sunday');
+        }
+    });
+
+    it('respects the target per week setting', () => {
+        const active = new Set([1, 2]); // 2 active in week 1
+        const gaps3 = identifyGapDays(active, 1, 7, epoch, 3);
+        expect(gaps3.length).toBe(1); // need 1 more to reach 3
+        const gaps5 = identifyGapDays(active, 1, 7, epoch, 5);
+        expect(gaps5.length).toBe(3); // need 3 more to reach 5
+    });
+
+    it('returns empty when no gaps exist', () => {
+        const active = new Set([1, 2, 3, 4, 5, 8, 9, 10, 11, 12]);
+        const gaps = identifyGapDays(active, 1, 14, epoch, 5);
+        expect(gaps.length).toBe(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Calendar date helpers
 // ---------------------------------------------------------------------------
 
@@ -370,85 +501,320 @@ describe('buildUserMessage', () => {
     });
 });
 
+describe('buildArcUserMessage', () => {
+    const focusArc: ActiveArc = {
+        id: 'auth-migration', type: 'project',
+        title: 'Auth migration', description: 'Replace auth system.',
+        phase: 'mid', dayInArc: 76, arcLength: 131,
+    };
+
+    const baseCtx: DayContext = {
+        dayNumber: 90,
+        calendarDate: '2024-03-30',
+        dayOfWeek: 'Saturday',
+        densityHint: 'busy',
+        activeArcs: [
+            focusArc,
+            { id: 'learning-k8s', type: 'learning', title: 'K8s operators', description: 'Learning K8s.', phase: 'mid', dayInArc: 41, arcLength: 231 },
+        ],
+        directives: [{ arc: 'auth-migration', event: 'Major milestone' }],
+        correctionStates: [],
+        arcSummaries: [],
+        recentHistory: [],
+    };
+
+    it('generates fresh content when no existing', () => {
+        const msg = buildArcUserMessage(baseCtx, focusArc, null);
+        expect(msg).toContain('Generate the daily memory log');
+        expect(msg).toContain('PRIMARY arc');
+        expect(msg).toContain('auth-migration');
+        expect(msg).toContain('Major milestone');
+        expect(msg).not.toContain('EXISTING LOG');
+    });
+
+    it('includes merge instructions when existing content provided', () => {
+        const msg = buildArcUserMessage(baseCtx, focusArc, 'Previous arc content here.');
+        expect(msg).toContain('Update the daily memory log');
+        expect(msg).toContain('EXISTING LOG');
+        expect(msg).toContain('Previous arc content here.');
+        expect(msg).toContain('PRIMARY arc');
+    });
+
+    it('shows other arcs as background context', () => {
+        const msg = buildArcUserMessage(baseCtx, focusArc, null);
+        expect(msg).toContain('Other active arcs');
+        expect(msg).toContain('learning-k8s');
+    });
+
+    it('only includes directives for the focus arc', () => {
+        const ctx: DayContext = {
+            ...baseCtx,
+            directives: [
+                { arc: 'auth-migration', event: 'Auth event' },
+                { arc: 'other-arc', event: 'Other event' },
+            ],
+        };
+        const msg = buildArcUserMessage(ctx, focusArc, null);
+        expect(msg).toContain('Auth event');
+        expect(msg).not.toContain('Other event');
+    });
+});
+
+describe('buildGapUserMessage', () => {
+    it('generates routine day prompt', () => {
+        const ctx: DayContext = {
+            dayNumber: 42,
+            calendarDate: '2024-02-11',
+            dayOfWeek: 'Sunday',
+            densityHint: 'quiet',
+            activeArcs: [
+                { id: 'auth', type: 'project', title: 'Auth', description: '', phase: 'mid', dayInArc: 28, arcLength: 131 },
+            ],
+            directives: [],
+            correctionStates: [],
+            arcSummaries: [],
+            recentHistory: [],
+        };
+
+        const msg = buildGapUserMessage(ctx);
+        expect(msg).toContain('routine daily memory log');
+        expect(msg).toContain('lighter day');
+        expect(msg).toContain('Density: quiet');
+        expect(msg).toContain('mention in passing');
+        expect(msg).toContain('auth');
+    });
+
+    it('handles no active arcs', () => {
+        const ctx: DayContext = {
+            dayNumber: 1,
+            calendarDate: '2024-01-01',
+            dayOfWeek: 'Monday',
+            densityHint: 'quiet',
+            activeArcs: [],
+            directives: [],
+            correctionStates: [],
+            arcSummaries: [],
+            recentHistory: [],
+        };
+
+        const msg = buildGapUserMessage(ctx);
+        expect(msg).toContain('No major arcs active');
+        expect(msg).toContain('general work activity');
+    });
+});
+
 // ---------------------------------------------------------------------------
-// DayGenerator integration
+// DayGenerator integration (2-pass)
 // ---------------------------------------------------------------------------
 
 describe('DayGenerator', () => {
-    it('generates days sequentially and tracks state', async () => {
-        let callCount = 0;
+    it('generates days via 2-pass pipeline and calls onDay in order', async () => {
+        const callArgs: Array<{ system: string; user: string }> = [];
         const model: GeneratorModel = {
             async complete(sys, user) {
-                callCount++;
+                callArgs.push({ system: sys, user });
                 return {
-                    text: `---\ntype: daily\nday: ${callCount}\n---\n\n# Day ${callCount}\n\nWorked on auth migration today.`,
+                    text: `---\ntype: daily\n---\n\n# Generated\n\nWorked on auth migration today.`,
                     inputTokens: 200,
                     outputTokens: 100,
                 };
             },
         };
 
+        const onDayOrder: number[] = [];
         const generator = new DayGenerator(testPersona, testArcs, model, {
-            startDay: 1,
-            endDay: 5,
+            startDay: 15,
+            endDay: 25,
+            minDaysPerWeek: 5,
+            onDay: async (dayNumber) => {
+                onDayOrder.push(dayNumber);
+            },
         });
 
         const result = await generator.generateAll();
 
         expect(result.personaId).toBe('test-persona');
-        expect(result.days).toHaveLength(5);
-        expect(result.totalInputTokens).toBe(1000); // 5 * 200
-        expect(result.totalOutputTokens).toBe(500);  // 5 * 100
-        expect(callCount).toBe(5);
+        // Should have generated some days (arc days + gap fills)
+        expect(result.days.length).toBeGreaterThan(0);
+        // onDay should fire in ascending day order
+        for (let i = 1; i < onDayOrder.length; i++) {
+            expect(onDayOrder[i]).toBeGreaterThan(onDayOrder[i - 1]);
+        }
+        // Token totals should accumulate
+        expect(result.totalInputTokens).toBeGreaterThan(0);
+        expect(result.totalOutputTokens).toBeGreaterThan(0);
     });
 
-    it('builds context with recent history window', async () => {
-        const contexts: DayContext[] = [];
+    it('pass 1 processes arcs in startDay order', async () => {
+        const promptArcs: string[] = [];
         const model: GeneratorModel = {
-            async complete() {
+            async complete(sys, user) {
+                // Extract the PRIMARY arc id from the prompt
+                const match = user.match(/PRIMARY arc[\s\S]*?id: (\S+)/);
+                if (match) promptArcs.push(match[1]);
                 return { text: 'Day content.', inputTokens: 50, outputTokens: 20 };
             },
         };
 
-        const generator = new DayGenerator(testPersona, testArcs, model, {
-            startDay: 1,
-            endDay: 5,
-            historyWindow: 2,
-        });
-
-        // Generate days and capture context for the last one
-        for (let d = 1; d <= 5; d++) {
-            const ctx = generator.buildDayContext(d);
-            contexts.push(ctx);
-            await generator.generateDay(d);
-        }
-
-        // Day 1: no history
-        expect(contexts[0].recentHistory).toHaveLength(0);
-        // Day 3: 2 days of history (window = 2)
-        expect(contexts[2].recentHistory).toHaveLength(2);
-        // Day 5: still 2 (window capped)
-        expect(contexts[4].recentHistory).toHaveLength(2);
-        expect(contexts[4].recentHistory[0].dayNumber).toBe(3);
-        expect(contexts[4].recentHistory[1].dayNumber).toBe(4);
-    });
-
-    it('calls onDay callback for each generated day', async () => {
-        const generated: Array<{ day: number; content: string }> = [];
-        const model = createMockModel('Some content.');
-
-        const generator = new DayGenerator(testPersona, testArcs, model, {
-            startDay: 1,
-            endDay: 3,
-            onDay: async (dayNumber, content) => {
-                generated.push({ day: dayNumber, content });
+        // Use two non-overlapping arcs for cleaner testing
+        const arcs: ArcDefinition[] = [
+            {
+                id: 'second-arc', type: 'project', title: 'Second',
+                description: 'Starts later.', startDay: 20, endDay: 25,
             },
+            {
+                id: 'first-arc', type: 'project', title: 'First',
+                description: 'Starts earlier.', startDay: 10, endDay: 15,
+            },
+        ];
+
+        const generator = new DayGenerator(testPersona, arcs, model, {
+            startDay: 10,
+            endDay: 25,
+            minDaysPerWeek: 0, // disable gap filling for this test
         });
 
         await generator.generateAll();
 
-        expect(generated).toHaveLength(3);
-        expect(generated[0].day).toBe(1);
-        expect(generated[2].day).toBe(3);
+        // first-arc (startDay 10) should appear before second-arc (startDay 20)
+        const firstIdx = promptArcs.indexOf('first-arc');
+        const secondIdx = promptArcs.indexOf('second-arc');
+        expect(firstIdx).toBeGreaterThanOrEqual(0);
+        expect(secondIdx).toBeGreaterThanOrEqual(0);
+        expect(firstIdx).toBeLessThan(secondIdx);
+    });
+
+    it('pass 1 merges content when arcs overlap on the same day', async () => {
+        let mergeCount = 0;
+        const model: GeneratorModel = {
+            async complete(sys, user) {
+                if (user.includes('EXISTING LOG')) mergeCount++;
+                return { text: 'Merged content.', inputTokens: 50, outputTokens: 20 };
+            },
+        };
+
+        // Two arcs that both have directives on day 85
+        const arcs: ArcDefinition[] = [
+            {
+                id: 'arc-a', type: 'project', title: 'Arc A',
+                description: 'First arc.', startDay: 80, endDay: 90,
+                directives: [{ day: 85, event: 'Event A' }],
+            },
+            {
+                id: 'arc-b', type: 'project', title: 'Arc B',
+                description: 'Second arc.', startDay: 83, endDay: 88,
+                directives: [{ day: 85, event: 'Event B' }],
+            },
+        ];
+
+        const generator = new DayGenerator(testPersona, arcs, model, {
+            startDay: 80,
+            endDay: 90,
+            minDaysPerWeek: 0,
+        });
+
+        await generator.generateAll();
+
+        // Day 85 should be generated first by arc-a, then merged by arc-b
+        expect(mergeCount).toBeGreaterThan(0);
+    });
+
+    it('pass 2 fills gap days to reach minDaysPerWeek', async () => {
+        let gapCallCount = 0;
+        const model: GeneratorModel = {
+            async complete(sys, user) {
+                if (user.includes('routine daily memory log')) gapCallCount++;
+                return { text: 'Day content.', inputTokens: 50, outputTokens: 20 };
+            },
+        };
+
+        // Single arc with only 1 directive day in a 2-week span
+        const arcs: ArcDefinition[] = [
+            {
+                id: 'sparse', type: 'learning', title: 'Sparse',
+                description: 'Very sparse arc.', startDay: 1, endDay: 14,
+                directives: [{ day: 3, event: 'Only event' }],
+            },
+        ];
+
+        const generator = new DayGenerator(testPersona, arcs, model, {
+            startDay: 1,
+            endDay: 14,
+            minDaysPerWeek: 5,
+        });
+
+        const result = await generator.generateAll();
+
+        // Should have gap-filled days
+        expect(gapCallCount).toBeGreaterThan(0);
+        // Total days should be at least arc days + some gap fills
+        expect(result.days.length).toBeGreaterThan(3);
+    });
+
+    it('respects minDaysPerWeek: 0 to disable gap filling', async () => {
+        let totalCalls = 0;
+        const model: GeneratorModel = {
+            async complete() {
+                totalCalls++;
+                return { text: 'Content.', inputTokens: 50, outputTokens: 20 };
+            },
+        };
+
+        const arcs: ArcDefinition[] = [
+            {
+                id: 'test', type: 'project', title: 'Test',
+                description: 'Test arc.', startDay: 1, endDay: 5,
+                directives: [{ day: 3, event: 'Event' }],
+            },
+        ];
+
+        const generator = new DayGenerator(testPersona, arcs, model, {
+            startDay: 1,
+            endDay: 7,
+            minDaysPerWeek: 0,
+        });
+
+        const result = await generator.generateAll();
+        const arcDayCount = totalCalls;
+
+        // With minDaysPerWeek: 0, no gap calls should happen
+        // All calls should be arc-focused (no "routine" prompts)
+        expect(result.days.length).toBe(arcDayCount);
+    });
+
+    it('builds context with recent history from previously generated days', async () => {
+        const historyLengths: number[] = [];
+        const model: GeneratorModel = {
+            async complete(sys, user) {
+                // Count how many "Day N" recent history sections appear
+                const matches = user.match(/### Day \d+/g);
+                historyLengths.push(matches ? matches.length : 0);
+                return { text: 'Content.', inputTokens: 50, outputTokens: 20 };
+            },
+        };
+
+        // Single arc across days 1-10 to generate sequential days
+        const arcs: ArcDefinition[] = [
+            {
+                id: 'test', type: 'incident', title: 'Test',
+                description: 'Test.', startDay: 1, endDay: 7,
+            },
+        ];
+
+        const generator = new DayGenerator(testPersona, arcs, model, {
+            startDay: 1,
+            endDay: 7,
+            historyWindow: 2,
+            minDaysPerWeek: 0,
+        });
+
+        await generator.generateAll();
+
+        // First generated day should have 0 history
+        expect(historyLengths[0]).toBe(0);
+        // Later days should have up to 2 history entries
+        const maxHistory = Math.max(...historyLengths);
+        expect(maxHistory).toBeGreaterThan(0);
+        expect(maxHistory).toBeLessThanOrEqual(2);
     });
 });

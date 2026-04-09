@@ -1,4 +1,4 @@
-import { LocalDocumentIndex } from "vectra";
+import { LocalDocumentIndex, LocalIndex } from "vectra";
 import type { EmbeddingsModel } from "vectra";
 import type {
     MemoryIndex,
@@ -22,9 +22,12 @@ export interface VectraIndexConfig {
 export class VectraIndex implements MemoryIndex {
     private readonly _index: LocalDocumentIndex;
     private readonly _folderPath: string;
+    private readonly _embeddings: EmbeddingsModel;
+    private _vectorIndex: LocalIndex | null = null;
 
     constructor(config: VectraIndexConfig) {
         this._folderPath = config.folderPath;
+        this._embeddings = config.embeddings;
         this._index = new LocalDocumentIndex({
             folderPath: config.folderPath,
             embeddings: config.embeddings,
@@ -33,6 +36,16 @@ export class VectraIndex implements MemoryIndex {
                 chunkOverlap: config.chunkOverlap ?? 0,
             },
         });
+    }
+
+    /**
+     * Access the underlying LocalIndex for raw vector operations.
+     */
+    private _getVectorIndex(): LocalIndex {
+        if (!this._vectorIndex) {
+            this._vectorIndex = new LocalIndex(this._folderPath);
+        }
+        return this._vectorIndex;
     }
 
     get folderPath(): string {
@@ -136,5 +149,51 @@ export class VectraIndex implements MemoryIndex {
             documentCount: stats.documents,
             chunkCount: stats.chunks,
         };
+    }
+
+    async getEmbedding(uri: string): Promise<number[] | null> {
+        const vecIdx = this._getVectorIndex();
+        const isCreated = await vecIdx.isIndexCreated();
+        if (!isCreated) return null;
+
+        const items = await vecIdx.listItems();
+        // Document chunks use URI-based IDs; find the first chunk for this URI
+        const item = items.find(
+            (i: any) => i.metadata?.uri === uri || i.id === uri,
+        );
+        if (!item) return null;
+        return item.vector ? Array.from(item.vector) : null;
+    }
+
+    async upsertEmbedding(
+        uri: string,
+        embedding: number[],
+        metadata?: DocumentMetadata,
+    ): Promise<void> {
+        const vecIdx = this._getVectorIndex();
+        const isCreated = await vecIdx.isIndexCreated();
+        if (!isCreated) {
+            await vecIdx.createIndex({ version: 1 });
+        }
+
+        const flatMeta: Record<string, string | number | boolean> = { uri };
+        if (metadata) {
+            for (const [key, value] of Object.entries(metadata)) {
+                if (
+                    value !== undefined &&
+                    (typeof value === "string" ||
+                        typeof value === "number" ||
+                        typeof value === "boolean")
+                ) {
+                    flatMeta[key] = value;
+                }
+            }
+        }
+
+        await vecIdx.upsertItem({
+            id: uri,
+            vector: embedding,
+            metadata: flatMeta,
+        });
     }
 }

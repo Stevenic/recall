@@ -26,6 +26,7 @@ describe("Compactor", () => {
             model,
             minDailiesForWeekly: 2,
             extractTypedMemories: false, // Disable for simpler tests
+            aggregationStrategy: "uniform", // Skip NER for unit tests
         });
     });
 

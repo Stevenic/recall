@@ -1,4 +1,5 @@
 import * as path from "path";
+import matter from "gray-matter";
 import type { FileStorage } from "./interfaces/storage.js";
 
 export interface ListOptions {
@@ -218,6 +219,39 @@ export class MemoryFiles {
         await this._storage.createFolder(
             path.join(this._root, "memory", "monthly"),
         );
+    }
+
+    /**
+     * Parse YAML frontmatter from a memory file's content.
+     * Returns the frontmatter data and the body text (without frontmatter).
+     */
+    parseFrontmatter(content: string): { data: Record<string, any>; body: string } {
+        const parsed = matter(content);
+        return { data: parsed.data, body: parsed.content };
+    }
+
+    /**
+     * Extract pointer URIs from a parent node's frontmatter.
+     * Returns empty array if no pointers found.
+     */
+    parsePointers(content: string): string[] {
+        const { data } = this.parseFrontmatter(content);
+        if (Array.isArray(data.pointers)) {
+            return data.pointers;
+        }
+        return [];
+    }
+
+    /**
+     * Extract salience weights from a parent node's frontmatter.
+     * Returns empty object if no salience found.
+     */
+    parseSalience(content: string): Record<string, number> {
+        const { data } = this.parseFrontmatter(content);
+        if (data.salience && typeof data.salience === "object") {
+            return data.salience as Record<string, number>;
+        }
+        return {};
     }
 
     // --- Helpers ---

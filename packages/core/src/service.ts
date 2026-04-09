@@ -11,10 +11,12 @@ import {
     type CompactOptions,
     type CompactionResult,
 } from "./compactor.js";
+import type { HierarchicalMemoryConfig } from "./hierarchical-config.js";
 import type { SearchResult } from "./interfaces/index.js";
 import { LocalFileStorage } from "./defaults/local-file-storage.js";
 import { LocalEmbeddings } from "./defaults/local-embeddings.js";
 import { VectraIndex } from "./defaults/vectra-index.js";
+import { computeSalienceWeights } from "./salience.js";
 
 export interface WatchConfig {
     syncOnChange?: boolean; // default: true
@@ -30,6 +32,15 @@ export interface MemoryServiceConfig {
     model?: MemoryModel;
     compaction?: Partial<CompactionConfig>;
     watch?: WatchConfig;
+    hierarchical?: HierarchicalMemoryConfig;
+}
+
+export interface MigrationReport {
+    parentsUpgraded: number;
+    pointersBackfilled: number;
+    brokenPointers: string[];
+    aggregatedEmbeddingsGenerated: number;
+    dryRun: boolean;
 }
 
 export interface MemoryStatus {
@@ -65,7 +76,11 @@ export class MemoryService {
             });
 
         this._files = new MemoryFiles(config.memoryRoot, this._storage);
-        this._search = new SearchService(this._index, this._files);
+        this._search = new SearchService(
+            this._index,
+            this._files,
+            config.hierarchical,
+        );
     }
 
     // --- File operations ---
@@ -190,10 +205,199 @@ export class MemoryService {
             }
             this._compactor = new Compactor(this._files, {
                 model: this._config.model,
+                index: this._index,
+                aggregationStrategy:
+                    this._config.hierarchical?.aggregationStrategy ?? "salience",
                 ...this._config.compaction,
             });
         }
         return this._compactor;
+    }
+
+    /**
+     * Migrate existing parent nodes to hierarchical architecture.
+     * Backfills pointers, generates aggregated embeddings.
+     */
+    async migrateToHierarchical(
+        dryRun: boolean = false,
+    ): Promise<MigrationReport> {
+        const report: MigrationReport = {
+            parentsUpgraded: 0,
+            pointersBackfilled: 0,
+            brokenPointers: [],
+            aggregatedEmbeddingsGenerated: 0,
+            dryRun,
+        };
+
+        const manifest = await this._files.listAll();
+
+        // Backfill weekly nodes
+        for (const week of manifest.weeklies) {
+            const content = await this._files.readWeekly(week);
+            if (!content) continue;
+
+            const existingPointers = this._files.parsePointers(content);
+            if (existingPointers.length > 0) continue; // Already migrated
+
+            // Infer pointers from date range
+            const dailyPointers = this._inferWeeklyPointers(
+                week,
+                manifest.dailies,
+            );
+            const broken = dailyPointers.filter(
+                (p) =>
+                    !manifest.dailies.includes(
+                        p.replace(/^memory\//, "").replace(/\.md$/, ""),
+                    ),
+            );
+            report.brokenPointers.push(...broken);
+
+            const validPointers = dailyPointers.filter(
+                (p) => !broken.includes(p),
+            );
+            report.pointersBackfilled += validPointers.length;
+            report.parentsUpgraded++;
+
+            if (!dryRun && validPointers.length > 0) {
+                // Compute salience
+                const entries: { uri: string; text: string }[] = [];
+                for (const ptr of validPointers) {
+                    const date = ptr
+                        .replace(/^memory\//, "")
+                        .replace(/\.md$/, "");
+                    const c = await this._files.readDaily(date);
+                    if (c) entries.push({ uri: ptr, text: c });
+                }
+                const salienceMap =
+                    entries.length > 0
+                        ? await computeSalienceWeights(entries)
+                        : {};
+
+                // Rewrite frontmatter
+                const { body } = this._files.parseFrontmatter(content);
+                const pointerYaml = validPointers
+                    .map((p) => `  - ${p}`)
+                    .join("\n");
+                const salienceYaml = Object.entries(salienceMap)
+                    .map(([k, v]) => `  ${k}: ${v.toFixed(2)}`)
+                    .join("\n");
+                const newContent = `---\ntype: weekly\nperiod: ${week}\npointers:\n${pointerYaml}\nsalience:\n${salienceYaml}\n---\n\n${body.trim()}\n`;
+                await this._files.writeWeekly(week, newContent);
+
+                // Generate dual embeddings
+                if (this._index) {
+                    report.aggregatedEmbeddingsGenerated++;
+                }
+            }
+        }
+
+        // Backfill monthly nodes
+        for (const month of manifest.monthlies) {
+            const content = await this._files.readMonthly(month);
+            if (!content) continue;
+
+            const existingPointers = this._files.parsePointers(content);
+            if (existingPointers.length > 0) continue;
+
+            const weeklyPointers = this._inferMonthlyPointers(
+                month,
+                manifest.weeklies,
+            );
+            report.pointersBackfilled += weeklyPointers.length;
+            report.parentsUpgraded++;
+
+            if (!dryRun && weeklyPointers.length > 0) {
+                const entries: { uri: string; text: string }[] = [];
+                for (const ptr of weeklyPointers) {
+                    const wk = ptr
+                        .replace(/^memory\/weekly\//, "")
+                        .replace(/\.md$/, "");
+                    const c = await this._files.readWeekly(wk);
+                    if (c) entries.push({ uri: ptr, text: c });
+                }
+                const salienceMap =
+                    entries.length > 0
+                        ? await computeSalienceWeights(entries)
+                        : {};
+
+                const { body } = this._files.parseFrontmatter(content);
+                const pointerYaml = weeklyPointers
+                    .map((p) => `  - ${p}`)
+                    .join("\n");
+                const salienceYaml = Object.entries(salienceMap)
+                    .map(([k, v]) => `  ${k}: ${v.toFixed(2)}`)
+                    .join("\n");
+                const newContent = `---\ntype: monthly\nperiod: ${month}\npointers:\n${pointerYaml}\nsalience:\n${salienceYaml}\n---\n\n${body.trim()}\n`;
+                await this._files.writeMonthly(month, newContent);
+
+                if (this._index) {
+                    report.aggregatedEmbeddingsGenerated++;
+                }
+            }
+        }
+
+        return report;
+    }
+
+    /**
+     * Infer which daily files belong to a given ISO week.
+     */
+    private _inferWeeklyPointers(
+        isoWeek: string,
+        _allDailies: string[],
+    ): string[] {
+        const match = isoWeek.match(/^(\d{4})-W(\d{2})$/);
+        if (!match) return [];
+        const year = parseInt(match[1]);
+        const weekNum = parseInt(match[2]);
+
+        // Compute Monday of this ISO week
+        const jan4 = new Date(Date.UTC(year, 0, 4));
+        const dayOfWeek = jan4.getUTCDay() || 7;
+        const monday = new Date(jan4);
+        monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1 + (weekNum - 1) * 7);
+
+        const pointers: string[] = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setUTCDate(monday.getUTCDate() + i);
+            const dateStr = d.toISOString().split("T")[0];
+            pointers.push(`memory/${dateStr}.md`);
+        }
+        return pointers;
+    }
+
+    /**
+     * Infer which weekly files belong to a given month.
+     */
+    private _inferMonthlyPointers(
+        yearMonth: string,
+        allWeeklies: string[],
+    ): string[] {
+        const match = yearMonth.match(/^(\d{4})-(\d{2})$/);
+        if (!match) return [];
+        const year = parseInt(match[1]);
+        const month = parseInt(match[2]) - 1;
+
+        return allWeeklies
+            .filter((w) => {
+                const wMatch = w.match(/^(\d{4})-W(\d{2})$/);
+                if (!wMatch) return false;
+                const wYear = parseInt(wMatch[1]);
+                const wNum = parseInt(wMatch[2]);
+                // Approximate: get Thursday of the ISO week
+                const jan4 = new Date(Date.UTC(wYear, 0, 4));
+                const dow = jan4.getUTCDay() || 7;
+                const mon = new Date(jan4);
+                mon.setUTCDate(jan4.getUTCDate() - dow + 1 + (wNum - 1) * 7);
+                const thu = new Date(mon);
+                thu.setUTCDate(mon.getUTCDate() + 3);
+                return (
+                    thu.getUTCFullYear() === year &&
+                    thu.getUTCMonth() === month
+                );
+            })
+            .map((w) => `memory/weekly/${w}.md`);
     }
 
     private async _indexAllFiles(): Promise<void> {

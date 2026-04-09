@@ -20,7 +20,10 @@ export type {
     IndexStats,
     MetadataFilter,
     MetadataTypes,
+    ScoringWeights,
 } from "./interfaces/index.js";
+
+export { ResultType } from "./interfaces/index.js";
 
 export type {
     MemoryModel,
@@ -48,6 +51,7 @@ export { MemoryService } from "./service.js";
 export type {
     MemoryServiceConfig,
     MemoryStatus,
+    MigrationReport,
     WatchConfig,
 } from "./service.js";
 
@@ -63,6 +67,24 @@ export {
 export type { CatalogEntry } from "./catalog.js";
 
 export { expandQuery } from "./query-expansion.js";
+
+export {
+    computeSalienceWeights,
+    countEntities,
+    countDecisionMarkers,
+    countTokens,
+} from "./salience.js";
+export type { SalienceWeights, SalienceEntry } from "./salience.js";
+
+export {
+    extractTemporalReference,
+    extractAllTemporalReferences,
+    temporalAffinity,
+    extractDateFromUri,
+} from "./temporal.js";
+export type { TemporalReference } from "./temporal.js";
+
+export type { HierarchicalMemoryConfig } from "./hierarchical-config.js";
 
 // --- Default implementations ---
 export { LocalFileStorage } from "./defaults/local-file-storage.js";

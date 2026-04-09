@@ -277,6 +277,32 @@ program
         }
     });
 
+// --- migrate ---
+program
+    .command("migrate")
+    .description("Migrate to hierarchical memory architecture")
+    .option("--to <target>", "Target architecture", "hierarchical")
+    .option("--dry-run", "Report only, don't execute")
+    .action(async (cmdOpts: Record<string, string | boolean>) => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir });
+        const dryRun = "dryRun" in cmdOpts;
+
+        if (cmdOpts.to !== "hierarchical") {
+            output(
+                globalOpts.json
+                    ? { error: `Unknown target: ${cmdOpts.to}` }
+                    : `Unknown migration target: ${cmdOpts.to}`,
+                globalOpts.json,
+            );
+            process.exitCode = 1;
+            return;
+        }
+
+        const report = await svc.migrateToHierarchical(dryRun);
+        output(report, globalOpts.json);
+    });
+
 // --- watch ---
 program
     .command("watch")

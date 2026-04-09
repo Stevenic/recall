@@ -38,11 +38,15 @@ export {
     getActiveArcs,
     getDirectives,
     getCorrectionStates,
+    selectArcDays,
+    identifyGapDays,
     computeCalendarDate,
     formatDate,
     getDayOfWeek,
     buildSystemPrompt,
     buildUserMessage,
+    buildArcUserMessage,
+    buildGapUserMessage,
 } from './generator.js';
 export type {
     PersonaDefinition,

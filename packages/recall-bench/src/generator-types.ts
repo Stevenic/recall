@@ -152,6 +152,8 @@ export interface GeneratorConfig {
     startDay?: number;
     /** Ending day number. Default: 1000. */
     endDay?: number;
+    /** Minimum active days per week for gap filling (Pass 2). Default: 5. */
+    minDaysPerWeek?: number;
     /** Callback after each day is generated. */
     onDay?: (dayNumber: number, content: string) => void | Promise<void>;
 }

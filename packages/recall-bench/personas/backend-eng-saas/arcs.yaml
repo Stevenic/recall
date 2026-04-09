@@ -20,6 +20,29 @@ arcs:
       Cross-references the caching decision (shared Redis dependency).
     startDay: 15
     endDay: 145
+    directives:
+      - day: 15
+        event: "Kickoff meeting for auth migration; reviewed current Express-session implementation and identified 3 breaking changes for mobile clients on v2.3 and below"
+      - day: 28
+        event: "Completed JWT token rotation design doc (ADR-007); chose RS256 over HS256 for token signing to support key rotation without redeploying services"
+      - day: 35
+        event: "Design review with team — agreed on 15-minute access token TTL and 7-day refresh token TTL; Alex raised concern about token size in headers for the order service"
+      - day: 55
+        event: "Prototyped backward-compat shim that translates session cookies to JWT for mobile clients still on v2.3; shim checks legacy sessions in Postgres before falling through to JWT path"
+      - day: 65
+        event: "Internal rollout begins — all Nexus employees switched to JWT auth; set up Grafana dashboard tracking token issuance rate, refresh rate, and error rate"
+      - day: 78
+        event: "Discovered refresh token rotation bug — old refresh tokens not being invalidated after use, creating a token replay window of up to 7 days; emergency fix PR opened"
+      - day: 93
+        event: "Fixed connection pool leak in backward-compat shim identified during db-pool incident post-mortem; shim rewritten with try-finally to guarantee connection release on both session-found and JWT paths"
+      - day: 105
+        event: "Beta rollout to 10% of external traffic via feature flag; monitoring dashboard shows 0.02% token error rate, all from expired refresh tokens on slow mobile connections"
+      - day: 125
+        event: "Beta expanded to 50% of external traffic — zero token-related errors in 14 days of monitoring; mobile team confirmed v2.3 shim working correctly"
+      - day: 138
+        event: "GA rollout complete — 100% of users on JWT auth; legacy Express-session Redis store marked for decommission next sprint"
+      - day: 145
+        event: "Auth migration retro and ADR-007 finalized; total migration took 130 days across 47 PRs with 1 security bug (token replay) and 1 production incident (connection pool leak)"
 
   - id: payments-v2
     type: project
@@ -76,6 +99,17 @@ arcs:
       auth-migration arc.
     startDay: 85
     endDay: 95
+    directives:
+      - day: 85
+        event: "Production alerts fired at 2:47 AM Pacific — Postgres connection pool exhausted with 450 active connections against a pool max of 100; all API requests returning 503 for 23 minutes before on-call (River) scaled pool to 200 as a temporary mitigation"
+      - day: 87
+        event: "Investigation narrowed the leak to the auth migration backward-compat shim; connection count correlates with traffic from mobile clients on v2.3 that hit the session-lookup fallback path"
+      - day: 90
+        event: "Root cause confirmed — the shim acquires a Postgres connection to check legacy sessions but only releases it on the session-found branch; when the JWT path is taken instead, the connection leaks. Alex reviewed the fix PR and caught a second leak in the error-handling path"
+      - day: 93
+        event: "Fix deployed to production — shim rewritten with try-finally to guarantee connection release on all code paths; connection pool stabilized at 35 active connections within 10 minutes of deploy"
+      - day: 95
+        event: "Post-mortem held with full team — action items: (1) add PgBouncer connection pool monitoring with alert at 60% utilization, (2) add connection cleanup to code review checklist, (3) require try-finally pattern for all database connection acquisition in the style guide"
 
   - id: incident-webhooks
     type: incident
@@ -159,6 +193,25 @@ arcs:
       tests recency bias resistance.
     startDay: 50
     endDay: 280
+    directives:
+      - day: 50
+        event: "Started reading Kubernetes operator documentation after team decided to move all services to K8s; focused on operator-sdk and kubebuilder frameworks"
+      - day: 75
+        event: "Completed first operator-sdk tutorial; built a hello-world operator that watches ConfigMap changes and logs diffs — ran it locally against minikube"
+      - day: 95
+        event: "Documented K8s resource limits and requests behavior — pods without explicit memory limits get OOMKilled under pressure because they default to BestEffort QoS class; set 256Mi default for all Nexus pods"
+      - day: 120
+        event: "Wrote first production operator — NexusConfigSync operator watches a Git repo and auto-syncs ConfigMaps to target namespaces; handles create, update, and delete with owner references for cleanup"
+      - day: 160
+        event: "NexusConfigSync operator deployed to staging; managing 214 ConfigMaps across 12 namespaces with average reconciliation time of 1.2 seconds"
+      - day: 200
+        event: "Hit CRD versioning issue — migrating NexusConfigSync CRD from v1beta1 to v1 broke existing custom resources; had to write a conversion webhook that translates the old spec.gitUrl field to the new spec.source.repository format"
+      - day: 250
+        event: "Mentored junior engineer Sam on operator patterns; created internal wiki page covering reconciliation loops, owner references, finalizers, and the watch-cache pitfall Sam hit in testing"
+      - day: 275
+        event: "NexusConfigSync operator has been running in production for 4 months with zero incidents; handles 340+ ConfigMaps now after payments-v2 onboarded"
+      - day: 280
+        event: "Operator learning arc complete — patterns established as team standard; Sam is now maintaining NexusConfigSync and Alex is using the same patterns for a new CronJob operator"
 
   - id: learning-ddd
     type: learning
@@ -194,6 +247,25 @@ arcs:
       Provides cross-reference material across many arcs.
     startDay: 30
     endDay: 850
+    directives:
+      - day: 30
+        event: "First code review with Alex — reviewed his Go service for order validation; suggested extracting auth middleware into shared package instead of duplicating across services"
+      - day: 65
+        event: "Paired with Alex on auth migration integration tests; Alex suggested using test containers for Postgres instead of mocking — River agreed and adopted the pattern project-wide"
+      - day: 120
+        event: "Alex asked about Kubernetes operator patterns over coffee; River walked through the CRD lifecycle and recommended starting with kubebuilder tutorials"
+      - day: 200
+        event: "Paired with Alex on payments-v2 webhook retry logic; Alex caught a race condition in the idempotency key check that River had missed in his initial implementation"
+      - day: 355
+        event: "Monorepo debate reached peak intensity — Alex presented a 12-slide deck arguing polyrepo for CI isolation with benchmark data showing 40% faster builds; River countered with cross-service refactoring cost analysis"
+      - day: 410
+        event: "After monorepo decision settled (Turborepo compromise), Alex acknowledged the shared tooling benefits but noted CI times need quarterly review"
+      - day: 500
+        event: "Alex promoted to Senior Engineer — River wrote the promo doc highlighting Alex's growth across auth migration testing, webhook reliability fix, and the monorepo CI benchmarks"
+      - day: 700
+        event: "Alex leading the event-driven migration's consumer implementation; first time River is reviewing Alex's architecture doc rather than the other way around"
+      - day: 850
+        event: "Alex presented event-driven architecture patterns at Nexus quarterly tech talk; River reflected on 820 days of working together from first code review to Alex designing major systems"
 
   - id: relationship-pm-dana
     type: relationship
@@ -223,6 +295,17 @@ arcs:
     correctedDay: 200
     wrongBelief: "Vendor API rate-limited to 100 requests/second"
     correctedBelief: "Actual rate limit is 1000 requests/second (docs were outdated)"
+    directives:
+      - day: 50
+        event: "Documented Acme Logistics API as rate-limited to 100 requests/second based on their v2 API documentation; added rate limit constant to the shared config"
+      - day: 75
+        event: "Designed request batching layer and local response cache to stay under the 100rps Acme API limit; batches up to 10 shipment tracking requests into a single bulk call"
+      - day: 130
+        event: "Referenced the 100rps Acme API limit during caching architecture review — the low limit was one of the arguments for choosing Redis as a caching layer to reduce outbound API calls"
+      - day: 170
+        event: "Started load testing the Acme API integration ahead of payments-v2 launch; testing at 50rps initially to stay well under the documented 100rps ceiling"
+      - day: 200
+        event: "Load test accidentally hit 800rps against Acme API with zero errors or throttling; contacted Acme support who confirmed actual limit is 1000rps — the v2 docs were outdated and corrected in v3. The batching layer adds unnecessary latency and can be simplified"
 
   - id: correction-config-drift
     type: correction

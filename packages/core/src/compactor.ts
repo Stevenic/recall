@@ -1,16 +1,19 @@
 import type { MemoryModel } from "./interfaces/model.js";
+import type { MemoryIndex } from "./interfaces/index.js";
 import type { MemoryFiles } from "./files.js";
+import { computeSalienceWeights, type SalienceWeights } from "./salience.js";
 
 export interface CompactionConfig {
     model: MemoryModel;
+    index?: MemoryIndex;
     agentName?: string; // default: "Agent"
-    dailyRetentionDays?: number; // default: 30
-    weeklyRetentionWeeks?: number; // default: 52
     minDailiesForWeekly?: number; // default: 3
     minWeekliesForMonthly?: number; // default: 2
     autoCompactThreshold?: number; // default: 12000
     compressionTarget?: number; // default: 0.3
     extractTypedMemories?: boolean; // default: true
+    /** Aggregation weighting strategy for parent embeddings (default: "salience") */
+    aggregationStrategy?: "uniform" | "recency" | "salience";
     wisdom?: WisdomConfig;
 }
 
@@ -99,6 +102,7 @@ export class Compactor {
 
     /**
      * Compact daily logs into weekly summaries.
+     * Eidetic: raw dailies are NEVER deleted. Parents store pointers + salience.
      */
     async compactDaily(
         week?: string,
@@ -106,32 +110,27 @@ export class Compactor {
     ): Promise<CompactionResult> {
         const result = emptyResult();
         const minDailies = this._config.minDailiesForWeekly ?? 3;
-        const retentionDays = this._config.dailyRetentionDays ?? 30;
 
         // Group dailies by ISO week
         const dailies = await this._files.listDailies();
         const weekGroups = groupByWeek(dailies);
 
         for (const [isoWeek, dates] of Object.entries(weekGroups)) {
-            // If a specific week was requested, skip others
             if (week && isoWeek !== week) continue;
-
-            // Skip if the week hasn't ended (current week)
             if (isCurrentWeek(isoWeek)) continue;
-
-            // Skip if not enough dailies
             if (dates.length < minDailies) continue;
 
-            // Skip if weekly already exists
             const existing = await this._files.readWeekly(isoWeek);
             if (existing) continue;
 
-            // Collect daily content
-            const dailyContents: string[] = [];
+            // Collect daily content and build pointer URIs
+            const dailyContents: { date: string; content: string }[] = [];
+            const pointerUris: string[] = [];
             for (const date of dates) {
                 const content = await this._files.readDaily(date);
                 if (content) {
-                    dailyContents.push(`## ${date}\n\n${content}`);
+                    dailyContents.push({ date, content });
+                    pointerUris.push(`memory/${date}.md`);
                     result.filesCompacted.push(`memory/${date}.md`);
                 }
             }
@@ -139,37 +138,65 @@ export class Compactor {
             if (dailyContents.length === 0) continue;
 
             if (!dryRun) {
-                // Use the model to generate the weekly summary
-                const summary = await this._config.model.complete(
-                    dailyContents.join("\n\n---\n\n"),
-                    {
-                        systemPrompt: WEEKLY_SYSTEM_PROMPT,
-                        temperature: 0.2,
-                    },
-                );
+                const combinedText = dailyContents
+                    .map((d) => `## ${d.date}\n\n${d.content}`)
+                    .join("\n\n---\n\n");
 
+                // Generate weekly summary
+                const summary = await this._config.model.complete(
+                    combinedText,
+                    { systemPrompt: WEEKLY_SYSTEM_PROMPT, temperature: 0.2 },
+                );
                 if (summary.error) continue;
 
-                const weeklyContent = `---\ntype: weekly\n---\n\n# Week ${isoWeek}\n\n${summary.text}`;
+                // Compute salience weights
+                const strategy = this._config.aggregationStrategy ?? "salience";
+                let salienceMap: SalienceWeights = {};
+                if (strategy === "salience") {
+                    const entries = dailyContents.map((d) => ({
+                        uri: `memory/${d.date}.md`,
+                        text: d.content,
+                    }));
+                    salienceMap = await computeSalienceWeights(entries);
+                } else {
+                    // Uniform weights
+                    const w = 1 / pointerUris.length;
+                    for (const uri of pointerUris) {
+                        salienceMap[uri] = Math.round(w * 100) / 100;
+                    }
+                }
+
+                // Build frontmatter with pointers and salience
+                const pointerYaml = pointerUris
+                    .map((p) => `  - ${p}`)
+                    .join("\n");
+                const salienceYaml = Object.entries(salienceMap)
+                    .map(([k, v]) => `  ${k}: ${v.toFixed(2)}`)
+                    .join("\n");
+                const weeklyContent = `---\ntype: weekly\nperiod: ${isoWeek}\npointers:\n${pointerYaml}\nsalience:\n${salienceYaml}\n---\n\n# Week ${isoWeek}\n\n${summary.text}`;
                 await this._files.writeWeekly(isoWeek, weeklyContent);
                 result.filesCreated.push(`memory/weekly/${isoWeek}.md`);
+
+                // Compute and store dual embeddings if index is available
+                if (this._config.index) {
+                    await this._storeDualEmbeddings(
+                        `weekly/${isoWeek}`,
+                        summary.text,
+                        pointerUris,
+                        salienceMap,
+                        { contentType: "weekly", period: isoWeek },
+                    );
+                }
 
                 // Extract typed memories if configured
                 if (this._config.extractTypedMemories !== false) {
                     const extracted = await this._extractTypedMemories(
-                        dailyContents.join("\n\n"),
+                        combinedText,
                     );
                     result.typedMemoriesExtracted.push(...extracted);
                 }
 
-                // Delete old dailies past retention
-                const cutoff = daysAgo(retentionDays);
-                for (const date of dates) {
-                    if (date < cutoff) {
-                        await this._files.deleteDaily(date);
-                        result.filesDeleted.push(`memory/${date}.md`);
-                    }
-                }
+                // Eidetic: NO deletion of daily files
             }
         }
 
@@ -178,6 +205,7 @@ export class Compactor {
 
     /**
      * Compact weekly summaries into monthly summaries.
+     * Eidetic: weekly nodes are NEVER deleted.
      */
     async compactWeekly(
         month?: string,
@@ -185,29 +213,25 @@ export class Compactor {
     ): Promise<CompactionResult> {
         const result = emptyResult();
         const minWeeklies = this._config.minWeekliesForMonthly ?? 2;
-        const retentionWeeks = this._config.weeklyRetentionWeeks ?? 52;
 
         const weeklies = await this._files.listWeeklies();
         const monthGroups = groupWeekliesByMonth(weeklies);
 
         for (const [yearMonth, weeks] of Object.entries(monthGroups)) {
             if (month && yearMonth !== month) continue;
-
-            // Skip current month
             if (isCurrentMonth(yearMonth)) continue;
-
-            // Skip if not enough weeklies
             if (weeks.length < minWeeklies) continue;
 
-            // Skip if monthly already exists
             const existing = await this._files.readMonthly(yearMonth);
             if (existing) continue;
 
-            const weeklyContents: string[] = [];
+            const weeklyContents: { week: string; content: string }[] = [];
+            const pointerUris: string[] = [];
             for (const w of weeks) {
                 const content = await this._files.readWeekly(w);
                 if (content) {
-                    weeklyContents.push(content);
+                    weeklyContents.push({ week: w, content });
+                    pointerUris.push(`memory/weekly/${w}.md`);
                     result.filesCompacted.push(`memory/weekly/${w}.md`);
                 }
             }
@@ -215,28 +239,54 @@ export class Compactor {
             if (weeklyContents.length === 0) continue;
 
             if (!dryRun) {
-                const summary = await this._config.model.complete(
-                    weeklyContents.join("\n\n---\n\n"),
-                    {
-                        systemPrompt: MONTHLY_SYSTEM_PROMPT,
-                        temperature: 0.2,
-                    },
-                );
+                const combinedText = weeklyContents
+                    .map((w) => w.content)
+                    .join("\n\n---\n\n");
 
+                const summary = await this._config.model.complete(
+                    combinedText,
+                    { systemPrompt: MONTHLY_SYSTEM_PROMPT, temperature: 0.2 },
+                );
                 if (summary.error) continue;
 
-                const monthlyContent = `---\ntype: monthly\n---\n\n# ${yearMonth}\n\n${summary.text}`;
+                // Compute salience weights for weekly children
+                const strategy = this._config.aggregationStrategy ?? "salience";
+                let salienceMap: SalienceWeights = {};
+                if (strategy === "salience") {
+                    const entries = weeklyContents.map((w) => ({
+                        uri: `memory/weekly/${w.week}.md`,
+                        text: w.content,
+                    }));
+                    salienceMap = await computeSalienceWeights(entries);
+                } else {
+                    const w = 1 / pointerUris.length;
+                    for (const uri of pointerUris) {
+                        salienceMap[uri] = Math.round(w * 100) / 100;
+                    }
+                }
+
+                const pointerYaml = pointerUris
+                    .map((p) => `  - ${p}`)
+                    .join("\n");
+                const salienceYaml = Object.entries(salienceMap)
+                    .map(([k, v]) => `  ${k}: ${v.toFixed(2)}`)
+                    .join("\n");
+                const monthlyContent = `---\ntype: monthly\nperiod: ${yearMonth}\npointers:\n${pointerYaml}\nsalience:\n${salienceYaml}\n---\n\n# ${yearMonth}\n\n${summary.text}`;
                 await this._files.writeMonthly(yearMonth, monthlyContent);
                 result.filesCreated.push(`memory/monthly/${yearMonth}.md`);
 
-                // Delete old weeklies past retention
-                const cutoff = weeksAgo(retentionWeeks);
-                for (const w of weeks) {
-                    if (w < cutoff) {
-                        await this._files.deleteWeekly(w);
-                        result.filesDeleted.push(`memory/weekly/${w}.md`);
-                    }
+                // Compute and store dual embeddings if index is available
+                if (this._config.index) {
+                    await this._storeDualEmbeddings(
+                        `monthly/${yearMonth}`,
+                        summary.text,
+                        pointerUris,
+                        salienceMap,
+                        { contentType: "monthly", period: yearMonth },
+                    );
                 }
+
+                // Eidetic: NO deletion of weekly files
             }
         }
 
@@ -301,6 +351,65 @@ export class Compactor {
         }
 
         return result;
+    }
+
+    /**
+     * Compute and store dual embeddings (aggregated + summary) for a parent node.
+     */
+    private async _storeDualEmbeddings(
+        parentUri: string,
+        summaryText: string,
+        childUris: string[],
+        salienceMap: SalienceWeights,
+        baseMeta: { contentType: string; period: string },
+    ): Promise<void> {
+        const index = this._config.index!;
+
+        // 1. Store the summary embedding via normal document upsert
+        await index.upsertDocument(`${parentUri}#summary`, summaryText, {
+            ...baseMeta,
+            embeddingType: "summary",
+        });
+
+        // 2. Compute aggregated embedding from children
+        const childEmbeddings: { uri: string; vec: number[] }[] = [];
+        for (const uri of childUris) {
+            // For weekly parents, children are raw dailies; for monthly, children are weeklies
+            // Try to get the #agg embedding first (for weekly children), fall back to raw
+            const aggUri = uri.replace(/\.md$/, "").replace(/^memory\//, "");
+            let vec = await index.getEmbedding(`${aggUri}#agg`);
+            if (!vec) {
+                vec = await index.getEmbedding(uri);
+            }
+            if (vec) {
+                childEmbeddings.push({ uri, vec });
+            }
+        }
+
+        if (childEmbeddings.length === 0) return;
+
+        // Compute weighted average
+        const dim = childEmbeddings[0].vec.length;
+        const agg = new Float64Array(dim);
+        for (const { uri, vec } of childEmbeddings) {
+            const weight = salienceMap[uri] ?? 1 / childEmbeddings.length;
+            for (let i = 0; i < dim; i++) {
+                agg[i] += weight * vec[i];
+            }
+        }
+
+        // L2-normalize
+        let norm = 0;
+        for (let i = 0; i < dim; i++) norm += agg[i] * agg[i];
+        norm = Math.sqrt(norm);
+        const normalized = Array.from(agg).map((v) =>
+            norm > 0 ? v / norm : 0,
+        );
+
+        await index.upsertEmbedding(`${parentUri}#agg`, normalized, {
+            ...baseMeta,
+            embeddingType: "agg",
+        });
     }
 
     /**
@@ -534,14 +643,3 @@ function isCurrentMonth(yearMonth: string): boolean {
     return current === yearMonth;
 }
 
-function daysAgo(days: number): string {
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d.toISOString().split("T")[0];
-}
-
-function weeksAgo(weeks: number): string {
-    const d = new Date();
-    d.setDate(d.getDate() - weeks * 7);
-    return getISOWeek(d.toISOString().split("T")[0]);
-}

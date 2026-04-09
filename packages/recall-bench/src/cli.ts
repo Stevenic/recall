@@ -108,7 +108,6 @@ program
     .description('Generate daily memory logs for a persona using an LLM')
     .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + arcs.yaml)')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
-    .requiredOption('--out <dir>', 'Output directory for generated day files')
     .option('--start <n>', 'Starting day number', parseInt, 1)
     .option('--end <n>', 'Ending day number', parseInt, 1000)
     .option('--temperature <n>', 'Generation temperature', parseFloat, 0.7)
@@ -117,12 +116,13 @@ program
     .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseInt, 120000)
     .option('--json', 'Output JSON summary instead of progress text')
     .action(async (opts) => {
-        const persona = await loadPersonaDefinition(opts.persona);
-        const arcs = await loadArcs(opts.persona);
+        const personaDir = resolve(opts.persona);
+        const persona = await loadPersonaDefinition(personaDir);
+        const arcs = await loadArcs(personaDir);
         const model = await resolveModel(opts.model, opts.timeout);
 
-        const outDir = resolve(opts.out);
-        await mkdir(outDir, { recursive: true });
+        const memoriesDir = join(personaDir, 'memories');
+        await mkdir(memoriesDir, { recursive: true });
 
         let dayCount = 0;
         const generator = new DayGenerator(persona, arcs, model, {
@@ -133,7 +133,7 @@ program
             historyWindow: opts.historyWindow,
             onDay: async (dayNumber, content) => {
                 const padded = String(dayNumber).padStart(4, '0');
-                await writeFile(join(outDir, `day-${padded}.md`), content, 'utf-8');
+                await writeFile(join(memoriesDir, `day-${padded}.md`), content, 'utf-8');
                 dayCount++;
                 if (!opts.json) {
                     process.stdout.write(`\r  Generated day ${dayNumber}/${opts.end}`);
@@ -147,14 +147,14 @@ program
             console.log(''); // newline after progress
             console.log(`Done. Generated ${dayCount} days for persona "${persona.name}" (${persona.id}).`);
             console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
-            console.log(`  Output: ${outDir}`);
+            console.log(`  Output: ${memoriesDir}`);
         } else {
             console.log(JSON.stringify({
                 personaId: result.personaId,
                 daysGenerated: result.days.length,
                 totalInputTokens: result.totalInputTokens,
                 totalOutputTokens: result.totalOutputTokens,
-                outputDir: outDir,
+                outputDir: memoriesDir,
             }, null, 2));
         }
     });
@@ -164,17 +164,17 @@ program
     .description('Create a new persona and story arcs from a text prompt using an LLM')
     .requiredOption('--prompt <text>', 'Description of the persona to create')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
-    .requiredOption('--out <dir>', 'Output directory for persona.yaml and arcs.yaml')
+    .requiredOption('--persona <dir>', 'Persona directory to write persona.yaml and arcs.yaml into')
     .option('--epoch <date>', 'Epoch date for the persona timeline', '2024-01-01')
     .option('--temperature <n>', 'Generation temperature', parseFloat, 0.7)
     .option('--max-tokens <n>', 'Max output tokens per LLM call', parseInt, 4000)
     .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseInt, 120000)
-    .option('--arcs-only', 'Only generate arcs for an existing persona (reads persona.yaml from --out)')
+    .option('--arcs-only', 'Only generate arcs for an existing persona (reads persona.yaml from --persona)')
     .option('--json', 'Output JSON summary instead of progress text')
     .action(async (opts) => {
         const model = await resolveModel(opts.model, opts.timeout);
-        const outDir = resolve(opts.out);
-        await mkdir(outDir, { recursive: true });
+        const personaDir = resolve(opts.persona);
+        await mkdir(personaDir, { recursive: true });
 
         const creator = new PersonaCreator(model, {
             temperature: opts.temperature,
@@ -184,25 +184,25 @@ program
 
         if (opts.arcsOnly) {
             // Generate arcs for an existing persona
-            const persona = await loadPersonaDefinition(outDir);
+            const persona = await loadPersonaDefinition(personaDir);
             if (!opts.json) {
                 process.stdout.write('  Generating arcs...');
             }
             const result = await creator.createArcs(persona);
-            await writeFile(join(outDir, 'arcs.yaml'), serializeArcsYaml(result.arcs), 'utf-8');
+            await writeFile(join(personaDir, 'arcs.yaml'), serializeArcsYaml(result.arcs), 'utf-8');
 
             if (!opts.json) {
                 console.log(' done.');
                 console.log(`  Created ${result.arcs.length} arcs for "${persona.name}" (${persona.id}).`);
                 console.log(`  Tokens — input: ${result.inputTokens}, output: ${result.outputTokens}`);
-                console.log(`  Output: ${outDir}/arcs.yaml`);
+                console.log(`  Output: ${personaDir}/arcs.yaml`);
             } else {
                 console.log(JSON.stringify({
                     personaId: persona.id,
                     arcsCreated: result.arcs.length,
                     inputTokens: result.inputTokens,
                     outputTokens: result.outputTokens,
-                    outputDir: outDir,
+                    outputDir: personaDir,
                 }, null, 2));
             }
         } else {
@@ -211,15 +211,15 @@ program
                 process.stdout.write('  Generating persona and arcs...');
             }
             const result = await creator.create(opts.prompt);
-            await writeFile(join(outDir, 'persona.yaml'), serializePersonaYaml(result.persona), 'utf-8');
-            await writeFile(join(outDir, 'arcs.yaml'), serializeArcsYaml(result.arcs), 'utf-8');
+            await writeFile(join(personaDir, 'persona.yaml'), serializePersonaYaml(result.persona), 'utf-8');
+            await writeFile(join(personaDir, 'arcs.yaml'), serializeArcsYaml(result.arcs), 'utf-8');
 
             if (!opts.json) {
                 console.log(' done.');
                 console.log(`  Persona: "${result.persona.name}" (${result.persona.id})`);
                 console.log(`  Arcs: ${result.arcs.length}`);
                 console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
-                console.log(`  Output: ${outDir}/persona.yaml, ${outDir}/arcs.yaml`);
+                console.log(`  Output: ${personaDir}/persona.yaml, ${personaDir}/arcs.yaml`);
             } else {
                 console.log(JSON.stringify({
                     personaId: result.persona.id,
@@ -227,7 +227,7 @@ program
                     arcsCreated: result.arcs.length,
                     totalInputTokens: result.totalInputTokens,
                     totalOutputTokens: result.totalOutputTokens,
-                    outputDir: outDir,
+                    outputDir: personaDir,
                 }, null, 2));
             }
         }
@@ -236,10 +236,8 @@ program
 program
     .command('generate-conversations')
     .description('Generate conversation history for each day from existing daily logs (Pass 2)')
-    .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml)')
+    .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml, memories/)')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
-    .requiredOption('--days <dir>', 'Directory containing day-NNNN.md files')
-    .requiredOption('--out <dir>', 'Output directory for conversation files')
     .option('--start <n>', 'Starting day number', parseInt, 1)
     .option('--end <n>', 'Ending day number', parseInt, 1000)
     .option('--temperature <n>', 'Generation temperature', parseFloat, 0.7)
@@ -248,12 +246,14 @@ program
     .option('--format <fmt>', 'Output format: markdown or json', 'markdown')
     .option('--json', 'Output JSON summary instead of progress text')
     .action(async (opts) => {
-        const persona = await loadPersonaDefinition(opts.persona);
+        const personaDir = resolve(opts.persona);
+        const persona = await loadPersonaDefinition(personaDir);
         const model = await resolveModel(opts.model, opts.timeout);
-        const outDir = resolve(opts.out);
-        await mkdir(outDir, { recursive: true });
 
-        const daysDir = resolve(opts.days);
+        const memoriesDir = join(personaDir, 'memories');
+        const conversationsDir = join(personaDir, 'conversations');
+        await mkdir(conversationsDir, { recursive: true });
+
         const format = opts.format as 'markdown' | 'json';
         let convCount = 0;
 
@@ -271,7 +271,7 @@ program
             },
         });
 
-        const result = await generator.generateAll(daysDir);
+        const result = await generator.generateAll(memoriesDir);
 
         // Write conversation files
         for (const conv of result.conversations) {
@@ -280,21 +280,21 @@ program
             const content = format === 'json'
                 ? serializeConversationJson(conv.turns)
                 : serializeConversation(conv.turns);
-            await writeFile(join(outDir, `conv-${padded}.${ext}`), content, 'utf-8');
+            await writeFile(join(conversationsDir, `conv-${padded}.${ext}`), content, 'utf-8');
         }
 
         if (!opts.json) {
             console.log(''); // newline after progress
             console.log(`Done. Generated ${result.conversations.length} conversations for "${persona.name}" (${persona.id}).`);
             console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
-            console.log(`  Output: ${outDir}`);
+            console.log(`  Output: ${conversationsDir}`);
         } else {
             console.log(JSON.stringify({
                 personaId: result.personaId,
                 conversationsGenerated: result.conversations.length,
                 totalInputTokens: result.totalInputTokens,
                 totalOutputTokens: result.totalOutputTokens,
-                outputDir: outDir,
+                outputDir: conversationsDir,
             }, null, 2));
         }
     });

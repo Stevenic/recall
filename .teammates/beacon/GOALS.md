@@ -60,6 +60,50 @@ Derived from `specs/memory-service.md` (v0.3, 2026-04-02).
 
 ---
 
+## Hierarchical Memory (v0.1.1)
+
+Derived from `specs/hierarchical-memory.md` (v0.4, 2026-04-08).
+
+### Phase A — Eidetic Storage
+
+- [x] Remove daily/weekly retention and deletion from `Compactor`
+- [x] Add `pointers` frontmatter generation to weekly and monthly compaction
+- [x] Update `MemoryFiles` to parse `pointers` from frontmatter
+
+### Phase B — Dual Embeddings + Salience
+
+- [x] Add `getEmbedding()` and `upsertEmbedding()` to `MemoryIndex` interface
+- [x] Implement in `VectraIndex`
+- [x] Implement salience signal extraction (`packages/core/src/salience.ts`)
+- [x] Integrate salience extraction into compaction pipeline
+- [x] Compute and store dual embeddings (#agg + #summary) during compaction
+
+### Phase C — Two-Phase Recall
+
+- [x] Implement pointer expansion (recursive, with dedup)
+- [x] Implement Phase 1a parallel retrieval (parent vector + raw vector)
+- [x] Implement Phase 2 reranking with configurable weights
+- [x] Extend `SearchResult` with `resultType`, `parentUri`, `scoreBreakdown`
+
+### Phase D — BM25 Integration
+
+- [x] Wire BM25 scoring weight into Phase 2 reranking formula
+- [ ] Validate BM25 with Vectra's built-in `setupBm25`/`bm25Search` in integration tests
+
+### Phase E — Migration
+
+- [x] Implement `recall migrate --to hierarchical` CLI command
+- [x] Pointer backfill logic for existing parent nodes
+- [x] `--dry-run` support
+
+### Supporting Modules
+
+- [x] Temporal reference extraction (`packages/core/src/temporal.ts`)
+- [x] Hierarchical memory config type (`packages/core/src/hierarchical-config.ts`)
+- [x] Tests: 38 new tests (82 total, all passing)
+
+---
+
 ## v0.2 (Future)
 
 - [ ] SQLite storage backend (`@stevenic/storage-sqlite`)

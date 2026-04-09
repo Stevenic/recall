@@ -1,10 +1,16 @@
 # Scribe — Goals
 
-**Updated:** 2026-04-06
+**Updated:** 2026-04-08
 
 ---
 
 ## Active
+
+### Hierarchical Memory
+- [x] Draft hierarchical memory spec v0.1 — eidetic storage, pointer nodes, two-phase recall, BM25 hybrid
+- [ ] Resolve open questions with stevenic (v0.2)
+- [ ] Create implementation plan for @beacon (sequenced work packages)
+- [ ] Update compaction prompt spec for pointer-aware output
 
 ### Recall Bench
 - [x] Draft benchmark spec v0.1 — personas, Q&A framework, scoring, adapter interface
