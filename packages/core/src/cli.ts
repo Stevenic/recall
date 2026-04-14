@@ -19,7 +19,11 @@ function getService(opts: { dir: string; agent?: string }): MemoryService {
     const model = opts.agent
         ? new CliAgentModel({ agent: opts.agent })
         : undefined;
-    return new MemoryService({ memoryRoot, model });
+    return new MemoryService({
+        memoryRoot,
+        model,
+        dreaming: { enabled: true, logSearches: true },
+    });
 }
 
 function output(data: unknown, json: boolean): void {
@@ -303,11 +307,97 @@ program
         output(report, globalOpts.json);
     });
 
+// --- dream ---
+const dreamCmd = program
+    .command("dream")
+    .description("Run a dreaming session (asynchronous knowledge synthesis)")
+    .option("--dry-run", "Show candidates without running LLM")
+    .option("--phase <phase>", "Only run a specific phase (gather | analyze | write)")
+    .option("--max-candidates <n>", "Max candidates to analyze", "20")
+    .option("--agent <name>", "CLI agent for synthesis", "claude")
+    .action(async (cmdOpts: Record<string, string | boolean>) => {
+        const globalOpts = program.opts();
+        const svc = getService({
+            dir: globalOpts.dir,
+            agent: typeof cmdOpts.agent === "string" ? cmdOpts.agent : "claude",
+        });
+
+        const phases = typeof cmdOpts.phase === "string"
+            ? [cmdOpts.phase as "gather" | "analyze" | "write"]
+            : undefined;
+
+        const result = await svc.dream({
+            dryRun: "dryRun" in cmdOpts,
+            maxCandidates: parseInt(cmdOpts.maxCandidates as string) || 20,
+            phases,
+        });
+
+        if (globalOpts.json) {
+            output(result, true);
+        } else {
+            console.log(`Dreaming session complete:`);
+            console.log(`  Candidates: ${result.candidatesExamined} of ${result.candidatesTotal} examined`);
+            console.log(`  Insights: ${result.insights.length}`);
+            console.log(`  Promotions: ${result.promotions.length}`);
+            console.log(`  Contradictions: ${result.contradictions.length}`);
+            console.log(`  Gaps: ${result.gaps.length}`);
+            console.log(`  LLM calls: ${result.modelCalls}`);
+
+            if (result.insights.length > 0) {
+                console.log(`\nInsights:`);
+                for (const i of result.insights) {
+                    console.log(`  - ${i.theme} (${i.confidence}, ${i.sources.length} sources)`);
+                }
+            }
+            if (result.promotions.length > 0) {
+                console.log(`\nPromotions:`);
+                for (const p of result.promotions) {
+                    console.log(`  - ${p}`);
+                }
+            }
+            if (result.contradictions.length > 0) {
+                console.log(`\nContradictions:`);
+                for (const c of result.contradictions) {
+                    console.log(`  - ${c.wisdomEntry}`);
+                }
+            }
+            if (result.gaps.length > 0) {
+                console.log(`\nGaps:`);
+                for (const g of result.gaps) {
+                    console.log(`  - "${g.query}" (${g.frequency} queries)`);
+                }
+            }
+        }
+    });
+
+dreamCmd
+    .command("status")
+    .description("Show dreaming status (last run, pending candidates, signal stats)")
+    .action(async () => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir });
+        const status = await svc.dreamStatus();
+
+        if (globalOpts.json) {
+            output(status, true);
+        } else {
+            console.log(`Dreaming status:`);
+            console.log(`  Last run: ${status.lastRun ?? "never"}`);
+            console.log(`  Pending candidates: ${status.pendingCandidates}`);
+            console.log(`  Search log entries: ${status.searchLogEntries}`);
+            if (status.searchLogOldest) {
+                console.log(`  Search log oldest: ${status.searchLogOldest}`);
+            }
+        }
+    });
+
 // --- watch ---
 program
     .command("watch")
     .description("Watch for changes and auto-sync/compact")
     .option("--compact", "Enable auto-compaction on threshold")
+    .option("--dream", "Enable dreaming on schedule")
+    .option("--dream-interval <ms>", "Dreaming interval in ms", "86400000")
     .option("--debounce <ms>", "Debounce interval", "2000")
     .action(async (cmdOpts: Record<string, string>) => {
         const globalOpts = program.opts();
@@ -342,6 +432,26 @@ program
             { recursive: true },
             handleChange,
         );
+
+        // Dreaming on interval
+        if ("dream" in cmdOpts) {
+            const dreamInterval = parseInt(cmdOpts.dreamInterval) || 86400000;
+            console.log(`Dreaming enabled (interval: ${dreamInterval}ms)`);
+            const dreamSvc = getService({
+                dir: globalOpts.dir,
+                agent: "claude",
+            });
+            setInterval(async () => {
+                try {
+                    const result = await dreamSvc.dream();
+                    console.log(
+                        `Dream session: ${result.insights.length} insights, ${result.promotions.length} promotions`,
+                    );
+                } catch (err) {
+                    console.error("Dream error:", err);
+                }
+            }, dreamInterval);
+        }
     });
 
 // --- Run ---

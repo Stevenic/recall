@@ -7,6 +7,7 @@ import type {
 import { ResultType } from "./interfaces/index.js";
 import type { MemoryFiles } from "./files.js";
 import type { HierarchicalMemoryConfig } from "./hierarchical-config.js";
+import type { SearchLogger } from "./search-logger.js";
 import { parseCatalogEntry, matchCatalog, type CatalogEntry } from "./catalog.js";
 import { expandQuery } from "./query-expansion.js";
 import {
@@ -53,6 +54,7 @@ export class SearchService {
     private readonly _index: MemoryIndex;
     private readonly _files: MemoryFiles;
     private readonly _config: HierarchicalMemoryConfig;
+    private _searchLogger: SearchLogger | null = null;
 
     constructor(
         index: MemoryIndex,
@@ -62,6 +64,14 @@ export class SearchService {
         this._index = index;
         this._files = files;
         this._config = config ?? {};
+    }
+
+    /**
+     * Set the search logger for dreaming signal collection.
+     * When set, every search operation appends to the search log.
+     */
+    setSearchLogger(logger: SearchLogger): void {
+        this._searchLogger = logger;
     }
 
     /**
@@ -84,7 +94,7 @@ export class SearchService {
         const catalogResults = await this._catalogSearch(query, maxResults);
 
         if (isHierarchical) {
-            return this._hierarchicalSearch(query, {
+            const results = await this._hierarchicalSearch(query, {
                 maxResults,
                 maxChunks,
                 maxTokens,
@@ -94,6 +104,8 @@ export class SearchService {
                 catalogResults,
                 ...options,
             });
+            await this._logSearchResults(query, results, maxResults);
+            return results;
         }
 
         // Legacy path: catalog + semantic + recency
@@ -111,9 +123,11 @@ export class SearchService {
             merged = this._mergeResults(merged, recentWeeklies, 1.0);
         }
 
-        return merged
+        const results = merged
             .sort((a, b) => b.score - a.score)
             .slice(0, maxResults);
+        await this._logSearchResults(query, results, maxResults);
+        return results;
     }
 
     /**
@@ -141,6 +155,26 @@ export class SearchService {
         return merged
             .sort((a, b) => b.score - a.score)
             .slice(0, maxResults);
+    }
+
+    /**
+     * Log search results to the dreaming search logger (if configured).
+     */
+    private async _logSearchResults(
+        query: string,
+        results: SearchResult[],
+        topK: number,
+    ): Promise<void> {
+        if (!this._searchLogger) return;
+        try {
+            await this._searchLogger.logSearch(
+                query,
+                results.map((r) => ({ uri: r.uri, score: r.score })),
+                topK,
+            );
+        } catch {
+            // Search logging is best-effort — never fail a search due to logging
+        }
     }
 
     // ─── Hierarchical two-phase recall ────────────────────────────

@@ -208,6 +208,35 @@ export class MemoryFiles {
         return { dailies, weeklies, monthlies, typedMemories, hasWisdom };
     }
 
+    // --- Dream files ---
+
+    async listInsights(): Promise<string[]> {
+        const dir = path.join(this._root, "memory", "dreams", "insights");
+        if (!(await this._storage.pathExists(dir))) return [];
+        const files = await this._storage.listFiles(dir, "files");
+        return files
+            .map((f) => f.name)
+            .filter((name) => name.endsWith(".md"))
+            .sort();
+    }
+
+    async listContradictions(): Promise<string[]> {
+        const dir = path.join(this._root, "memory", "dreams", "contradictions");
+        if (!(await this._storage.pathExists(dir))) return [];
+        const files = await this._storage.listFiles(dir, "files");
+        return files
+            .map((f) => f.name)
+            .filter((name) => name.endsWith(".md"))
+            .sort();
+    }
+
+    async readDreamFile(relativePath: string): Promise<string | null> {
+        const p = path.join(this._root, relativePath);
+        if (!(await this._storage.pathExists(p))) return null;
+        const buf = await this._storage.readFile(p);
+        return buf.toString("utf-8");
+    }
+
     /**
      * Ensure the directory structure exists.
      */
@@ -218,6 +247,15 @@ export class MemoryFiles {
         );
         await this._storage.createFolder(
             path.join(this._root, "memory", "monthly"),
+        );
+        await this._storage.createFolder(
+            path.join(this._root, "memory", "dreams"),
+        );
+        await this._storage.createFolder(
+            path.join(this._root, "memory", "dreams", "insights"),
+        );
+        await this._storage.createFolder(
+            path.join(this._root, "memory", "dreams", "contradictions"),
         );
     }
 

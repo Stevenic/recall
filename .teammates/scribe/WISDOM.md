@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-07
+Last compacted: 2026-04-14
 
 ---
 
@@ -35,6 +35,18 @@ Periodically compare live conventions against templates to catch gaps that evolv
 **Simplify the model before shipping**
 When a design has multiple knobs (named indexes, extra flags, provider factories), ask whether the simpler version covers real use cases. Fewer abstractions mean fewer interfaces, fewer CLI flags, and fewer config fields to maintain.
 
+**Summaries assist recall, never replace source data**
+Raw data is the permanent source of truth; summaries and aggregations provide faster access but must always be regenerable from originals. This preserves auditability and prevents silent data loss.
+
+**Prefer explicit signals over implicit decay**
+Instead of penalizing old data with recency bias, use explicit signals (temporal affinity, salience scores) when the query demands it. Neutral defaults preserve fairness across the full timeline and avoid baking assumptions into the retrieval path.
+
+**Architecture docs should trace the full path**
+When documenting system architecture, trace from user entry point through every layer to storage. A doc that covers components but skips their wiring forces readers to reverse-engineer the flow from code.
+
+**Competitive analysis sharpens design rationale**
+Writing a structured side-by-side comparison against a similar system forces explicit articulation of why your design makes different tradeoffs. Do this early -- it prevents accidental convergence and clarifies which constraints are load-bearing.
+
 ## Specs
 
 **Audit acceptance criteria against every interface**
@@ -43,8 +55,8 @@ After writing a spec, systematically walk each interface and ask "is there a cri
 **Include concrete input --> output examples in prompt specs**
 Behavioral specs for LLM-driven features (compaction, extraction) must include at least one full input/output example. Without it, implementers guess at format, and reviewers can't verify compliance.
 
-**Iterate specs in versioned rounds**
-Draft --> resolve open questions --> apply feedback is a reliable cadence. Each round should produce a changelog entry in the spec so reviewers can diff intent, not just text.
+**Iterate specs in versioned rounds, resolve questions incrementally**
+Draft --> resolve open questions --> apply feedback is a reliable cadence. Each round should produce a changelog entry so reviewers can diff intent, not just text. Resolve open questions in focused rounds (one topic per round) rather than in bulk -- this gives the decision-maker full context on each question and avoids cross-contamination between unrelated choices.
 
 **Audit open questions before handoff**
 Cross-reference implementation checklists against resolved decisions. What looks answered in prose may still have gaps that block execution -- scaffolding metadata, optional tooling, and product-level decisions are commonly overlooked.
@@ -53,7 +65,10 @@ Cross-reference implementation checklists against resolved decisions. What looks
 When defining data files (YAML, JSON) consumed by multiple pipeline stages, include fields needed by downstream stages even if the current consumer ignores them. Retrofitting schema after data generation is expensive; unused fields are free.
 
 **Start with cost-conscious defaults, document the upgrade path**
-When a design parameter trades cost against quality (context window size, model tier, batch size), pick the cheaper default and document the conditions under which to escalate. This avoids premature optimization while keeping the door open.
+When a design parameter trades cost against quality (context window size, model tier, batch size), pick the cheaper default and document the conditions under which to escalate. Applies to algorithms too: use deterministic approaches (regex, rules) first and escalate to LLM-assisted processing only when quality demands it.
+
+**Promote deferred features when they prove load-bearing**
+When a feature deferred to a later version turns out to be essential for quality (e.g., salience weighting for retrieval), promote it to the current scope rather than shipping a weaker MVP. The cost of retrofitting a core feature later exceeds the cost of building it now.
 
 ## Process
 

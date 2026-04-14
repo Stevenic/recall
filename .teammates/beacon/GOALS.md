@@ -104,6 +104,63 @@ Derived from `specs/hierarchical-memory.md` (v0.4, 2026-04-08).
 
 ---
 
+## Dreaming System (v0.1.2)
+
+Derived from `specs/dreaming.md` (v0.1, 2026-04-11).
+
+### Phase A — Search Signal Infrastructure
+
+- [x] Search log writing in `SearchService` (opt-in via `SearchLogger`)
+- [x] Search log JSONL format with query, results, scores, timestamp
+- [x] Monthly log rotation (`SearchLogger.rotateLog()`)
+- [x] `.dreams/` directory management (search-log.jsonl, candidates.json, dream-state.json)
+- [x] `DreamingConfig` added to `MemoryServiceConfig`
+
+### Phase B — Signal Collection + Candidate Scoring
+
+- [x] Hit frequency signal (URI recall count + query diversity)
+- [x] Gap signal (null/low-score queries)
+- [x] Entity frequency signal (recurring entities without typed memories)
+- [x] Staleness signal (old project/reference typed memories)
+- [x] Wisdom drift signal (wisdom entries with no search activity)
+- [x] Candidate scoring with configurable weights
+- [x] Carry-over candidate persistence (`candidates.json`)
+
+### Phase C — Synthesis Pipeline
+
+- [x] Five analysis templates: cross-reference, gap, contradiction, typed-memory, theme
+- [x] `DreamEngine.analyze()` — per-candidate LLM analysis
+- [x] JSON + freeform output parsing
+- [x] Token usage tracking
+
+### Phase D — Output + Integration
+
+- [x] Insight files → `memory/dreams/insights/YYYY-MM-DD-<slug>.md`
+- [x] Promoted typed memories → `memory/<type>_<topic>.md` (deduplicated)
+- [x] Contradiction files → `memory/dreams/contradictions/YYYY-MM-DD.md`
+- [x] Dream diary → `DREAMS.md` (append-only)
+- [x] Insight and contradiction files indexed by Vectra (searchable)
+- [x] Dreaming never modifies or deletes existing memory files
+
+### CLI
+
+- [x] `recall dream` — full dreaming session
+- [x] `recall dream --dry-run` — show candidates without LLM calls
+- [x] `recall dream --phase <phase>` — run specific phase
+- [x] `recall dream --max-candidates <n>`
+- [x] `recall dream status` — last run, pending candidates, signal stats
+- [x] `recall watch --dream` — dreaming on interval
+- [x] `--json` output on all dream commands
+
+### Testing
+
+- [x] Tests: 29 new tests (111 total, all passing)
+- [x] SearchLogger: log writing, reading, window filtering, candidate/state persistence
+- [x] Signal Collector: hit frequency, gap, entity, staleness, wisdom drift, entity extraction
+- [x] DreamEngine: dry-run, gather, full session, insight writing, diary, state, dedup, graceful non-JSON, contradictions
+
+---
+
 ## v0.2 (Future)
 
 - [ ] SQLite storage backend (`@stevenic/storage-sqlite`)

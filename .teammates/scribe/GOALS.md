@@ -1,6 +1,6 @@
 # Scribe — Goals
 
-**Updated:** 2026-04-08
+**Updated:** 2026-04-11
 
 ---
 
@@ -35,6 +35,12 @@
 - [x] Create implementation plan breaking MVP (§12) into sequenced work packages for @beacon
 - [ ] Write CLI spec detail for `recall watch` (filesystem watcher behavior, debounce edge cases)
 - [x] Define compaction prompt templates (daily→weekly, weekly→monthly, wisdom distillation) for @lexicon
+
+### Dreaming System
+- [x] Draft dreaming spec v0.1 — signal collection, candidate scoring, synthesis pipeline, output formats
+- [ ] Resolve open questions with stevenic (v0.2)
+- [ ] Create implementation plan for @beacon (sequenced work packages)
+- [ ] Define dreaming prompt templates (cross-reference, gap analysis, contradiction, theme synthesis) for @lexicon
 
 ### Milestone Tracking
 - [ ] Set up acceptance criteria checklist (§12 MVP) as trackable artifact

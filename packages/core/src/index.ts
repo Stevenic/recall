@@ -86,6 +86,42 @@ export type { TemporalReference } from "./temporal.js";
 
 export type { HierarchicalMemoryConfig } from "./hierarchical-config.js";
 
+// --- Dreaming ---
+export { DreamEngine } from "./dream-engine.js";
+export { SearchLogger } from "./search-logger.js";
+export {
+    collectSignals,
+    collectHitFrequencySignals,
+    collectGapSignals,
+    collectEntitySignals,
+    collectStalenessSignals,
+    collectWisdomDriftSignals,
+    extractEntitiesLightweight,
+} from "./signal-collector.js";
+export type { SignalCollectorConfig } from "./signal-collector.js";
+export type {
+    DreamingConfig,
+    DreamScoringWeights,
+    AnalysisTemplates,
+    SearchLogEntry,
+    DreamCandidate,
+    DreamCandidateType,
+    DreamOptions,
+    DreamResult,
+    InsightRecord,
+    ContradictionRecord,
+    GapRecord,
+    AnalysisResult,
+    DreamStatus,
+    DreamState,
+} from "./dreaming-config.js";
+export {
+    DEFAULT_SCORING_WEIGHTS,
+    DEFAULT_MAX_CANDIDATES,
+    DEFAULT_SIGNAL_WINDOW_DAYS,
+    DEFAULT_STALENESS_THRESHOLD_DAYS,
+} from "./dreaming-config.js";
+
 // --- Default implementations ---
 export { LocalFileStorage } from "./defaults/local-file-storage.js";
 export { VirtualFileStorage } from "./defaults/virtual-file-storage.js";

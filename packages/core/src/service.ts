@@ -17,6 +17,14 @@ import { LocalFileStorage } from "./defaults/local-file-storage.js";
 import { LocalEmbeddings } from "./defaults/local-embeddings.js";
 import { VectraIndex } from "./defaults/vectra-index.js";
 import { computeSalienceWeights } from "./salience.js";
+import { SearchLogger } from "./search-logger.js";
+import { DreamEngine } from "./dream-engine.js";
+import type {
+    DreamingConfig,
+    DreamOptions,
+    DreamResult,
+    DreamStatus,
+} from "./dreaming-config.js";
 
 export interface WatchConfig {
     syncOnChange?: boolean; // default: true
@@ -33,6 +41,8 @@ export interface MemoryServiceConfig {
     compaction?: Partial<CompactionConfig>;
     watch?: WatchConfig;
     hierarchical?: HierarchicalMemoryConfig;
+    /** Dreaming configuration */
+    dreaming?: DreamingConfig;
 }
 
 export interface MigrationReport {
@@ -60,7 +70,9 @@ export class MemoryService {
     private readonly _index: MemoryIndex;
     private readonly _files: MemoryFiles;
     private readonly _search: SearchService;
+    private readonly _searchLogger: SearchLogger | null;
     private _compactor: Compactor | null = null;
+    private _dreamEngine: DreamEngine | null = null;
 
     constructor(config: MemoryServiceConfig) {
         this._config = config;
@@ -81,6 +93,16 @@ export class MemoryService {
             this._files,
             config.hierarchical,
         );
+
+        // Wire up search logging if dreaming is enabled
+        const dreamConfig = config.dreaming;
+        const logSearches = dreamConfig?.logSearches ?? (dreamConfig?.enabled ?? false);
+        if (logSearches) {
+            this._searchLogger = new SearchLogger(config.memoryRoot, this._storage);
+            this._search.setSearchLogger(this._searchLogger);
+        } else {
+            this._searchLogger = null;
+        }
     }
 
     // --- File operations ---
@@ -180,6 +202,18 @@ export class MemoryService {
         return compactor.distillWisdom();
     }
 
+    // --- Dreaming ---
+
+    async dream(options?: DreamOptions): Promise<DreamResult> {
+        const engine = this._getDreamEngine();
+        return engine.dream(options);
+    }
+
+    async dreamStatus(): Promise<DreamStatus> {
+        const engine = this._getDreamEngine();
+        return engine.status();
+    }
+
     // --- Lifecycle ---
 
     async initialize(): Promise<void> {
@@ -195,6 +229,26 @@ export class MemoryService {
     }
 
     // --- Internals ---
+
+    private _getDreamEngine(): DreamEngine {
+        if (!this._dreamEngine) {
+            if (!this._config.model) {
+                throw new Error(
+                    "A MemoryModel is required for dreaming. Pass `model` in MemoryServiceConfig.",
+                );
+            }
+            const logger = this._searchLogger ?? new SearchLogger(this._config.memoryRoot, this._storage);
+            this._dreamEngine = new DreamEngine(
+                this._files,
+                this._index,
+                this._config.model,
+                this._storage,
+                logger,
+                this._config.dreaming,
+            );
+        }
+        return this._dreamEngine;
+    }
 
     private _getCompactor(): Compactor {
         if (!this._compactor) {
@@ -459,6 +513,36 @@ export class MemoryService {
                     "WISDOM.md",
                     content,
                     { contentType: "wisdom" },
+                );
+            }
+        }
+
+        // Index dream insights
+        const insights = await this._files.listInsights();
+        for (const filename of insights) {
+            const content = await this._files.readDreamFile(
+                `memory/dreams/insights/${filename}`,
+            );
+            if (content) {
+                await this._index.upsertDocument(
+                    `memory/dreams/insights/${filename}`,
+                    content,
+                    { contentType: "insight" },
+                );
+            }
+        }
+
+        // Index dream contradictions
+        const contradictions = await this._files.listContradictions();
+        for (const filename of contradictions) {
+            const content = await this._files.readDreamFile(
+                `memory/dreams/contradictions/${filename}`,
+            );
+            if (content) {
+                await this._index.upsertDocument(
+                    `memory/dreams/contradictions/${filename}`,
+                    content,
+                    { contentType: "contradiction" },
                 );
             }
         }
