@@ -56,19 +56,20 @@ Scores are broken down across **8 categories** that probe different memory capab
 | `synthesis` | Combining information from multiple days into a coherent answer |
 | `negative-recall` | Correctly reporting that something did NOT happen |
 
-## Time Ranges
+## Evaluation Periods
 
-Performance is measured at 5 corpus sizes to reveal how the system degrades as memory grows:
+Performance is measured at regular intervals across the corpus to reveal how the system degrades as memory grows. The evaluation period is configurable — the default is **1 week** (7 days).
 
-| Range | Days Ingested | Purpose |
+For a 1,000-day corpus at weekly intervals, this produces **143 evaluation points**, each representing a fresh ingest-and-query cycle up to that day. The heatmap renders each point as a colored cell, creating a continuous gradient that exposes degradation patterns more precisely than a handful of fixed ranges.
+
+| Interval | Evaluation Points (1000d) | Best for |
 |---|---|---|
-| `30d` | 1–30 | Short-term recall baseline |
-| `90d` | 1–90 | Quarter-scale |
-| `6mo` | 1–180 | Half-year |
-| `1y` | 1–365 | Full-year |
-| `full` | 1–1000 | Complete corpus (~2.7 years) |
+| `1` (daily) | 1000 | Fine-grained analysis (slow) |
+| `7` (weekly, default) | 143 | Standard benchmark runs |
+| `14` (biweekly) | 72 | Faster iteration |
+| `30` (monthly) | 34 | Quick smoke tests |
 
-Each range gets a **completely fresh** adapter lifecycle. Q&A pairs are filtered so only questions whose `relevant_days` all fall within the cutoff are included.
+Each evaluation point gets a **completely fresh** adapter lifecycle. Q&A pairs are filtered so only questions whose `relevant_days` all fall within the cutoff day are included.
 
 ## The Persona System
 
@@ -166,64 +167,51 @@ The primary output is a **category × time-range heatmap** showing mean composit
 ### Example Heatmap Output
 
 ```
-═══════════════════════════════════════════════════════════════════════════
-  AGGREGATE HEATMAP — Recall System v0.4 (5 personas)
-═══════════════════════════════════════════════════════════════════════════
-                               30d     90d     6mo      1y    full
-───────────────────────────────────────────────────────────────────────────
-  factual-recall              5.4     5.1     4.7     4.3     3.8
-  temporal-reasoning          4.6     4.2     3.8     3.4     2.9
-  decision-tracking           5.2     4.9     4.5     4.2     3.7
-  contradiction-resolution     --      --     3.3     2.9     2.4
-  cross-reference             4.8     4.4     3.9     3.5     3.1
-  recency-bias-resistance     5.0     4.6     4.1     3.3     2.6
-  synthesis                   4.2     3.9     3.5     3.1     2.7
-  negative-recall             5.6     5.3     4.9     4.5     4.1
-───────────────────────────────────────────────────────────────────────────
-  OVERALL                     4.97    4.63    4.09    3.65    3.16
-═══════════════════════════════════════════════════════════════════════════
-  Hallucination rate:  1.2%    2.4%    4.1%    6.8%   10.3%
-═══════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════════════
+  AGGREGATE HEATMAP — Recall System v0.4 (5 personas, 1-week intervals)
+═══════════════════════════════════════════════════════════════════════════════
+                             7d   14d   21d   28d  ...   980d  987d  994d 1000d
+───────────────────────────────────────────────────────────────────────────────
+  factual-recall            5.5   5.5   5.4   5.4  ...   3.9   3.8   3.8   3.8
+  temporal-reasoning        4.7   4.7   4.7   4.6  ...   3.0   2.9   2.9   2.9
+  decision-tracking         5.3   5.3   5.2   5.2  ...   3.8   3.7   3.7   3.7
+  contradiction-resolution   --    --    --    --   ...   2.5   2.4   2.4   2.4
+  cross-reference           4.9   4.8   4.8   4.7  ...   3.2   3.1   3.1   3.1
+  recency-bias-resistance   5.1   5.1   5.0   5.0  ...   2.7   2.7   2.6   2.6
+  synthesis                 4.3   4.3   4.2   4.2  ...   2.8   2.7   2.7   2.7
+  negative-recall           5.6   5.6   5.5   5.5  ...   4.1   4.1   4.1   4.1
+───────────────────────────────────────────────────────────────────────────────
+  OVERALL                   5.06  5.04  5.01  4.99 ...   3.25  3.19  3.17  3.16
+═══════════════════════════════════════════════════════════════════════════════
+  Hallucination rate:       1.0%  1.1%  1.1%  1.2% ...   9.7%  9.9% 10.1% 10.3%
+═══════════════════════════════════════════════════════════════════════════════
+
+  143 evaluation points (... indicates ~135 omitted columns)
 ```
 
 ### Reading the Heatmap
 
-**Columns** represent time-range slices. Reading left to right shows how performance degrades as the corpus grows. A system with good long-term recall will show a gentle slope; a system that relies heavily on recency will show steep drop-offs.
+**Columns** represent evaluation points at each interval. Reading left to right shows how performance degrades as the corpus grows. A system with good long-term recall will show a gentle color transition; a system that relies heavily on recency will show a sharp green-to-red shift.
 
-**Rows** represent evaluation categories. Each cell is the mean composite score (0.0–6.0) across all personas and eligible questions for that category/range combination.
+**Rows** represent evaluation categories. Each cell's color reflects the mean composite score (0.0–6.0) across all personas and eligible questions for that category at that evaluation point. Green = strong performance, amber = moderate, red = poor.
 
 Key patterns to look for:
 
-- **Steep left-to-right drop** in `recency-bias-resistance` → system over-weights recent memories
-- **`--` cells** in `contradiction-resolution` at short ranges → correction arcs haven't started yet (by design — corrections take time to develop)
-- **Low `synthesis` scores** across all ranges → system struggles to combine information from multiple memories
-- **High `negative-recall`** → system correctly avoids fabricating answers to questions about events that didn't happen
-- **Rising hallucination rate** → system fills gaps with fabricated content as the corpus grows and retrieval becomes harder
+- **Sharp color transition** in `recency-bias-resistance` → system over-weights recent memories
+- **Gray cells** in `contradiction-resolution` at early periods → correction arcs haven't started yet (by design — corrections take time to develop)
+- **Consistently warm colors** across `synthesis` → system struggles to combine information from multiple memories
+- **Persistent green** in `negative-recall` → system correctly avoids fabricating answers
+- **Hallucination rate shifting to warm colors** → system fills gaps with fabricated content as the corpus grows
 
 ### Visual Heatmap (Color-Coded)
 
-When rendered visually, the heatmap uses color to make patterns immediately obvious:
+When rendered visually, the heatmap uses a green → amber → red color scale to make performance patterns immediately obvious:
 
-```
-                          30d    90d    6mo     1y   full
-                        ┌──────┬──────┬──────┬──────┬──────┐
-  factual-recall        │ ███  │ ██▓  │ ██░  │ █▓░  │ █░░  │
-  temporal-reasoning    │ ██▓  │ ██░  │ █▓░  │ █░░  │ ▓░░  │
-  decision-tracking     │ ███  │ ██▓  │ ██░  │ █▓░  │ █░░  │
-  contradiction-resol.  │  --  │  --  │ █▓░  │ █░░  │ ▓░░  │
-  cross-reference       │ ██▓  │ ██░  │ █▓░  │ █░░  │ █░░  │
-  recency-bias-resist.  │ ███  │ ██░  │ █▓░  │ █░░  │ ▓░░  │
-  synthesis             │ ██░  │ █▓░  │ █░░  │ █░░  │ ▓░░  │
-  negative-recall       │ ███  │ ███  │ ██▓  │ ██░  │ █▓░  │
-                        └──────┴──────┴──────┴──────┴──────┘
+![Recall Bench Heatmap](recall-bench-heatmap.png)
 
-  Legend:  ███ = 5.0-6.0 (excellent)    ██▓ = 4.0-5.0 (good)
-           ██░ = 3.0-4.0 (adequate)     █▓░ = 2.0-3.0 (weak)
-           █░░ = 1.0-2.0 (poor)         ▓░░ = 0.0-1.0 (failing)
-            -- = insufficient data (< 3 eligible questions)
-```
+The characteristic "cooling gradient" from left to right is expected — all memory systems degrade with scale. What matters is *how steep* the gradient is and *which categories* degrade fastest. Gray cells (`--`) indicate insufficient data at that time range.
 
-The characteristic "cooling gradient" from left to right is expected — all memory systems degrade with scale. What matters is *how steep* the gradient is and *which categories* degrade fastest.
+> **Regenerate the image:** `node scripts/generate-heatmap.mjs [--interval 7] [--days 1000] [--output path.png]` (requires `canvas` dev dependency).
 
 ## CLI Reference
 
@@ -245,7 +233,8 @@ npx recall-bench run \
 | `--data <dir>` | required | Dataset directory |
 | `--judge <path>` | stub (zeros) | JS judge module |
 | `--personas <ids...>` | all | Subset of personas to run |
-| `--ranges <ranges...>` | all 5 | Time ranges to evaluate |
+| `--interval <days>` | 7 | Evaluation period in days |
+| `--ranges <ranges...>` | all | Time ranges to evaluate (legacy) |
 | `--seed <n>` | 42 | Shuffle seed for question order |
 | `--timeout <ms>` | 30000 | Per-question timeout |
 | `--grpc-timeout <ms>` | 120000 | Per-RPC timeout |

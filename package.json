@@ -15,5 +15,8 @@
   },
   "dependencies": {
     "vectra": "^0.14.0"
+  },
+  "devDependencies": {
+    "canvas": "^3.2.3"
   }
 }
