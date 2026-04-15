@@ -130,6 +130,33 @@ Datasets are generated using a **two-pass LLM pipeline**:
 
 **Pass 1** separates "what happened" from how it was communicated. **Pass 2** optionally reconstructs the conversations that would have produced those logs.
 
+### Optional: Conversation History Generation
+
+Pass 2 (`generate-conversations`) converts daily memory logs into multi-turn **user/assistant conversations** — the kind of dialogue that would have produced each day's log. This is useful for memory systems that ingest conversation transcripts rather than structured logs.
+
+Each generated conversation contains 4–12 turns, written in the persona's natural voice and communication style. The conversations are consistent with the daily log but feel like organic dialogue, not forced extraction — some log entries are the persona's own observations that don't appear in the conversation.
+
+You can generate conversations for the **full 1,000-day corpus** or a **subset** using `--start` and `--end` flags. For example, generating 100 days of conversation history is a good way to test a system's conversation ingestion without the cost of processing all 1,000 days:
+
+```bash
+# Generate conversations for days 1–100 only
+npx recall-bench generate-conversations \
+  --persona ./dataset/my-persona \
+  --model claude \
+  --days ./dataset/my-persona/memories \
+  --out ./dataset/my-persona/conversations \
+  --start 1 --end 100
+
+# Generate for the full corpus
+npx recall-bench generate-conversations \
+  --persona ./dataset/my-persona \
+  --model claude \
+  --days ./dataset/my-persona/memories \
+  --out ./dataset/my-persona/conversations
+```
+
+Output is written as one file per day (`conv-0001.md` or `conv-0001.json`) in either **markdown** or **JSON** format (`--format markdown|json`). Since each day's conversation depends only on its daily log, generation is fully parallel across days.
+
 ## Connecting Your Memory System
 
 Any system that can ingest markdown and answer questions can participate. Two integration paths:
