@@ -45,16 +45,16 @@ Recall Bench follows a three-phase evaluation loop:
 
 Scores are broken down across **8 categories** that probe different memory capabilities:
 
-| Category | What it tests |
-|---|---|
-| `factual-recall` | Retrieving specific facts from past days |
-| `temporal-reasoning` | Understanding when events happened and their order |
-| `decision-tracking` | Remembering decisions and their rationale |
-| `contradiction-resolution` | Detecting when later information supersedes earlier beliefs |
-| `cross-reference` | Connecting information across unrelated arcs |
-| `recency-bias-resistance` | Not favoring recent memories over equally relevant older ones |
-| `synthesis` | Combining information from multiple days into a coherent answer |
-| `negative-recall` | Correctly reporting that something did NOT happen |
+| Category | What It Measures | Example Question |
+|---|---|---|
+| `factual-recall` | Retrieving a specific fact stated on a specific day. Tests basic storage and retrieval fidelity — can the system find a needle in 1,000 days of hay? | "What database engine did the team choose for the analytics service on day 247?" |
+| `temporal-reasoning` | Understanding *when* things happened and in what order. Requires the system to maintain or reconstruct chronological relationships between events. | "Did the load balancer migration finish before or after the Q3 security audit?" |
+| `decision-tracking` | Following a decision through its full lifecycle — proposal, discussion, objections, and final resolution. Tests whether the system preserves deliberation context, not just outcomes. | "Why was Redis chosen over Memcached for the session store, and who raised the initial objection?" |
+| `contradiction-resolution` | Handling information that was later corrected or superseded. The system must recognize that an earlier belief was updated and return the *latest* correct version. | "What is the current max connection pool size? (It was changed from the original setting on day 312.)" |
+| `cross-reference` | Connecting information that spans multiple unrelated arcs or time periods. Tests the system's ability to synthesize across memory boundaries that were never explicitly linked. | "Which two projects both experienced deployment failures caused by the same misconfigured environment variable?" |
+| `recency-bias-resistance` | Recalling old information that hasn't been mentioned recently with the same fidelity as recent events. Exposes systems that implicitly down-weight older memories. | "What was the root cause of the day-45 outage?" (asked at day 900, with no intervening references) |
+| `synthesis` | Combining information from multiple separate memories into an answer that doesn't exist in any single entry. Requires aggregation, comparison, or pattern recognition across days. | "How did the team's approach to database migrations evolve over the first year?" |
+| `negative-recall` | Correctly identifying that something was *not* mentioned or did not happen. Tests whether the system fabricates plausible-sounding answers when the truthful response is "no evidence found." | "Did the team ever discuss migrating to GraphQL?" (when they didn't) |
 
 ## Evaluation Periods
 
