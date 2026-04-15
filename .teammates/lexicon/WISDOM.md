@@ -2,7 +2,7 @@
 
 Distilled principles. Read first every session (after SOUL.md).
 
-Last compacted: 2026-04-14
+Last compacted: 2026-04-15
 
 ---
 
@@ -16,17 +16,17 @@ Last compacted: 2026-04-14
 
 **Structure over volume** — Sharp sections with labels adjacent to values beat longer, vaguer prompts.
 
-**Reference data off the evidence path** — Roster, services, datetime dilute the evidence chain. Keep them outside the context-to-task span.
+**Reference data off the evidence path** — Roster, services, datetime dilute evidence. Keep them outside the context-to-task span.
 
-**Bottom-edge reinforcement** — Short end-of-prompt reminders carry outsized force. Tie each to its `<SECTION_NAME>`.
+**Bottom-edge reinforcement** — End-of-prompt reminders carry outsized force. Tie each to its `<SECTION_NAME>`.
 
-**Constraint over choreography** — Specify outcomes, format, limits. Avoid sequencing mandates unless order matters.
+**Constraint over choreography** — Specify outcomes, format, limits. Avoid sequencing unless order matters.
 
 ## Prompt Integration
 
 **SOUL is identity, not runtime control** — Persona and durable principles only. Runtime mechanics go in the instruction block.
 
-**Specs are hypotheses until verified in assembly** — Check the prompt builder before treating any design note as live behavior.
+**Specs are hypotheses until verified in assembly** — Check the prompt builder before treating any design note as live.
 
 **Patch the assembly point** — Changes only matter where the final token stream is built. A correct idea in the wrong file has no effect.
 
@@ -44,7 +44,7 @@ Last compacted: 2026-04-14
 
 ## Operational
 
-**Deliverable first, housekeeping second** — Front-loading upkeep consumes budget before the visible answer ships.
+**Deliverable first, housekeeping second** — Front-loading upkeep consumes budget before the answer ships.
 
 **Compression bugs look like missing context** — Right facts buried in duplicates behave as absent. Dedupe before concluding retrieval failed.
 

@@ -205,7 +205,17 @@ Q&A pairs are stored in `qa/questions.yaml` inside each persona directory. Each 
 | `requires_synthesis` | boolean | Whether the answer spans multiple memories |
 
 **Evaluation categories:**
-`factual-recall`, `temporal-reasoning`, `decision-tracking`, `contradiction-resolution`, `cross-reference`, `recency-bias-resistance`, `synthesis`, `negative-recall`
+
+| Category | What It Measures | Example |
+|---|---|---|
+| `factual-recall` | Retrieving a specific fact from a specific day | "What port was the staging server running on during the March deployment?" |
+| `temporal-reasoning` | Understanding when things happened and in what order | "Did the team adopt the new linting rules before or after the CI migration?" |
+| `decision-tracking` | Following a decision through proposal, discussion, and resolution | "Why was the original database schema rejected?" |
+| `contradiction-resolution` | Handling information that was corrected or superseded | "What is the current API rate limit?" (was 100rps on day 50, corrected to 1000rps on day 200) |
+| `cross-reference` | Connecting information across multiple arcs or time periods | "Which two projects shared the same blocking dependency?" |
+| `recency-bias-resistance` | Correctly recalling old information that hasn't been mentioned recently | "What testing framework was used for the first project?" (day 12, never mentioned again) |
+| `synthesis` | Combining multiple memories to produce an answer not stated in any single entry | "What pattern emerges in how the team handles database migrations?" |
+| `negative-recall` | Correctly identifying that something was NOT mentioned | "Did the persona ever work on mobile features?" |
 
 ### Shipped Personas
 

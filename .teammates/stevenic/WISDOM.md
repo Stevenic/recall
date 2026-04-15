@@ -2,7 +2,7 @@
 
 Distilled from work history. Updated during compaction.
 
-Last compacted: 2026-04-14
+Last compacted: 2026-04-15
 
 ---
 
@@ -34,25 +34,22 @@ Used in both Phase 1 (parent retrieval) and Phase 2 (reranking). Especially valu
 ## Dreaming System
 
 **Dreaming is asynchronous knowledge synthesis, complementary to compaction.**
-Compaction is structural (summarize within temporal windows). Dreaming is analytical — discovers cross-temporal patterns, surfaces forgotten connections, extracts insights, promotes durable knowledge, and detects contradictions. Spec v0.1, drafted 2026-04-11.
+Compaction is structural (summarize within temporal windows). Dreaming is analytical — discovers cross-temporal patterns, surfaces forgotten connections, extracts insights, promotes durable knowledge, and detects contradictions.
 
 **Three-phase pipeline: Gather → Analyze → Write.**
 Phase 1 (Gather) collects signals from search logs, entity scans, staleness checks, and wisdom drift — all deterministic. Phase 2 (Analyze) uses the LLM via `MemoryModel` abstraction for synthesis. Phase 3 (Write) persists results without modifying existing files.
 
 **Signal-driven candidate selection with weighted scoring.**
-Five signal types feed candidate scoring: hit frequency (0.25), query diversity (0.25), gap signal (0.20), staleness (0.15), entity frequency (0.15). Max 20 candidates per session (configurable). Unprocessed candidates carry over.
+Five signal types: hit frequency (0.25), query diversity (0.25), gap signal (0.20), staleness (0.15), entity frequency (0.15). Max 20 candidates per session. Unprocessed candidates carry over.
 
 **Three output types, all append-only.**
-Insights (`memory/dreams/insights/`), promoted typed memories (`memory/`), and contradiction flags (`memory/dreams/contradictions/`). Dream diary appended to `DREAMS.md`. All indexed in Vectra for searchability. Never modifies or deletes existing files (eidetic-compatible).
+Insights (`memory/dreams/insights/`), promoted typed memories (`memory/`), and contradiction flags (`memory/dreams/contradictions/`). Dream diary appended to `DREAMS.md`. All indexed in Vectra. Never modifies or deletes existing files (eidetic-compatible).
 
 **Search signal logging via `SearchLogger`.**
-Append-only JSONL at `.dreams/search-log.jsonl`. Records query, result URIs, scores, topK, timestamp. Rotated monthly (archives not deleted). Opt-in via `DreamingConfig.logSearches`. `.dreams/` is gitignored machine state.
+Append-only JSONL at `.dreams/search-log.jsonl`. Records query, result URIs, scores, topK, timestamp. Rotated monthly. Opt-in via `DreamingConfig.logSearches`. `.dreams/` is gitignored machine state.
 
 **Five LLM analysis templates.**
 Cross-reference analysis, gap analysis, contradiction detection, typed memory extraction, and theme synthesis. All overridable via `DreamingConfig.analysisTemplates`.
-
-**Implementation scaffolding complete (as of 2026-04-12).**
-`DreamEngine`, `SearchLogger`, `SignalCollector`, and `DreamingConfig` types all exist in `packages/core/src/`. Spec phases A–D defined; A (search signal infrastructure) can ship independently to start accumulating signals.
 
 ## Model & Abstractions
 
@@ -96,13 +93,25 @@ Bindings (Python, Go, Rust, C#) spawn the `recall` CLI with `--json` and parse s
 ## Benchmarking
 
 **recall-bench: persona-driven benchmark harness for agent memory systems.**
-1000 days of synthetic memories per persona. Time-range subsetting (30d, 90d, 6mo, 1y, full). Pluggable via gRPC adapter. Covers diverse domains beyond software engineering.
+1000 days of synthetic memories per persona. Variable evaluation periods (default 1-week intervals = 143 evaluation points). Pluggable via gRPC adapter or direct TypeScript adapter. Covers diverse domains beyond software engineering.
+
+**5 shipped personas across diverse domains.**
+backend-eng-saas (SaaS platform), er-physician (trauma center), litigation-attorney (law firm), research-scientist (biology lab), financial-advisor (wealth management). Each has identity YAML, story arcs, daily logs, and Q&A pairs.
+
+**8 evaluation categories.**
+factual-recall, temporal-reasoning, decision-tracking, contradiction-resolution, cross-reference, recency-bias-resistance, synthesis, negative-recall. Scored on correctness (0-3) + completeness (0-2) + hallucination (0-1) = composite max 6.0.
+
+**Heatmap is the primary output artifact.**
+Category × evaluation-point grid. Green → amber → red color scale. Column = evaluation point (left-to-right shows degradation as corpus grows). Row = category. Reveals which capabilities degrade fastest. Generated via `scripts/generate-heatmap.mjs` with `--interval`, `--days`, `--output` flags. Cells are color-only (no score text), auto-scaling width.
 
 **Benchmark dataset generation is two-pass.**
-Pass 1 generates daily activity logs from persona story arcs. Pass 2 optionally constructs conversations that produce those logs. Separates "what happened" from "how it was communicated."
+Pass 1 generates daily activity logs from persona story arcs (arc-driven, with gap filling for weeks < 5 active days). Pass 2 optionally constructs conversations that produce those logs. Separates "what happened" from "how it was communicated."
+
+**Story arcs create realistic complexity.**
+4 max concurrent arcs. Arc types: projects, incidents, decisions, learning, relationships, corrections. Correction arcs specifically test belief revision tracking. Quiet periods (vacations, breaks) test temporal gap handling.
 
 **gRPC for cross-language memory system binding.**
-recall-bench binds to memory systems over gRPC. gRPC server support also planned for recall itself.
+`MemoryBenchService` proto maps 1:1 to TypeScript adapter interface. recall-bench binds to memory systems over gRPC. gRPC server support also planned for recall itself.
 
 ## Implementation Status
 
@@ -113,4 +122,4 @@ Scaffolding & interfaces done. File management done. Phase 5 (MemoryService wiri
 5 phases (A-E). Phase A: eidetic storage. Phase B: dual embeddings + salience. Phase C: two-phase recall (depends on B). Phase D: BM25 integration (parallel with C). Phase E: migration CLI. A+B started in parallel.
 
 **Dreaming system scaffolding added 2026-04-12.**
-Spec v0.1 authored by @scribe (2026-04-11). Implementation assigned to @beacon (2026-04-12). `DreamEngine`, `SearchLogger`, `SignalCollector`, and config types exist. Implementation phases: A (search signal infra) → B (signal collection + scoring) → C (synthesis pipeline) → D (output + integration). A can ship independently to start accumulating search signals.
+`DreamEngine`, `SearchLogger`, `SignalCollector`, and `DreamingConfig` types exist in `packages/core/src/`. Implementation phases: A (search signal infra) → B (signal collection + scoring) → C (synthesis pipeline) → D (output + integration). A can ship independently to start accumulating search signals.

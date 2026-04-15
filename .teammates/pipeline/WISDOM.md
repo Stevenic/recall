@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-14
+Last compacted: 2026-04-15
 
 ---
 
