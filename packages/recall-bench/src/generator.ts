@@ -693,13 +693,15 @@ export class DayGenerator {
      * returns the full GenerationResult.
      */
     async generateAll(): Promise<GenerationResult> {
-        // Pass 1 — arc-by-arc
+        // Pass 1 — arc-by-arc (writes onDay incrementally as each day is generated)
         await this.runArcPass();
 
-        // Pass 2 — gap filling
+        // Pass 2 — gap filling (also writes onDay incrementally)
         await this.runGapPass();
 
-        // Collect results in day order and fire onDay callbacks
+        // Build the GenerationResult from in-memory state. onDay has already
+        // been called for every generated day during the passes above; we do
+        // not re-fire it here.
         const sortedDays = [...this.generatedDays.keys()].sort((a, b) => a - b);
         const days: GeneratedDay[] = [];
         let totalInputTokens = 0;
@@ -710,20 +712,15 @@ export class DayGenerator {
             const date = computeCalendarDate(this.persona.epoch, dayNumber);
             const tokens = this.dayTokens.get(dayNumber) ?? { input: 0, output: 0 };
 
-            const day: GeneratedDay = {
+            days.push({
                 dayNumber,
                 calendarDate: formatDate(date),
                 content,
                 inputTokens: tokens.input,
                 outputTokens: tokens.output,
-            };
-            days.push(day);
+            });
             totalInputTokens += tokens.input;
             totalOutputTokens += tokens.output;
-
-            if (this.config.onDay) {
-                await this.config.onDay(dayNumber, content);
-            }
         }
 
         return {
@@ -795,16 +792,31 @@ export class DayGenerator {
                 const existing = this.generatedDays.get(dayNumber) ?? null;
                 const userMessage = buildArcUserMessage(ctx, focusArc, existing);
 
-                const result = await this.model.complete(systemPrompt, userMessage, {
-                    maxTokens: this.config.maxTokens,
-                    temperature: this.config.temperature,
-                });
+                let result;
+                try {
+                    result = await this.model.complete(systemPrompt, userMessage, {
+                        maxTokens: this.config.maxTokens,
+                        temperature: this.config.temperature,
+                    });
+                } catch (err) {
+                    // Per-call failures (timeout, subprocess crash) must not
+                    // abort the run — keep going so we don't lose all prior days.
+                    const msg = err instanceof Error ? err.message : String(err);
+                    process.stderr.write(`\n[generator] arc=${arc.id} day=${dayNumber} skipped: ${msg.split('\n')[0]}\n`);
+                    continue;
+                }
 
                 const content = result.text;
                 this.generatedDays.set(dayNumber, content);
                 this.trackTokens(dayNumber, result.inputTokens ?? 0, result.outputTokens ?? 0);
                 this.insertRecentDay(dayNumber, ctx.calendarDate, ctx.dayOfWeek, content);
                 await this.updateArcSummaries(dayNumber, [focusArc], content);
+
+                // Write through onDay so progress is durable on disk before
+                // the next subprocess call. A mid-run crash keeps prior days.
+                if (this.config.onDay) {
+                    await this.config.onDay(dayNumber, content);
+                }
             }
         }
     }
@@ -831,15 +843,26 @@ export class DayGenerator {
             const ctx = this.buildDayContext(dayNumber);
             const userMessage = buildGapUserMessage(ctx);
 
-            const result = await this.model.complete(systemPrompt, userMessage, {
-                maxTokens: this.config.maxTokens,
-                temperature: this.config.temperature,
-            });
+            let result;
+            try {
+                result = await this.model.complete(systemPrompt, userMessage, {
+                    maxTokens: this.config.maxTokens,
+                    temperature: this.config.temperature,
+                });
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                process.stderr.write(`\n[generator] gap day=${dayNumber} skipped: ${msg.split('\n')[0]}\n`);
+                continue;
+            }
 
             const content = result.text;
             this.generatedDays.set(dayNumber, content);
             this.trackTokens(dayNumber, result.inputTokens ?? 0, result.outputTokens ?? 0);
             this.insertRecentDay(dayNumber, ctx.calendarDate, ctx.dayOfWeek, content);
+
+            if (this.config.onDay) {
+                await this.config.onDay(dayNumber, content);
+            }
         }
     }
 

@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-15
+Last compacted: 2026-04-25
 
 ---
 
@@ -23,6 +23,15 @@ Extract state-computation logic as pure exported functions alongside stateful cl
 **Ship verified code**
 Build, run the relevant tests, and call out any verification gap plainly. Don't log completion until the file is written and verified — false "done" entries poison future debugging.
 
+**Verify outputs, not exit codes**
+A clean exit doesn't prove the operation did work. After batch jobs, generators, or filters, check the artifacts you expected — file count, size, content. Silent zero-result runs with exit 0 are the worst failure mode because they look like success.
+
+**Persist work incrementally in batch jobs**
+In long-running batch jobs (generation, migration, indexing), commit each item to disk as soon as it completes — never accumulate in memory and write at the end. A timeout, crash, or single failure on item 22 must not lose work for items 1–21. Hook into per-item completion (e.g. `onDay`, `onItem`) and write immediately.
+
+**Isolate per-item failures in batch loops**
+Wrap each iteration's risky call (model, network, subprocess) in try/catch and continue with a one-line skip log. One flaky call must not abort an N-item run. The exception boundary is what separates "one bad item" from "whole run failed."
+
 **Clean dist AND tsbuildinfo before rebuilding**
 Always remove `dist/` and `*.tsbuildinfo` before `npm run build`. With `composite: true`, a stale `.tsbuildinfo` can make tsc skip emit entirely — the build succeeds but produces no output.
 
@@ -37,6 +46,12 @@ Track durable item identity instead of parallel index-keyed structures when stat
 
 **Instrumentation must not break the primary path**
 Observability hooks (search logging, metrics, telemetry) should be best-effort with try/catch. A logging failure must never fail the operation being logged.
+
+**Wrap parseInt/parseFloat as Commander coercers**
+Commander invokes coercers as `coerce(value, previousValue)`, so `parseInt("1", 1)` treats `1` as the radix and returns `NaN`. Always wrap: `(v: string) => parseInt(v, 10)`. The `??` default guard does NOT catch `NaN` (it's not nullish), and `NaN` propagates silently through comparisons (`x >= NaN` is always false), producing zero-result runs with exit 0.
+
+**Gate per-tool flags on tool identity**
+When one adapter wraps multiple CLI tools, do not append flags universally. Built-in CLIs (`claude`, `codex`, `copilot`) and custom CLIs accept different flag sets — assuming universal support produces immediate exit 1 errors. Branch on tool identity before adding tool-specific flags.
 
 ## Architecture
 
@@ -74,6 +89,9 @@ Resolve sibling files with `fileURLToPath(new URL(..., import.meta.url))`, never
 
 **Spawned stdin needs EOF protection**
 Whenever writing to a child process stdin, attach an error handler that swallows `EPIPE` and `EOF`. Some processes close stdin early — that should not crash the parent.
+
+**Windows spawn timeout needs explicit watchdog**
+Node's `spawn({ timeout })` uses SIGTERM, which Windows doesn't honor — hung subprocesses run forever. Use a `setTimeout` watchdog that calls `taskkill /PID <pid> /T /F` on Windows (POSIX falls back to SIGKILL). The `/T` flag matters because `shell: true` makes the real subprocess a grandchild of `cmd.exe`; without it you only kill the wrapper. Wrap `resolve`/`reject` in a `settled` flag so the watchdog and a delayed `close` event can't double-settle the Promise.
 
 ## Monorepo
 

@@ -91,15 +91,19 @@ export class CliGeneratorModel implements GeneratorModel {
         const name = this._config.agent;
         const extraArgs = [...(this._config.args ?? [])];
 
-        // Pass temperature/max-tokens for agents that support them
-        if (options?.temperature !== undefined) {
-            extraArgs.push('--temperature', String(options.temperature));
-        }
-        if (options?.maxTokens !== undefined) {
-            extraArgs.push('--max-tokens', String(options.maxTokens));
+        // Well-known coding-agent CLIs (claude, codex, copilot) don't accept
+        // --temperature / --max-tokens flags. Only pass them to custom commands.
+        const isWellKnown = name in WELL_KNOWN_AGENTS;
+        if (!isWellKnown) {
+            if (options?.temperature !== undefined) {
+                extraArgs.push('--temperature', String(options.temperature));
+            }
+            if (options?.maxTokens !== undefined) {
+                extraArgs.push('--max-tokens', String(options.maxTokens));
+            }
         }
 
-        if (name in WELL_KNOWN_AGENTS) {
+        if (isWellKnown) {
             const base = WELL_KNOWN_AGENTS[name as CliAgentName];
             return {
                 command: base.command,
@@ -130,12 +134,22 @@ function runWithStdin(
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
             stdio: ['pipe', 'pipe', 'pipe'],
-            timeout,
             shell: true,
         });
 
         let stdout = '';
         let stderr = '';
+        let settled = false;
+        const done = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
+
+        // Explicit watchdog — spawn()'s `timeout` option uses SIGTERM, which
+        // Windows does not actually deliver; a hung subprocess can sit forever.
+        // Force-kill with tree-kill semantics via taskkill on Windows, SIGKILL
+        // on POSIX.
+        const watchdog = setTimeout(() => {
+            killChildTree(child);
+            done(() => reject(new Error(`Agent timed out after ${timeout}ms`)));
+        }, timeout);
 
         child.stdout.on('data', (data: Buffer) => {
             stdout += data.toString();
@@ -146,27 +160,56 @@ function runWithStdin(
         });
 
         child.on('error', (err: Error) => {
-            reject(err);
+            clearTimeout(watchdog);
+            done(() => reject(err));
         });
 
         child.on('close', (code: number | null) => {
+            clearTimeout(watchdog);
             if (code === 0) {
-                resolve(stdout);
+                done(() => resolve(stdout));
             } else {
-                reject(
+                done(() => reject(
                     new Error(`Agent exited with code ${code}: ${stderr || stdout}`),
-                );
+                ));
             }
         });
 
         // Write prompt to stdin with EPIPE protection
         child.stdin.on('error', (err: NodeJS.ErrnoException) => {
             if (err.code !== 'EPIPE' && err.code !== 'EOF') {
-                reject(err);
+                clearTimeout(watchdog);
+                done(() => reject(err));
             }
         });
         child.stdin.end(prompt);
     });
+}
+
+/**
+ * Force-kill a spawned child and its descendants. On Windows we use
+ * taskkill /T /F because SIGTERM/SIGKILL are not honored reliably by
+ * shell-launched subprocesses. On POSIX we fall back to SIGKILL.
+ */
+function killChildTree(child: ReturnType<typeof spawn>): void {
+    if (child.killed || child.pid === undefined) return;
+    if (process.platform === 'win32') {
+        try {
+            // `spawn` with shell: true wraps the command in cmd.exe — we need
+            // to kill the tree so claude.cmd's child processes don't linger.
+            spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+                stdio: 'ignore',
+                shell: false,
+            });
+        } catch {
+            // Best effort; fall through to kill() below.
+        }
+    }
+    try {
+        child.kill('SIGKILL');
+    } catch {
+        // Already dead or unkillable — nothing more we can do.
+    }
 }
 
 async function runWithTempFile(

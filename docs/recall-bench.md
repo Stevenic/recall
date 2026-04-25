@@ -31,21 +31,36 @@ Recall Bench follows a three-phase evaluation loop:
 
 **Phase 2 — Querying.** The harness poses natural-language questions grounded in specific days. Questions are filtered per time-range so the system is only asked about information it has actually seen.
 
-**Phase 3 — Scoring.** A judge model compares each answer against a reference answer and scores it on three dimensions:
+**Phase 3 — Scoring.** A judge model compares each answer against a reference answer and scores it across the **8+1 dimensions** described in the next section.
 
-| Dimension | Scale | What it measures |
-|---|---|---|
-| **Correctness** | 0–3 | Does the answer contain the right facts? |
-| **Completeness** | 0–2 | Does it include all relevant details? |
-| **Hallucination** | 0–1 | Is it grounded in actual memories? (1 = yes) |
+## The 8+1 Dimensions
 
-**Composite score** = correctness + completeness + hallucination → max **6.0** per question.
+Recall Bench measures memory quality along **eight recall dimensions** plus **one independent dimension** for hallucination. The eight dimensions describe *what kind of memory work* the question demands; the +1 describes *whether the answer is grounded in real memories at all*.
 
-## Evaluation Dimensions
+```
+                ┌─────────────────────────────────────┐
+                │   8 Recall Dimensions (per Q&A)     │
+                │   correctness (0–3)                 │
+                │ + completeness (0–2)                │
+                │ → composite recall score (0–5)      │
+                └─────────────────────────────────────┘
+                                  +
+                ┌─────────────────────────────────────┐
+                │   1 Hallucination Dimension         │
+                │   hallucination (0–1)               │
+                │   1 = grounded, 0 = fabricated      │
+                └─────────────────────────────────────┘
 
-Scores are broken down across **8 categories** that probe different memory capabilities:
+  Composite score per Q&A = correctness + completeness + hallucination → max 6.0
+```
 
-| Category | What It Measures | Example Question |
+Hallucination is scored on every question, regardless of category. Holding it apart from the recall score lets you read each in isolation — a system can be confidently wrong (high recall score, low hallucination score) or accurately silent (low recall score, high hallucination score). Mixing them into one number hides which failure mode dominates.
+
+### The 8 Recall Dimensions
+
+Each question is tagged with exactly one of these categories. The harness reports per-category scores so you can see *which kind* of memory work degrades first as the corpus grows.
+
+| Dimension | What It Measures | Example Question |
 |---|---|---|
 | `factual-recall` | Retrieving a specific fact stated on a specific day. Tests basic storage and retrieval fidelity — can the system find a needle in 1,000 days of hay? | "What database engine did the team choose for the analytics service on day 247?" |
 | `temporal-reasoning` | Understanding *when* things happened and in what order. Requires the system to maintain or reconstruct chronological relationships between events. | "Did the load balancer migration finish before or after the Q3 security audit?" |
@@ -55,6 +70,38 @@ Scores are broken down across **8 categories** that probe different memory capab
 | `recency-bias-resistance` | Recalling old information that hasn't been mentioned recently with the same fidelity as recent events. Exposes systems that implicitly down-weight older memories. | "What was the root cause of the day-45 outage?" (asked at day 900, with no intervening references) |
 | `synthesis` | Combining information from multiple separate memories into an answer that doesn't exist in any single entry. Requires aggregation, comparison, or pattern recognition across days. | "How did the team's approach to database migrations evolve over the first year?" |
 | `negative-recall` | Correctly identifying that something was *not* mentioned or did not happen. Tests whether the system fabricates plausible-sounding answers when the truthful response is "no evidence found." | "Did the team ever discuss migrating to GraphQL?" (when they didn't) |
+
+### The +1: Hallucination
+
+Hallucination is a **binary** judgement on every answer: was anything in this answer *not* supported by memories the system actually has?
+
+| Score | Meaning |
+|---|---|
+| `1` | Fully grounded — every claim traces to an ingested memory (or correctly admits no evidence) |
+| `0` | Hallucinated — at least one claim was fabricated, embellished, or transplanted from outside the corpus |
+
+Two design choices matter here:
+
+- **Hallucination is independent of correctness.** A system can hallucinate while still being correct (lucky guess) or be wrong without hallucinating (it retrieved the wrong real memory). The judge prompt is structured to score these separately so neither masks the other.
+- **`negative-recall` is the canary.** When the truthful answer is "no evidence found," any plausible-sounding answer is by definition a hallucination. This category is the cleanest direct test of the +1 dimension; the other seven test it indirectly.
+
+The aggregate **hallucination rate** for a run is the percentage of questions scored `0` on this dimension. It is reported separately from the recall composite — you'll see it as a dedicated row beneath the heatmap, not as one of the eight category rows.
+
+### Tracking Hallucinations Over Time
+
+Hallucination tends to *increase* with corpus size — the more memories a system has, the more raw material it has to confuse, conflate, or invent from. Recall Bench surfaces this trajectory through several views, and you should track all of them across runs to spot regressions early:
+
+**1. The hallucination row in the heatmap.** Every evaluation point reports its hallucination rate as a single percentage. Reading left-to-right shows the trajectory as the corpus grows. A flat line near 0% is the goal; a steady rise from 1% → 10% across the 1,000-day axis means the system increasingly fills gaps with fabrication.
+
+**2. Per-category hallucination.** Aggregate rate hides where the fabrication is concentrated. Break it out: `negative-recall` and `synthesis` are the highest-risk categories, and their hallucination rates often diverge from the rest. A system can have a healthy 2% overall rate but a 40% rate inside `negative-recall` — the aggregate masks a clear failure mode.
+
+**3. Trend slope, not just absolute rate.** Two systems both ending at 8% hallucination tell different stories if one started at 2% (steady degradation) and the other at 7% (always bad, didn't get worse). When comparing runs, fit a simple linear regression of hallucination rate against corpus size and report both intercept and slope. The slope is the more interesting number — it predicts how the system will behave at 2,000 or 5,000 days.
+
+**4. Question-level reproducibility across runs.** Some questions reliably trigger hallucination across seeds, models, and corpus sizes. Tag these as **canary questions** and watch them on every run — when one stops hallucinating, you've made real progress; when a previously-clean question starts hallucinating, you've regressed. The harness's `--json` output includes per-question scores so this can be diffed automatically.
+
+**5. Hallucination versus recall correlation.** Plot recall composite (x-axis) against hallucination rate (y-axis) per evaluation point. A healthy system shows hallucination *rising* as recall *falls* — the system is honestly admitting uncertainty when memories are gone. A pathological system shows hallucination *also falling* as recall falls — meaning the system is confidently fabricating answers it doesn't actually have, and the judge is sometimes scoring those fabrications as correct. The second pattern is far more dangerous and the only way to catch it is by tracking these two metrics jointly.
+
+**6. Per-persona splits.** Different domains exercise different fabrication tendencies — a system trained heavily on tech vocabulary may invent plausible-sounding legal precedents but balk at fabricating medical diagnoses (or vice versa). Always report hallucination broken out by persona, not just aggregated, so domain-specific weaknesses don't get averaged away.
 
 ## Evaluation Periods
 
@@ -130,6 +177,70 @@ Datasets are generated using a **two-pass LLM pipeline**:
 
 **Pass 1** separates "what happened" from how it was communicated. **Pass 2** optionally reconstructs the conversations that would have produced those logs.
 
+### Creating a Cast
+
+Generating a 1,000-day persona is a long, expensive operation — at typical CLI-agent latencies, a full run takes hours and burns through hundreds of subprocess invocations. Recall Bench's generation pipeline is designed around the assumption that **something will go wrong mid-run** (network blip, agent crash, watchdog timeout, the user hitting Ctrl-C) and that the run must be cheap to recover from.
+
+#### Incremental, durable progress
+
+`recall-bench generate` writes each day to disk **as soon as it is produced**, not at the end of the run. A 1,000-day run that crashes at day 437 leaves you with 436 days on disk; resuming with `--start 437` picks up where you left off. The progress indicator reflects this:
+
+```
+  Generated day 437/1000 (437 unique)
+```
+
+The "(N unique)" counter shows how many distinct days have actually landed on disk, which can differ from the day number when arcs overlap (the same day can be touched by Pass 1 and again by gap-fill).
+
+#### Per-day failure resilience
+
+A single failed subprocess call (timeout, agent crash, malformed output) **no longer aborts the run**. The failure is logged to stderr and the generator moves on:
+
+```
+[generator] arc=incident-q3-outage day=237 skipped: Agent timed out after 600000ms
+```
+
+When the run finishes, the result reports only the days that succeeded. To fill the gaps left by skipped days, re-run `generate` with `--start <skipped-day> --end <skipped-day>` for each one, or run a wider range and existing files will be overwritten with fresh content.
+
+#### Coding-agent quirks
+
+The built-in CLI agents (`claude`, `codex`, `copilot`) **do not accept `--temperature` or `--max-tokens` flags**. The pipeline detects these well-known agents and silently strips those flags before invocation; the values you pass to `recall-bench generate --temperature 0.7` are honored only when the underlying model is a custom command or a JS module. If you need finer control over coding-agent generation parameters, configure them through the agent's own configuration file rather than through the bench CLI.
+
+#### Subprocess termination on Windows
+
+The default `--timeout` for `generate` is **600 seconds** (10 minutes) per day. When a subprocess exceeds the timeout, the harness uses an explicit watchdog and force-kills the process tree:
+
+- **Windows:** `taskkill /T /F /PID <pid>` — terminates the cmd.exe wrapper *and* the agent subprocess it spawned. Necessary because Node's built-in `spawn` timeout sends SIGTERM, which `cmd.exe` does not propagate to children.
+- **POSIX:** `SIGKILL` to the process group.
+
+This matters in practice: without tree-kill on Windows, a hung `claude.cmd` subprocess can leak file handles and sit consuming a token bucket indefinitely while the parent thinks it's been cleaned up.
+
+#### End-to-end example
+
+```bash
+# Step 1 — create the persona
+npx recall-bench create-persona \
+  --prompt "A research scientist studying protein folding at a university lab" \
+  --model claude \
+  --persona ./dataset/scientist
+
+# Step 2 — generate 1,000 days (resume-safe, failures are skipped)
+npx recall-bench generate \
+  --persona ./dataset/scientist \
+  --model claude
+
+# If days 237 and 612 were skipped due to subprocess failures,
+# re-run just those:
+npx recall-bench generate \
+  --persona ./dataset/scientist \
+  --model claude \
+  --start 237 --end 237
+
+npx recall-bench generate \
+  --persona ./dataset/scientist \
+  --model claude \
+  --start 612 --end 612
+```
+
 ### Optional: Conversation History Generation
 
 Pass 2 (`generate-conversations`) converts daily memory logs into multi-turn **user/assistant conversations** — the kind of dialogue that would have produced each day's log. This is useful for memory systems that ingest conversation transcripts rather than structured logs.
@@ -143,19 +254,15 @@ You can generate conversations for the **full 1,000-day corpus** or a **subset**
 npx recall-bench generate-conversations \
   --persona ./dataset/my-persona \
   --model claude \
-  --days ./dataset/my-persona/memories \
-  --out ./dataset/my-persona/conversations \
   --start 1 --end 100
 
 # Generate for the full corpus
 npx recall-bench generate-conversations \
   --persona ./dataset/my-persona \
-  --model claude \
-  --days ./dataset/my-persona/memories \
-  --out ./dataset/my-persona/conversations
+  --model claude
 ```
 
-Output is written as one file per day (`conv-0001.md` or `conv-0001.json`) in either **markdown** or **JSON** format (`--format markdown|json`). Since each day's conversation depends only on its daily log, generation is fully parallel across days.
+The `generate-conversations` command reads daily logs from `<persona-dir>/memories/` and writes conversation files to `<persona-dir>/conversations/`. Output is written as one file per day (`conv-0001.md` or `conv-0001.json`) in either **markdown** or **JSON** format (`--format markdown|json`). Since each day's conversation depends only on its daily log, generation is fully parallel across days.
 
 ## Connecting Your Memory System
 
@@ -275,7 +382,7 @@ npx recall-bench run \
 # Step 1: Create persona + arcs
 npx recall-bench create-persona \
   --prompt "A backend engineer at a B2B SaaS company" \
-  --model claude --out ./dataset/my-persona
+  --model claude --persona ./dataset/my-persona
 
 # Step 2: Generate 1,000 days
 npx recall-bench generate \

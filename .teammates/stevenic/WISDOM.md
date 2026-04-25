@@ -2,7 +2,7 @@
 
 Distilled from work history. Updated during compaction.
 
-Last compacted: 2026-04-15
+Last compacted: 2026-04-25
 
 ---
 
@@ -98,14 +98,20 @@ Bindings (Python, Go, Rust, C#) spawn the `recall` CLI with `--json` and parse s
 **5 shipped personas across diverse domains.**
 backend-eng-saas (SaaS platform), er-physician (trauma center), litigation-attorney (law firm), research-scientist (biology lab), financial-advisor (wealth management). Each has identity YAML, story arcs, daily logs, and Q&A pairs.
 
+**Personas model the humans the agent interacts with.**
+recall-bench simulates an *agent*, so each persona needs a variable number of human collaborators (peers, stakeholders, clients, etc.) populated per scenario. The collaborator cast is a first-class part of the persona definition, not an afterthought of arc generation.
+
 **8 evaluation categories.**
 factual-recall, temporal-reasoning, decision-tracking, contradiction-resolution, cross-reference, recency-bias-resistance, synthesis, negative-recall. Scored on correctness (0-3) + completeness (0-2) + hallucination (0-1) = composite max 6.0.
 
 **Heatmap is the primary output artifact.**
-Category × evaluation-point grid. Green → amber → red color scale. Column = evaluation point (left-to-right shows degradation as corpus grows). Row = category. Reveals which capabilities degrade fastest. Generated via `scripts/generate-heatmap.mjs` with `--interval`, `--days`, `--output` flags. Cells are color-only (no score text), auto-scaling width.
+Category × evaluation-point grid. Green → amber → red color scale. Column = evaluation point (left-to-right shows degradation as corpus grows). Row = category. Reveals which capabilities degrade fastest. Generated via `scripts/generate-heatmap.mjs` with `--interval` (default 7d) and `--days` (default 1000) flags. Cells are color-only (no score text), continuous gradient; cell width auto-scales (4–16px); time-axis labels auto-space.
 
 **Benchmark dataset generation is two-pass.**
-Pass 1 generates daily activity logs from persona story arcs (arc-driven, with gap filling for weeks < 5 active days). Pass 2 optionally constructs conversations that produce those logs. Separates "what happened" from "how it was communicated."
+Pass 1 generates daily activity logs from persona story arcs (arc-driven, with gap filling for weeks < 5 active days). Pass 2 optionally constructs ~100 days of conversation history that produces those logs. Separates "what happened" from "how it was communicated."
+
+**Generation order: persona & arcs → Q&A pairs → memories.**
+Q&A pairs are defined *after* persona and story arcs are locked but *before* memory generation, so the memory pass can deliberately seed the facts each evaluation question needs to recall. Generating Q&A after memories risks unanswerable questions or trivially-answered ones.
 
 **Story arcs create realistic complexity.**
 4 max concurrent arcs. Arc types: projects, incidents, decisions, learning, relationships, corrections. Correction arcs specifically test belief revision tracking. Quiet periods (vacations, breaks) test temporal gap handling.
@@ -119,7 +125,10 @@ Pass 1 generates daily activity logs from persona story arcs (arc-driven, with g
 Scaffolding & interfaces done. File management done. Phase 5 (MemoryService wiring & CLI) follows. @beacon owns implementation.
 
 **Hierarchical memory implementation kicked off 2026-04-09.**
-5 phases (A-E). Phase A: eidetic storage. Phase B: dual embeddings + salience. Phase C: two-phase recall (depends on B). Phase D: BM25 integration (parallel with C). Phase E: migration CLI. A+B started in parallel.
+5 phases (A–E). Phase A: eidetic storage. Phase B: dual embeddings + salience. Phase C: two-phase recall (depends on B). Phase D: BM25 integration (parallel with C). Phase E: migration CLI. A+B started in parallel.
 
 **Dreaming system scaffolding added 2026-04-12.**
-`DreamEngine`, `SearchLogger`, `SignalCollector`, and `DreamingConfig` types exist in `packages/core/src/`. Implementation phases: A (search signal infra) → B (signal collection + scoring) → C (synthesis pipeline) → D (output + integration). A can ship independently to start accumulating search signals.
+`DreamEngine`, `SearchLogger`, `SignalCollector`, and `DreamingConfig` types exist in `packages/core/src/`. Implementation phases: A (search signal infra) → B (signal collection + scoring) → C (synthesis pipeline) → D (output + integration). A can ship independently to start accumulating search signals. @beacon owns implementation (assigned 2026-04-12).
+
+**Persona generation in flight for recall-bench (status check 2026-04-25).**
+Recall-bench generator and CLI under active modification (`packages/recall-bench/src/cli-generator-model.ts`, `cli.ts`, `generator.ts`). research-scientist persona memories partially generated. Adding human-collaborator modeling per persona and reordering Q&A generation to precede memory generation. Persona file shape consolidated to 2 files (down from 3) — applies to all 5 personas. @beacon owns implementation.

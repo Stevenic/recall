@@ -2,7 +2,7 @@
 
 Distilled principles. Read first every session (after SOUL.md).
 
-Last compacted: 2026-04-15
+Last compacted: 2026-04-25
 
 ---
 
@@ -28,7 +28,7 @@ Last compacted: 2026-04-15
 
 **Specs are hypotheses until verified in assembly** — Check the prompt builder before treating any design note as live.
 
-**Patch the assembly point** — Changes only matter where the final token stream is built. A correct idea in the wrong file has no effect.
+**Patch the assembly point** — Changes only land where the final token stream is built — a correct idea in the wrong file has no effect.
 
 **Read consumer code before finalizing prompts** — Output format assumptions diverge between docs and implementation. Read the parser first.
 
@@ -38,7 +38,7 @@ Last compacted: 2026-04-15
 
 **Two-phase: structural then semantic** — Roll up structure mechanically first. Invoke LLM compression only when budget is exceeded.
 
-**Unambiguous delimiters for dual output** — When one prompt produces summary and extracted items, use distinct fenced-block markers so parsing is a single regex.
+**Unambiguous delimiters for dual output** — When one prompt produces summary and extracted items, use distinct fenced-block markers for single-regex parsing.
 
 **Temperature tracks task entropy** — Classification/extraction: 0.1-0.2. Synthesis: 0.3. Higher values hallucinate connections.
 
@@ -46,8 +46,8 @@ Last compacted: 2026-04-15
 
 **Deliverable first, housekeeping second** — Front-loading upkeep consumes budget before the answer ships.
 
-**Compression bugs look like missing context** — Right facts buried in duplicates behave as absent. Dedupe before concluding retrieval failed.
+**Compression bugs look like missing context** — Right facts buried in duplicates behave as absent. Dedupe before blaming retrieval.
 
-**Attention failures are multi-layer** — One symptom can have co-occurring distance, compression, and decompression causes. Check all three.
+**Attention failures are multi-layer** — Distance, compression, and decompression failures can co-occur. Check all three.
 
-**Log bloat is a per-turn compression tax** — Duplicated entries compete with task-relevant context. Aggressive historical compression improves performance.
+**Log bloat is a per-turn compression tax** — Duplicated entries compete with task-relevant context. Aggressive historical compression frees attention.

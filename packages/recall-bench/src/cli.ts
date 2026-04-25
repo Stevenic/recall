@@ -23,6 +23,9 @@ import { TIME_RANGES } from './types.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const parseIntArg = (v: string) => parseInt(v, 10);
+const parseFloatArg = (v: string) => parseFloat(v);
+
 const program = new Command();
 
 program
@@ -38,10 +41,10 @@ program
     .option('--judge <path>', 'Path to judge module (must export default JudgeModel)')
     .option('--personas <ids...>', 'Persona IDs to benchmark (default: all)')
     .option('--ranges <ranges...>', 'Time ranges to evaluate (30d, 90d, 6mo, 1y, full)', parseRanges)
-    .option('--seed <n>', 'Shuffle seed (0 = no shuffle)', parseInt, 42)
-    .option('--timeout <ms>', 'Per-question timeout', parseInt, 30000)
-    .option('--grpc-timeout <ms>', 'Per-RPC timeout for gRPC adapter', parseInt, 120000)
-    .option('--parallelism <n>', 'Max concurrent queries', parseInt, 1)
+    .option('--seed <n>', 'Shuffle seed (0 = no shuffle)', parseIntArg, 42)
+    .option('--timeout <ms>', 'Per-question timeout', parseIntArg, 30000)
+    .option('--grpc-timeout <ms>', 'Per-RPC timeout for gRPC adapter', parseIntArg, 120000)
+    .option('--parallelism <n>', 'Max concurrent queries', parseIntArg, 1)
     .option('--json', 'Output JSON instead of text')
     .option('--heatmap', 'Output only the heatmap grid as JSON')
     .action(async (opts) => {
@@ -108,12 +111,12 @@ program
     .description('Generate daily memory logs for a persona using an LLM')
     .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + arcs.yaml)')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
-    .option('--start <n>', 'Starting day number', parseInt, 1)
-    .option('--end <n>', 'Ending day number', parseInt, 1000)
-    .option('--temperature <n>', 'Generation temperature', parseFloat, 0.7)
-    .option('--max-tokens <n>', 'Max output tokens per day', parseInt, 2000)
-    .option('--history-window <n>', 'Number of recent days for context', parseInt, 3)
-    .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseInt, 120000)
+    .option('--start <n>', 'Starting day number', parseIntArg, 1)
+    .option('--end <n>', 'Ending day number', parseIntArg, 1000)
+    .option('--temperature <n>', 'Generation temperature', parseFloatArg, 0.7)
+    .option('--max-tokens <n>', 'Max output tokens per day', parseIntArg, 2000)
+    .option('--history-window <n>', 'Number of recent days for context', parseIntArg, 3)
+    .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseIntArg, 600000)
     .option('--json', 'Output JSON summary instead of progress text')
     .action(async (opts) => {
         const personaDir = resolve(opts.persona);
@@ -124,7 +127,7 @@ program
         const memoriesDir = join(personaDir, 'memories');
         await mkdir(memoriesDir, { recursive: true });
 
-        let dayCount = 0;
+        const writtenDays = new Set<number>();
         const generator = new DayGenerator(persona, arcs, model, {
             startDay: opts.start,
             endDay: opts.end,
@@ -134,9 +137,9 @@ program
             onDay: async (dayNumber, content) => {
                 const padded = String(dayNumber).padStart(4, '0');
                 await writeFile(join(memoriesDir, `day-${padded}.md`), content, 'utf-8');
-                dayCount++;
+                writtenDays.add(dayNumber);
                 if (!opts.json) {
-                    process.stdout.write(`\r  Generated day ${dayNumber}/${opts.end}`);
+                    process.stdout.write(`\r  Generated day ${dayNumber}/${opts.end} (${writtenDays.size} unique)`);
                 }
             },
         });
@@ -145,7 +148,7 @@ program
 
         if (!opts.json) {
             console.log(''); // newline after progress
-            console.log(`Done. Generated ${dayCount} days for persona "${persona.name}" (${persona.id}).`);
+            console.log(`Done. Generated ${result.days.length} days for persona "${persona.name}" (${persona.id}).`);
             console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
             console.log(`  Output: ${memoriesDir}`);
         } else {
@@ -166,9 +169,9 @@ program
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
     .requiredOption('--persona <dir>', 'Persona directory to write persona.yaml and arcs.yaml into')
     .option('--epoch <date>', 'Epoch date for the persona timeline', '2024-01-01')
-    .option('--temperature <n>', 'Generation temperature', parseFloat, 0.7)
-    .option('--max-tokens <n>', 'Max output tokens per LLM call', parseInt, 4000)
-    .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseInt, 120000)
+    .option('--temperature <n>', 'Generation temperature', parseFloatArg, 0.7)
+    .option('--max-tokens <n>', 'Max output tokens per LLM call', parseIntArg, 4000)
+    .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseIntArg, 120000)
     .option('--arcs-only', 'Only generate arcs for an existing persona (reads persona.yaml from --persona)')
     .option('--json', 'Output JSON summary instead of progress text')
     .action(async (opts) => {
@@ -238,11 +241,11 @@ program
     .description('Generate conversation history for each day from existing daily logs (Pass 2)')
     .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml, memories/)')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
-    .option('--start <n>', 'Starting day number', parseInt, 1)
-    .option('--end <n>', 'Ending day number', parseInt, 1000)
-    .option('--temperature <n>', 'Generation temperature', parseFloat, 0.7)
-    .option('--max-tokens <n>', 'Max output tokens per conversation', parseInt, 4000)
-    .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseInt, 120000)
+    .option('--start <n>', 'Starting day number', parseIntArg, 1)
+    .option('--end <n>', 'Ending day number', parseIntArg, 1000)
+    .option('--temperature <n>', 'Generation temperature', parseFloatArg, 0.7)
+    .option('--max-tokens <n>', 'Max output tokens per conversation', parseIntArg, 4000)
+    .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseIntArg, 120000)
     .option('--format <fmt>', 'Output format: markdown or json', 'markdown')
     .option('--json', 'Output JSON summary instead of progress text')
     .action(async (opts) => {

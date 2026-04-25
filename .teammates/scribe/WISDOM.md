@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-15
+Last compacted: 2026-04-25
 
 ---
 
@@ -23,11 +23,8 @@ Names, commands, and docs should match the product so users and teammates are no
 **Spec --> handoff --> docs is the full cycle**
 Design behavior before implementation, hand off to the owner, then document the shipped result. Skipping the first step creates churn; skipping the last creates drift.
 
-**Cross-file consistency is non-negotiable**
-Framework concepts repeat across templates, onboarding, protocol docs, and READMEs. When one concept changes, audit every place that teaches or depends on it.
-
-**New concepts need a propagation pass**
-Adding a new file type or convention means updating every doc that describes the file structure. Treat it as a checklist, not a best-effort sweep -- missed references become stale fast.
+**Doc concepts propagate -- audit on every change or addition**
+Framework concepts repeat across templates, onboarding, protocol docs, and READMEs. When a concept is added, removed, or changed, audit every place that teaches or depends on it. Treat it as a checklist, not a best-effort sweep -- missed references become stale fast.
 
 **Practice drifts from templates**
 Periodically compare live conventions against templates to catch gaps that evolved in practice but weren't backported. The template is the contract; if practice improved, update the template.

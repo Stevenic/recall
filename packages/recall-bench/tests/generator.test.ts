@@ -608,7 +608,7 @@ describe('buildGapUserMessage', () => {
 // ---------------------------------------------------------------------------
 
 describe('DayGenerator', () => {
-    it('generates days via 2-pass pipeline and calls onDay in order', async () => {
+    it('generates days via 2-pass pipeline and fires onDay for every result day', async () => {
         const callArgs: Array<{ system: string; user: string }> = [];
         const model: GeneratorModel = {
             async complete(sys, user) {
@@ -621,13 +621,13 @@ describe('DayGenerator', () => {
             },
         };
 
-        const onDayOrder: number[] = [];
+        const onDayInvocations: number[] = [];
         const generator = new DayGenerator(testPersona, testArcs, model, {
             startDay: 15,
             endDay: 25,
             minDaysPerWeek: 5,
             onDay: async (dayNumber) => {
-                onDayOrder.push(dayNumber);
+                onDayInvocations.push(dayNumber);
             },
         });
 
@@ -636,13 +636,56 @@ describe('DayGenerator', () => {
         expect(result.personaId).toBe('test-persona');
         // Should have generated some days (arc days + gap fills)
         expect(result.days.length).toBeGreaterThan(0);
-        // onDay should fire in ascending day order
-        for (let i = 1; i < onDayOrder.length; i++) {
-            expect(onDayOrder[i]).toBeGreaterThan(onDayOrder[i - 1]);
+        // Every day in the final result must have had onDay called for it.
+        // (onDay fires per call during pass 1/2, so it can fire multiple
+        // times for a day that two arcs both touch — that's expected.)
+        const writtenDays = new Set(onDayInvocations);
+        for (const day of result.days) {
+            expect(writtenDays.has(day.dayNumber)).toBe(true);
         }
         // Token totals should accumulate
         expect(result.totalInputTokens).toBeGreaterThan(0);
         expect(result.totalOutputTokens).toBeGreaterThan(0);
+    });
+
+    it('fires onDay incrementally so progress survives mid-run failures', async () => {
+        // Simulate a mid-run subprocess crash: third call throws.
+        let callCount = 0;
+        const model: GeneratorModel = {
+            async complete() {
+                callCount++;
+                if (callCount === 3) {
+                    throw new Error('Agent exited with code null');
+                }
+                return { text: 'Content.', inputTokens: 50, outputTokens: 20 };
+            },
+        };
+
+        const arcs: ArcDefinition[] = [
+            {
+                id: 'flaky', type: 'project', title: 'Flaky',
+                description: 'Arc that hits a transient subprocess failure.',
+                startDay: 1, endDay: 30,
+            },
+        ];
+
+        const writtenBeforeError: number[] = [];
+        const generator = new DayGenerator(testPersona, arcs, model, {
+            startDay: 1,
+            endDay: 30,
+            minDaysPerWeek: 0,
+            onDay: async (dayNumber) => {
+                writtenBeforeError.push(dayNumber);
+            },
+        });
+
+        // Should NOT throw — failures are logged and the run continues.
+        const result = await generator.generateAll();
+
+        // Days written before the failure must be persisted via onDay.
+        expect(writtenBeforeError.length).toBeGreaterThanOrEqual(2);
+        // The run produces at least the days that succeeded.
+        expect(result.days.length).toBeGreaterThanOrEqual(2);
     });
 
     it('pass 1 processes arcs in startDay order', async () => {
