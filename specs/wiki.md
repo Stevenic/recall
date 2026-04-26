@@ -34,7 +34,7 @@ Two problems:
 - **No compounding synthesis.** Querying for a concept that has accumulated context over many months requires the LLM to retrieve and re-synthesize fragments on every query. Nothing is *built up*. WISDOM.md has been absorbing topical content (e.g., "Architecture docs should trace the full path") that doesn't really belong there — it's a principle, but the underlying knowledge graph is missing.
 - **Typed memories overlap with wiki synthesis.** A typed memory like `feedback_database-mocks.md` (rule + why + how-to-apply) and a hypothetical wiki page `database-mocking.md` (synthesis over many sources) cover the same conceptual territory. Maintaining both creates a "is this typed or wiki?" judgment call on every durable write.
 
-Karpathy's "LLM Wiki" pattern (https://karpathy.bearblog.dev/llm-wiki/, 2026) frames this as a compounding artifact: cross-references are pre-computed, contradictions are pre-flagged, synthesis already reflects everything the agent has read. The wiki keeps getting richer with every source ingested and every question asked.
+Karpathy's "LLM Wiki" pattern ([LLM Wiki Gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), 2026) frames this as a compounding artifact: cross-references are pre-computed, contradictions are pre-flagged, synthesis already reflects everything the agent has read. The wiki keeps getting richer with every source ingested and every question asked.
 
 ### Solution
 
