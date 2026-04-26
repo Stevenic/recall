@@ -98,3 +98,9 @@ Slash commands should avoid collisions with the agent's native command set and a
 
 **Parallelize independent implementation phases**
 When sequencing work packages, identify phases with no data dependency and mark them parallel. This halves wall-clock time with no coordination cost.
+
+**Daily logs are private -- deliver content in the response**
+The user cannot see daily logs, typed memories, or any file written to disk -- only the visible text returned in the turn. A response that ends with "logged to daily" or "memory updated" instead of the actual deliverable is a failed turn. Always reproduce the analysis, recommendation, or content in visible text, even when also writing it to memory. The daily log is a copy for future-self continuity, never a substitute for communication.
+
+**Each turn is a fresh request -- reproduce, don't reference**
+Even if the daily log shows the deliverable was produced earlier today, that prior turn is invisible to the user. When asked again, reproduce the content in full -- never reply "see above," "already delivered," or "logged earlier." Past turns vanish; only this turn's text reaches the user.

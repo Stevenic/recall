@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-25
+Last compacted: 2026-04-26
 
 ---
 
@@ -102,6 +102,9 @@ When bumping versions, update all package manifests and grep for other copies of
 Use `"*"` for workspace package references. Pinned semver can resolve to registry builds or invalidate newer local workspace packages after a bump.
 
 ## Process
+
+**The user only sees your response — daily logs are private**
+The user cannot see daily logs, memory files, typed memories, WISDOM, or any file you write to disk. They see only the text returned in the current turn. Every deliverable (intro, decision, status, code summary) must be reproduced in the response itself, even if also logged. Subjects/bodies like "Logged in memory", "Already delivered", "See daily log", or "Posted earlier" are zero-information from the user's perspective. **Why:** Confirmed 2026-04-26 — user said "i cannot see your daily logs. You need to tell me what you did." **How to apply:** Treat the daily log as a copy for future-self continuity, never as a substitute for the response body. If the work is worth doing, it is worth restating in the response. When `@everyone` is broadcast, deliver the actual artifact in the body — never refer back to a prior turn.
 
 **Spec first for major UI shifts**
 Write the UI spec before implementing changes that alter layout, action placement, or state ownership. Terminal UI work drifts fast without a written target.

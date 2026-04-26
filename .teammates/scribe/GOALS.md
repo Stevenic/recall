@@ -1,6 +1,6 @@
 # Scribe — Goals
 
-**Updated:** 2026-04-11
+**Updated:** 2026-04-26
 
 ---
 
@@ -38,9 +38,18 @@
 
 ### Dreaming System
 - [x] Draft dreaming spec v0.1 — signal collection, candidate scoring, synthesis pipeline, output formats
-- [ ] Resolve open questions with stevenic (v0.2)
+- [ ] Resolve open questions with stevenic (v0.2 — must absorb wiki integration changes from §10 of wiki spec)
 - [ ] Create implementation plan for @beacon (sequenced work packages)
 - [ ] Define dreaming prompt templates (cross-reference, gap analysis, contradiction, theme synthesis) for @lexicon
+
+### Wiki System
+- [x] Draft wiki spec v0.1 — page format, categories, cross-references, lifecycle, search/dreaming/WISDOM integration, surface area separation rule
+- [x] Wiki spec v0.2 — collapse typed memories into wiki (stub vs synthesized model, per-category templates, typed-memory migration)
+- [ ] Resolve remaining open questions with stevenic (v0.3 — Q1 scoreBoost default, Q2 chunking strategy, Q3 Knowledge Map location, Q4 access control, Q6 link resolution timing, Q7 multimedia, Q8 WISDOM migration, Q9 slug collisions, Q10 stub re-indexing latency)
+- [ ] Revise dreaming spec to v0.2 — make wiki edits the canonical synthesis output (replaces standalone insight files); add stub enrichment to dreaming pipeline
+- [ ] Update WISDOM.md compaction prompt — read from wiki pages (not typed memories) post-migration; push topical content toward wiki layer
+- [ ] Define wiki prompt templates (stub generation, page synthesis, merge, regeneration) for @lexicon
+- [ ] Create implementation plan for @beacon (sequenced work packages — Phases A-E in §20; typed-memory migration sub-phase parallelizable with B/C/D)
 
 ### Milestone Tracking
 - [ ] Set up acceptance criteria checklist (§12 MVP) as trackable artifact

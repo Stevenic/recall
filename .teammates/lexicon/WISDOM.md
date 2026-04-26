@@ -44,6 +44,8 @@ Last compacted: 2026-04-25
 
 ## Operational
 
+**Daily logs are invisible — say it in the response** — The user cannot read daily logs, memory files, or anything written to disk. Only this turn's text output is visible. State what you did and what the answer is in the response body, even when also logging it. "Logged in memory" or "see daily log" reads as a no-op to the user.
+
 **Deliverable first, housekeeping second** — Front-loading upkeep consumes budget before the answer ships.
 
 **Compression bugs look like missing context** — Right facts buried in duplicates behave as absent. Dedupe before blaming retrieval.

@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-25
+Last compacted: 2026-04-26
 
 ---
 
@@ -47,6 +47,11 @@ CI changes are not done when they merely look correct. Run the real workspace co
 
 **Repo-root paths matter in workflows**
 CI steps start at the repository root unless a `working-directory` is set. Package-scoped logic should use explicit repo-root paths, not assume the package directory is current.
+
+## Communication
+
+**The user cannot see daily logs or memory writes**
+Daily logs, typed memories, and WISDOM edits are private continuity artifacts. The user only sees the text returned in the response body. Always state what you did — files touched, decisions made, status — directly in the response, even when also writing it to a daily log. "Logged in memory" is not a deliverable; the deliverable must appear in the body. Reproduce the answer every turn even if it was logged earlier today.
 
 ## Process
 
