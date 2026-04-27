@@ -2,7 +2,7 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-25
+Last compacted: 2026-04-26
 
 ---
 
@@ -44,6 +44,12 @@ When documenting system architecture, trace from user entry point through every 
 **Competitive analysis sharpens design rationale**
 Writing a structured side-by-side comparison against a similar system forces explicit articulation of why your design makes different tradeoffs. Do this early -- it prevents accidental convergence and clarifies which constraints are load-bearing.
 
+**Identify the primitive beneath an adopted pattern**
+When evaluating an external idea (e.g. Karpathy's wiki), ask what underlying mechanism makes it work, then consider generalizing that primitive instead of importing the surface pattern. The wiki was one application of "memories citing memories with on-demand chasing"; the primitive (`[[ref]]` resolution) unlocks back-pointers in daily logs, structural rollup, and topical synthesis under a single mechanism. Adopting only the surface pattern leaves three parallel pointer systems; adopting the primitive unifies them.
+
+**Collapse tiers when the boundary rule keeps requiring judgment**
+A surface-area rule that asks the writer "is this an X or a Y?" on every write is friction encoded as architecture. When you find yourself writing decision tables to disambiguate adjacent layers (typed memory vs. wiki, insight file vs. wiki page), the tiers probably want to merge. Tier count is right when the writer's question reduces to a single binary and the categories live in frontmatter, not directory paths.
+
 ## Specs
 
 **Audit acceptance criteria against every interface**
@@ -66,6 +72,12 @@ When a design parameter trades cost against quality (context window size, model 
 
 **Promote deferred features when they prove load-bearing**
 When a feature deferred to a later version turns out to be essential for quality (e.g., salience weighting for retrieval), promote it to the current scope rather than shipping a weaker MVP. The cost of retrofitting a core feature later exceeds the cost of building it now.
+
+**Encode write modes in frontmatter, not directory splits**
+When a single durable layer serves multiple writers with different quality bars (agent real-time stub vs. dreaming synthesis vs. compaction rewrite), distinguish them with frontmatter flags and threshold logic (`len(sources)`, confidence levels) rather than splitting into separate files or directories. The file system shouldn't encode the writer -- doing so multiplies link namespaces, search indexes, and migration cost. One layer, many write modes, frontmatter discriminates.
+
+**Port write conventions when consolidating layers**
+When collapsing tiers (typed memories into wiki, insight files into wiki pages), the discipline that made the old tier useful must move forward as per-category templates in the new layer. The "Why: / How to apply:" structure on feedback memories, the source-list shape on project memories -- these are the substance; the directory name was just the wrapper. A consolidation that keeps file structure and drops conventions is the worst of both worlds: same surface area, less rigor.
 
 ## Process
 

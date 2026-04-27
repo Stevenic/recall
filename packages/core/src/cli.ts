@@ -14,7 +14,11 @@ program
     .option("--json", "JSON output")
     .option("--verbose", "Verbose logging");
 
-function getService(opts: { dir: string; agent?: string }): MemoryService {
+function getService(opts: {
+    dir: string;
+    agent?: string;
+    enableWiki?: boolean;
+}): MemoryService {
     const memoryRoot = path.resolve(opts.dir);
     const model = opts.agent
         ? new CliAgentModel({ agent: opts.agent })
@@ -23,6 +27,7 @@ function getService(opts: { dir: string; agent?: string }): MemoryService {
         memoryRoot,
         model,
         dreaming: { enabled: true, logSearches: true },
+        wiki: opts.enableWiki ? { enabled: true } : undefined,
     });
 }
 
@@ -451,6 +456,286 @@ program
                     console.error("Dream error:", err);
                 }
             }, dreamInterval);
+        }
+    });
+
+// --- wiki ---
+const wikiCmd = program
+    .command("wiki")
+    .description("Wiki page operations (list, show, stub, append, status)");
+
+wikiCmd
+    .command("targets")
+    .description("List configured wiki targets and roles")
+    .action(async () => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        const targets = svc.wiki.resolveTargets();
+        if (globalOpts.json) {
+            output(targets, true);
+        } else {
+            for (const t of targets) {
+                console.log(`${t.name} (${t.role}) — ${t.wikiDir}`);
+            }
+        }
+    });
+
+wikiCmd
+    .command("list")
+    .description("List wiki page slugs")
+    .option("--shared <name>", "List pages in a shared wiki")
+    .option("--all", "List across private + every shared wiki")
+    .option("--stubs", "Only stubs (sources <= 1)")
+    .option("--category <c>", "Filter by category")
+    .action(async (cmdOpts: Record<string, string | boolean>) => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+
+        let entries: { target: string; slug: string }[];
+        if ("all" in cmdOpts) {
+            entries = await svc.wiki.listAll();
+        } else {
+            const target =
+                typeof cmdOpts.shared === "string" ? cmdOpts.shared : "private";
+            const slugs = await svc.wiki.list(target);
+            entries = slugs.map((slug) => ({ target, slug }));
+        }
+
+        const stubsOnly = "stubs" in cmdOpts;
+        const categoryFilter =
+            typeof cmdOpts.category === "string" ? cmdOpts.category : null;
+
+        const detailed: {
+            target: string;
+            slug: string;
+            category: string;
+            sources: number;
+            description: string;
+        }[] = [];
+        for (const { target, slug } of entries) {
+            const page = await svc.wiki.read(slug, target);
+            if (!page) continue;
+            if (categoryFilter && page.category !== categoryFilter) continue;
+            if (stubsOnly && page.sources.length > 1) continue;
+            detailed.push({
+                target,
+                slug,
+                category: page.category,
+                sources: page.sources.length,
+                description: page.description,
+            });
+        }
+
+        if (globalOpts.json) {
+            output(detailed, true);
+        } else if (detailed.length === 0) {
+            console.log("(no wiki pages)");
+        } else {
+            for (const d of detailed) {
+                const stub = d.sources <= 1 ? " (stub)" : "";
+                const tgt = d.target === "private" ? "" : `[${d.target}] `;
+                console.log(
+                    `${tgt}${d.slug} [${d.category}]${stub} — ${d.description}`,
+                );
+            }
+        }
+    });
+
+wikiCmd
+    .command("show <slug>")
+    .description("Print a wiki page")
+    .option("--shared <name>", "Read from a shared wiki")
+    .action(async (slug: string, cmdOpts: Record<string, string>) => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const target =
+            typeof cmdOpts.shared === "string" ? cmdOpts.shared : "private";
+        const page = await svc.wiki.read(slug, target);
+        if (!page) {
+            output(
+                globalOpts.json
+                    ? { error: "Page not found", slug, target }
+                    : `Page not found: ${slug} (target: ${target})`,
+                globalOpts.json,
+            );
+            process.exitCode = 1;
+            return;
+        }
+        if (globalOpts.json) {
+            output(page, true);
+        } else {
+            console.log(
+                `# ${page.name} [${page.category}] (${page.sources.length} source${page.sources.length === 1 ? "" : "s"})`,
+            );
+            console.log(`Slug: ${page.slug}`);
+            console.log(
+                `Created: ${page.created} | Updated: ${page.updated} | Confidence: ${page.confidence ?? "—"}`,
+            );
+            console.log(`Description: ${page.description}`);
+            console.log("");
+            console.log(page.body.trimEnd());
+        }
+    });
+
+wikiCmd
+    .command("stub <slug>")
+    .description("Create a stub wiki page from a category template")
+    .requiredOption(
+        "--category <c>",
+        "Category: entity | concept | project | reference",
+    )
+    .requiredOption("--name <name>", "Display name for the page")
+    .requiredOption("--description <text>", "One-line description")
+    .requiredOption("--lede <text>", "Lede paragraph")
+    .option("--why <text>", "Required for concept and project categories")
+    .option("--how-to-apply <text>", "Required for concept and project")
+    .option("--where <text>", "Used by reference category")
+    .option("--when <text>", "Used by reference category")
+    .option("--source <uri>", "Source URI (default: today's daily log)")
+    .option("--shared <name>", "Stub directly in a shared wiki")
+    .action(async (slug: string, cmdOpts: Record<string, string>) => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const today = new Date().toISOString().split("T")[0];
+        const source =
+            cmdOpts.source ?? `memory/${today}.md`;
+        const target =
+            typeof cmdOpts.shared === "string" ? cmdOpts.shared : "private";
+
+        const { renderStubBody } = await import("./wiki-templates.js");
+        const body = renderStubBody(
+            cmdOpts.category as
+                | "entity"
+                | "concept"
+                | "project"
+                | "reference",
+            {
+                lede: cmdOpts.lede,
+                why: cmdOpts.why,
+                howToApply: cmdOpts.howToApply,
+                where: cmdOpts.where,
+                when: cmdOpts.when,
+            },
+        );
+        const page = await svc.wiki.stub({
+            slug,
+            name: cmdOpts.name,
+            description: cmdOpts.description,
+            category: cmdOpts.category as
+                | "entity"
+                | "concept"
+                | "project"
+                | "reference",
+            source,
+            body,
+            target,
+        });
+        await svc.wiki.rebuildIndex(target);
+        output(
+            globalOpts.json
+                ? page
+                : `Stubbed ${target === "private" ? "" : `[${target}] `}${page.slug} (${page.category})`,
+            globalOpts.json,
+        );
+    });
+
+wikiCmd
+    .command("append <slug>")
+    .description("Append a source + body fragment to an existing wiki page")
+    .requiredOption("--source <uri>", "Source URI to add")
+    .requiredOption("--body <text>", "Body fragment to append")
+    .option("--shared <name>", "Append to a shared wiki page")
+    .action(async (slug: string, cmdOpts: Record<string, string>) => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const target =
+            typeof cmdOpts.shared === "string" ? cmdOpts.shared : "private";
+        const page = await svc.wiki.append(
+            slug,
+            cmdOpts.source,
+            cmdOpts.body,
+            target,
+        );
+        await svc.wiki.rebuildIndex(target);
+        output(
+            globalOpts.json
+                ? page
+                : `Appended source to ${target === "private" ? "" : `[${target}] `}${page.slug} (${page.sources.length} source${page.sources.length === 1 ? "" : "s"} now)`,
+            globalOpts.json,
+        );
+    });
+
+wikiCmd
+    .command("status")
+    .description("Per-target page counts and identity summary")
+    .action(async () => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const targets = svc.wiki.resolveTargets();
+        const identity = await svc.identity.resolve();
+        type TargetStatus = {
+            target: string;
+            role: "member" | "reader";
+            wikiDir: string;
+            total: number;
+            stubs: number;
+            byCategory: Record<string, number>;
+        };
+        const perTarget: TargetStatus[] = [];
+        for (const t of targets) {
+            const slugs = await svc.wiki.list(t.name);
+            let stubs = 0;
+            const byCategory: Record<string, number> = {};
+            for (const slug of slugs) {
+                const page = await svc.wiki.read(slug, t.name);
+                if (!page) continue;
+                if (page.sources.length <= 1) stubs += 1;
+                byCategory[page.category] =
+                    (byCategory[page.category] ?? 0) + 1;
+            }
+            perTarget.push({
+                target: t.name,
+                role: t.role,
+                wikiDir: t.wikiDir,
+                total: slugs.length,
+                stubs,
+                byCategory,
+            });
+        }
+
+        if (globalOpts.json) {
+            output(
+                {
+                    identity: {
+                        name: identity.name,
+                        role: identity.role,
+                        fallback: identity.fallback,
+                        path: identity.resolvedPath,
+                    },
+                    targets: perTarget,
+                },
+                true,
+            );
+        } else {
+            const idLabel = identity.fallback
+                ? `${identity.name} (fallback — IDENTITY.md missing or empty)`
+                : `${identity.name}`;
+            console.log(`Identity: ${idLabel}`);
+            console.log(`  ${identity.role}`);
+            console.log("");
+            for (const t of perTarget) {
+                console.log(
+                    `${t.target} (${t.role}): ${t.total} pages, ${t.stubs} stubs`,
+                );
+                for (const [cat, n] of Object.entries(t.byCategory)) {
+                    console.log(`  ${cat}: ${n}`);
+                }
+            }
         }
     });
 

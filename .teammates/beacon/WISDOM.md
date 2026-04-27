@@ -2,11 +2,11 @@
 
 Distilled principles. Read this first every session (after SOUL.md).
 
-Last compacted: 2026-04-26
+Last compacted: 2026-04-27
 
 ---
 
-## Engineering
+## Engineering — Workflow
 
 **Read before editing**
 Inspect the module, its call sites, and existing tests before changing behavior. Most regressions come from changing one layer in isolation.
@@ -20,23 +20,34 @@ Add or update tests for the observable behavior you changed. Happy path alone is
 **Export pure functions for testability**
 Extract state-computation logic as pure exported functions alongside stateful classes. Pure functions are trivially testable without mocks; the class stays focused on orchestration.
 
+## Engineering — Verification
+
 **Ship verified code**
 Build, run the relevant tests, and call out any verification gap plainly. Don't log completion until the file is written and verified — false "done" entries poison future debugging.
 
 **Verify outputs, not exit codes**
 A clean exit doesn't prove the operation did work. After batch jobs, generators, or filters, check the artifacts you expected — file count, size, content. Silent zero-result runs with exit 0 are the worst failure mode because they look like success.
 
-**Persist work incrementally in batch jobs**
-In long-running batch jobs (generation, migration, indexing), commit each item to disk as soon as it completes — never accumulate in memory and write at the end. A timeout, crash, or single failure on item 22 must not lose work for items 1–21. Hook into per-item completion (e.g. `onDay`, `onItem`) and write immediately.
-
-**Isolate per-item failures in batch loops**
-Wrap each iteration's risky call (model, network, subprocess) in try/catch and continue with a one-line skip log. One flaky call must not abort an N-item run. The exception boundary is what separates "one bad item" from "whole run failed."
+## Engineering — Build Hygiene
 
 **Clean dist AND tsbuildinfo before rebuilding**
 Always remove `dist/` and `*.tsbuildinfo` before `npm run build`. With `composite: true`, a stale `.tsbuildinfo` can make tsc skip emit entirely — the build succeeds but produces no output.
 
 **Lint after every build**
 Run the linter with auto-fix after the build, then rebuild if lint changed code. Build → lint → rebuild is the required verification loop.
+
+**Restart the process after rebuilds**
+Node.js caches modules at startup. After rebuilding packages, the running process still uses old code until restarted.
+
+## Engineering — Batch Jobs
+
+**Persist work incrementally**
+In long-running batch jobs (generation, migration, indexing), commit each item to disk as soon as it completes — never accumulate in memory and write at the end. A timeout, crash, or single failure on item 22 must not lose work for items 1–21. Hook into per-item completion (e.g. `onDay`, `onItem`) and write immediately.
+
+**Isolate per-item failures**
+Wrap each iteration's risky call (model, network, subprocess) in try/catch and continue with a one-line skip log. One flaky call must not abort an N-item run. The exception boundary is what separates "one bad item" from "whole run failed."
+
+## Engineering — Operations
 
 **Make destructive operations dry-run capable**
 Operations that mutate or delete data (compaction, migrations, bulk updates) should support a dry-run mode. Makes testing, debugging, and user confirmation trivial.
@@ -46,6 +57,8 @@ Track durable item identity instead of parallel index-keyed structures when stat
 
 **Instrumentation must not break the primary path**
 Observability hooks (search logging, metrics, telemetry) should be best-effort with try/catch. A logging failure must never fail the operation being logged.
+
+## Engineering — CLI Specifics
 
 **Wrap parseInt/parseFloat as Commander coercers**
 Commander invokes coercers as `coerce(value, previousValue)`, so `parseInt("1", 1)` treats `1` as the radix and returns `NaN`. Always wrap: `(v: string) => parseInt(v, 10)`. The `??` default guard does NOT catch `NaN` (it's not nullish), and `NaN` propagates silently through comparisons (`x >= NaN` is always false), producing zero-result runs with exit 0.
@@ -104,13 +117,10 @@ Use `"*"` for workspace package references. Pinned semver can resolve to registr
 ## Process
 
 **The user only sees your response — daily logs are private**
-The user cannot see daily logs, memory files, typed memories, WISDOM, or any file you write to disk. They see only the text returned in the current turn. Every deliverable (intro, decision, status, code summary) must be reproduced in the response itself, even if also logged. Subjects/bodies like "Logged in memory", "Already delivered", "See daily log", or "Posted earlier" are zero-information from the user's perspective. **Why:** Confirmed 2026-04-26 — user said "i cannot see your daily logs. You need to tell me what you did." **How to apply:** Treat the daily log as a copy for future-self continuity, never as a substitute for the response body. If the work is worth doing, it is worth restating in the response. When `@everyone` is broadcast, deliver the actual artifact in the body — never refer back to a prior turn.
+The user sees only the text returned in the current turn. Daily logs, memory files, typed memories, and WISDOM are invisible to them. Every deliverable (intro, decision, status, code summary) must appear in the response body, even if also logged. Bodies like "Logged in memory", "Already delivered", "See daily log", or "Posted earlier" are zero-information. **Why:** Confirmed 2026-04-26 — user said "i cannot see your daily logs. You need to tell me what you did." **How to apply:** Treat the daily log as a continuity copy, never as a substitute for the response. When `@everyone` is broadcast, deliver the actual artifact in the body — never refer back to a prior turn.
 
 **Spec first for major UI shifts**
 Write the UI spec before implementing changes that alter layout, action placement, or state ownership. Terminal UI work drifts fast without a written target.
 
 **Oversized files deserve structural fixes**
 Once a source file grows beyond comfortable review size, recommend extraction — not just more careful editing.
-
-**Restart the process after rebuilds**
-Node.js caches modules at startup. After rebuilding packages, the running process still uses old code until restarted.

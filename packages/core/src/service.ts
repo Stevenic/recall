@@ -25,6 +25,9 @@ import type {
     DreamResult,
     DreamStatus,
 } from "./dreaming-config.js";
+import { IdentityLoader, type IdentityConfig } from "./identity.js";
+import { WikiEngine } from "./wiki-engine.js";
+import type { WikiConfig } from "./wiki-types.js";
 
 export interface WatchConfig {
     syncOnChange?: boolean; // default: true
@@ -43,6 +46,10 @@ export interface MemoryServiceConfig {
     hierarchical?: HierarchicalMemoryConfig;
     /** Dreaming configuration */
     dreaming?: DreamingConfig;
+    /** Wiki configuration (Phase A — read/write/list/stub; Phases B+ extend) */
+    wiki?: WikiConfig;
+    /** Identity file (used by future synthesis prompt threading) */
+    identity?: IdentityConfig;
 }
 
 export interface MigrationReport {
@@ -73,6 +80,8 @@ export class MemoryService {
     private readonly _searchLogger: SearchLogger | null;
     private _compactor: Compactor | null = null;
     private _dreamEngine: DreamEngine | null = null;
+    private readonly _identity: IdentityLoader;
+    private readonly _wiki: WikiEngine;
 
     constructor(config: MemoryServiceConfig) {
         this._config = config;
@@ -94,6 +103,17 @@ export class MemoryService {
             config.hierarchical,
         );
 
+        this._identity = new IdentityLoader(
+            config.memoryRoot,
+            this._storage,
+            config.identity,
+        );
+        this._wiki = new WikiEngine(
+            config.memoryRoot,
+            this._storage,
+            config.wiki,
+        );
+
         // Wire up search logging if dreaming is enabled
         const dreamConfig = config.dreaming;
         const logSearches = dreamConfig?.logSearches ?? (dreamConfig?.enabled ?? false);
@@ -109,6 +129,18 @@ export class MemoryService {
 
     get files(): MemoryFiles {
         return this._files;
+    }
+
+    // --- Wiki ---
+
+    get wiki(): WikiEngine {
+        return this._wiki;
+    }
+
+    // --- Identity ---
+
+    get identity(): IdentityLoader {
+        return this._identity;
     }
 
     // --- Search ---
@@ -218,6 +250,9 @@ export class MemoryService {
 
     async initialize(): Promise<void> {
         await this._files.initialize();
+        if (this._wiki.enabled) {
+            await this._wiki.initialize();
+        }
         const isCreated = await this._index.isCreated();
         if (!isCreated) {
             await this._index.createIndex();

@@ -2,8 +2,8 @@
 
 **Status:** Draft  
 **Author:** Scribe  
-**Date:** 2026-04-02  
-**Version:** 0.3
+**Date:** 2026-04-27  
+**Version:** 0.4
 
 ---
 
@@ -276,6 +276,40 @@ Well-known agent resolution:
 Passing any other string uses it as a raw command (e.g., `"aider"`, `"/usr/local/bin/my-agent"`).
 
 No API keys required for the model layer — just a working CLI agent installation.
+
+### 3.5 Identity
+
+Every synthesis pass (compaction, wisdom distillation, and — once dreaming and the wiki ship — wiki stub generation and dream synthesis) is framed by the agent's **identity**: a one-or-two-sentence description of the role doing the synthesizing. The role provides framing; the LLM derives what's salient from it.
+
+The full design rationale, file format, fallback behavior, and prompt-threading contract live in [wiki.md §11](./wiki.md). Memory-service is responsible for **resolving identity at construction** and **passing it into every synthesis prompt** as a leading `<IDENTITY>...</IDENTITY>` block.
+
+```typescript
+export interface IdentityConfig {
+  /** Path to IDENTITY.md, resolved relative to memoryRoot (default: "IDENTITY.md") */
+  path?: string;
+
+  /** Display name override; if omitted, parsed from the H1 of the identity file */
+  name?: string;
+}
+
+export interface ResolvedIdentity {
+  /** Display name (from config override or parsed H1) */
+  name: string;
+
+  /** Identity body — the H1 plus the role description, used directly in <IDENTITY> blocks */
+  content: string;
+
+  /** Whether the identity file was found; false → fallback to generic role + startup warning */
+  resolved: boolean;
+}
+```
+
+**Resolution rules:**
+
+- Resolved once at `MemoryService.initialize()`. Cached for the session; re-read only if the file mtime changes.
+- Missing or empty `IDENTITY.md` → fallback to a generic `"a knowledge-worker agent"` role and a one-time startup warning. Synthesis still runs; quality may be lower.
+- Identity is read-only from the service's perspective. Authors edit `IDENTITY.md` directly; recall does not generate or rewrite it.
+- The resolved identity is exposed on the service as `service.identity: ResolvedIdentity` so callers (and the dream/wiki engines) can inspect it.
 
 ---
 
@@ -565,6 +599,9 @@ export interface MemoryServiceConfig {
   /** LLM for compaction (required — no default, must configure explicitly) */
   model?: MemoryModel;
 
+  /** Identity — frames every synthesis prompt with the agent's role (§3.5) */
+  identity?: IdentityConfig;
+
   /** Compaction settings */
   compaction?: Partial<CompactionConfig>;
 
@@ -586,6 +623,9 @@ export class MemoryService {
 
   // --- File operations ---
   readonly files: MemoryFiles;
+
+  // --- Identity (resolved during initialize(); read-only thereafter) ---
+  readonly identity: ResolvedIdentity;
 
   // --- Search ---
   search(query: string, options?: SearchOptions): Promise<SearchResult[]>;
@@ -854,6 +894,12 @@ recall/
 - [ ] Auto-sync before search (with `--no-sync` opt-out)
 - [ ] Markdown chunking for index ingestion
 
+**Identity:**
+- [ ] `IDENTITY.md` is resolved at `MemoryService.initialize()` and exposed as `service.identity`
+- [ ] Missing/empty identity falls back to `"a knowledge-worker agent"` with a one-time startup warning
+- [ ] Identity is re-read when its file mtime changes
+- [ ] Compaction and wisdom distillation prompts include the resolved identity as a leading `<IDENTITY>...</IDENTITY>` block
+
 **Compaction:**
 - [ ] Daily→weekly compaction with typed memory extraction (§5.3)
 - [ ] Weekly→monthly compaction
@@ -904,3 +950,14 @@ recall/
 ## 14. Open Questions
 
 (None — all initial questions resolved.)
+
+---
+
+## 15. Changelog
+
+| Version | Date | Changes |
+|---|---|---|
+| 0.1 | 2026-04-02 | Initial draft — pluggable abstractions, file lifecycle, compaction, search, CLI, MVP acceptance criteria |
+| 0.2 | 2026-04-02 | Added language bindings, simplified single-index-per-root model, enriched `CompletionResult` |
+| 0.3 | 2026-04-02 | Final review pass — acceptance criteria audit, configuration cleanup |
+| 0.4 | 2026-04-27 | Added §3.5 Identity (`IdentityConfig`, `ResolvedIdentity`); threaded `identity` into `MemoryServiceConfig` and exposed `service.identity`; added MVP identity acceptance criteria. Conceptual definition in [wiki.md §11](./wiki.md) |

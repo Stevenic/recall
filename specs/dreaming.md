@@ -2,9 +2,9 @@
 
 **Status:** Draft  
 **Author:** Scribe  
-**Date:** 2026-04-11  
-**Version:** 0.1  
-**Parent spec:** [memory-service.md](./memory-service.md) v0.3, [hierarchical-memory.md](./hierarchical-memory.md) v0.4
+**Date:** 2026-04-27  
+**Version:** 0.2  
+**Parent spec:** [memory-service.md](./memory-service.md) v0.4, [hierarchical-memory.md](./hierarchical-memory.md) v0.4, [wiki.md](./wiki.md) v0.4
 
 ---
 
@@ -36,6 +36,7 @@ A dreaming pipeline that runs on a configurable schedule (or on-demand) and prod
 - **Eidetic-compatible** — Dreaming never deletes or modifies raw memories. It only creates new files (insights, promotions, diary entries).
 - **Signal-driven, not schedule-driven** — While dreaming runs on a schedule, what it *examines* is guided by recall signals (search hits, typed memory gaps, temporal clusters) rather than processing everything sequentially.
 - **LLM-powered with deterministic scaffolding** — Signal collection and candidate selection are deterministic. Synthesis and insight generation use the `MemoryModel` abstraction.
+- **Identity-framed** — Every synthesis prompt is led by an `<IDENTITY>...</IDENTITY>` block sourced from the agent's `IDENTITY.md` (see [wiki.md §11](./wiki.md) and [memory-service.md §3.5](./memory-service.md)). The role drives what counts as a salient pattern, a worth-promoting fact, or a meaningful contradiction — the templates do not restate role-specific filtering rules.
 - **Observable** — Every dreaming session produces a diary entry explaining what was examined and what was found. No silent side effects.
 
 ---
@@ -107,7 +108,7 @@ The search log is append-only and rotated monthly (old logs archived, not delete
 For each candidate cluster (batched by theme or time range):
 
 1. **Load context** — Retrieve the candidate memories + surrounding context (adjacent days, parent summaries)
-2. **Prompt the model** with one of several analysis templates:
+2. **Prompt the model** with one of several analysis templates. Every prompt is led by an `<IDENTITY>` block sourced from `service.identity.content` (see [memory-service.md §3.5](./memory-service.md)) so the role frames what the analysis treats as salient:
    - **Cross-reference analysis** — "Here are N memories mentioning [entity]. What patterns, contradictions, or evolution do you see?"
    - **Gap analysis** — "Here is a period with sparse coverage. Based on surrounding context, what might be missing or worth noting?"
    - **Contradiction detection** — "Here is the current WISDOM.md and here are recent memories. Do any entries conflict with observed behavior?"
@@ -613,6 +614,8 @@ export interface MemoryServiceConfig {
 - [ ] Typed memory extraction finds decisions/feedback/references missed by compaction
 - [ ] Theme synthesis traces entity or topic evolution across temporal boundaries
 - [ ] All synthesis uses the `MemoryModel` abstraction (no hardcoded LLM)
+- [ ] Every analysis prompt is led by an `<IDENTITY>...</IDENTITY>` block sourced from `service.identity` ([memory-service.md §3.5](./memory-service.md))
+- [ ] Templates do not restate role-specific filtering rules — the identity provides the lens
 
 ### Output
 
@@ -682,3 +685,4 @@ export interface MemoryServiceConfig {
 | Version | Date | Changes |
 |---|---|---|
 | 0.1 | 2026-04-11 | Initial draft — three-phase dreaming architecture, signal collection, candidate scoring, synthesis pipeline, output formats, CLI, integration with existing systems |
+| 0.2 | 2026-04-27 | Threaded identity through Phase 2 synthesis — every analysis prompt now leads with an `<IDENTITY>` block sourced from `service.identity` ([memory-service.md §3.5](./memory-service.md), [wiki.md §11](./wiki.md)). Added "Identity-framed" design principle and matching acceptance criteria. Wiki integration changes (insights → wiki edits) deferred to v0.3. |

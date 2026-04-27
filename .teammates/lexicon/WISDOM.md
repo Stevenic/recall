@@ -2,7 +2,7 @@
 
 Distilled principles. Read first every session (after SOUL.md).
 
-Last compacted: 2026-04-25
+Last compacted: 2026-04-26
 
 ---
 
@@ -21,6 +21,10 @@ Last compacted: 2026-04-25
 **Bottom-edge reinforcement** — End-of-prompt reminders carry outsized force. Tie each to its `<SECTION_NAME>`.
 
 **Constraint over choreography** — Specify outcomes, format, limits. Avoid sequencing unless order matters.
+
+## Memory Architecture
+
+**Atomic facts and synthesis hubs serve different distances** — Single-claim memories give sharp embedding matches with minimal surrounding noise; topical hubs give synthesis context across related claims. Hubs should cite atomic memories, not absorb them — collapsing causes distance dilution and lifecycle mismatch.
 
 ## Prompt Integration
 
@@ -44,7 +48,7 @@ Last compacted: 2026-04-25
 
 ## Operational
 
-**Daily logs are invisible — say it in the response** — The user cannot read daily logs, memory files, or anything written to disk. Only this turn's text output is visible. State what you did and what the answer is in the response body, even when also logging it. "Logged in memory" or "see daily log" reads as a no-op to the user.
+**Daily logs are invisible — say it in the response** — The user only sees this turn's text output; daily logs, memory files, and disk writes are invisible. State what you did and what the answer is in the response body, even when also logging it. "Logged in memory" or "see daily log" reads as a no-op.
 
 **Deliverable first, housekeeping second** — Front-loading upkeep consumes budget before the answer ships.
 

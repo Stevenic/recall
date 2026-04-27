@@ -122,6 +122,47 @@ export {
     DEFAULT_STALENESS_THRESHOLD_DAYS,
 } from "./dreaming-config.js";
 
+// --- Identity ---
+export {
+    IdentityLoader,
+    parseIdentityMarkdown,
+    formatIdentityFrame,
+} from "./identity.js";
+export type { IdentityConfig, ResolvedIdentity } from "./identity.js";
+
+// --- Wiki ---
+export {
+    WikiEngine,
+    parseWikiPage,
+    serializeWikiPage,
+    parseWikiLinks,
+    validateSlug,
+} from "./wiki-engine.js";
+export {
+    DEFAULT_WIKI_CONFIG,
+    isStub,
+} from "./wiki-types.js";
+export type {
+    WikiPage,
+    WikiCategory,
+    WikiTarget,
+    WikiConfig,
+    SharedWikiConfig,
+    WikiPageStubInput,
+    WikiPageRef,
+    WikiLinkRef,
+    ResolvedWikiTarget,
+    WikiLintReport,
+    WikiRebuildReport,
+    WikiMigrationReport,
+    WikiTypedMigrationReport,
+} from "./wiki-types.js";
+export {
+    renderStubBody,
+    isStubbable,
+} from "./wiki-templates.js";
+export type { StubBodyInput } from "./wiki-templates.js";
+
 // --- Default implementations ---
 export { LocalFileStorage } from "./defaults/local-file-storage.js";
 export { VirtualFileStorage } from "./defaults/virtual-file-storage.js";

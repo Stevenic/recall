@@ -2,8 +2,8 @@
 
 **Status:** Draft
 **Author:** Scribe
-**Date:** 2026-04-26
-**Version:** 0.2
+**Date:** 2026-04-27
+**Version:** 0.4
 **Parent specs:** [memory-service.md](./memory-service.md) v0.3, [hierarchical-memory.md](./hierarchical-memory.md) v0.4, [dreaming.md](./dreaming.md) v0.1
 
 ---
@@ -11,6 +11,8 @@
 ## 1. Overview
 
 The Wiki is a **persistent, structured knowledge graph** that sits alongside Recall's eidetic logs. Where daily/weekly/monthly logs are temporal, the wiki is **topical** — each page is everything the memory holds about a single entity, concept, or theme, with cross-references to related pages.
+
+Every agent has a **private wiki** in its own memory root. Groups of agents may also maintain one or more **shared wikis** for knowledge that should compound across teammates (see §14). Search federates across both: an agent's recall query hits its private index plus the index of every shared wiki it is a member of.
 
 Wiki pages have two write modes:
 
@@ -48,6 +50,7 @@ Collapse the three durable layers into two — **raw logs** (history) and **wiki
 6. **Replaces typed memories** — The `<type>_<topic>.md` filename convention is retired. The four typed categories (`user`, `feedback`, `project`, `reference`) become wiki page categories with per-category templates that preserve the typed-memory write conventions (see §3.4).
 7. **Replaces dreaming insight files** — Wiki pages are also the primary output of the dreaming pipeline.
 8. **Regenerable** — Any wiki page can be rebuilt from its `sources` list, preserving the "summaries assist recall, never replace source data" wisdom
+9. **Private + shared** — Each agent has its own private wiki by default; groups of agents may opt into one or more shared wikis with their own slug namespace and Vectra index. Search federates across all enabled wikis (see §14)
 
 ### Design Principles
 
@@ -65,36 +68,35 @@ Collapse the three durable layers into two — **raw logs** (history) and **wiki
 ## 2. Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Search Layer                             │
-│  (raw logs · weekly · monthly · typed · wisdom · WIKI)      │
-│                          ▲                                  │
-│                          │ score boost (wiki)               │
-│                          │                                  │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │             Wiki Layer (memory/wiki/)                   ││
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   ││
-│  │  │ entity/  │ │ concept/ │ │ project/ │ │ index.md │   ││
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘   ││
-│  └────────────────────────▲────────────────────────────────┘│
-│                           │ creates/updates                 │
-│  ┌────────────────────────┴────────────────────────────────┐│
-│  │              DreamEngine (Synthesis)                    ││
-│  └────────────────────────▲────────────────────────────────┘│
-│                           │ reads                           │
-│  ┌────────────────────────┴────────────────────────────────┐│
-│  │  Raw logs · Typed memories · WISDOM.md · Search log     ││
-│  └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                       Search Layer (federated)                     │
+│   raw logs · weekly · monthly · WISDOM · PRIVATE WIKI · SHARED WIKI│
+│                                ▲                                   │
+│                                │ score boost (wiki, both layers)   │
+│  ┌─────────────────────────────┴────────────────────────────────┐  │
+│  │  Private Wiki (memory/wiki/)      Shared Wiki(s)             │  │
+│  │   own index, own [[slug]]ns        own index, own [[slug]]ns │  │
+│  │   read-write by owning agent       read-write by members,    │  │
+│  │                                    read-only by readers      │  │
+│  └─────────────────────────────▲────────────────────────────────┘  │
+│                                │ creates/updates                   │
+│  ┌─────────────────────────────┴────────────────────────────────┐  │
+│  │                    DreamEngine (Synthesis)                   │  │
+│  └─────────────────────────────▲────────────────────────────────┘  │
+│                                │ reads                             │
+│  ┌─────────────────────────────┴────────────────────────────────┐  │
+│  │  Raw logs · WISDOM.md · Search log (private to each agent)   │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 | Component | Responsibility |
 |-----------|---------------|
-| **WikiEngine** | Read/write wiki pages (stubs and synthesized), maintain index, validate links, provide regeneration commands |
-| **Agent (in conversation)** | Writes single-source stubs in real time, replacing the old typed-memory write path |
-| **DreamEngine (extended)** | Enriches stubs into multi-source synthesized pages; merges, contradicts, refactors |
-| **SearchService (extended)** | Apply wiki score boost during ranking; treat wiki pages as first-class memories |
-| **MemoryFiles (extended)** | Add wiki-aware file operations (read/write/list wiki pages) |
+| **WikiEngine** | Read/write wiki pages (stubs and synthesized), maintain index, validate links, provide regeneration commands. Operates over the private wiki and any shared wikis the agent is a member of. |
+| **Agent (in conversation)** | Writes single-source stubs in real time (private by default; explicitly targets shared wikis via `--shared <group>`), replacing the old typed-memory write path |
+| **DreamEngine (extended)** | Enriches stubs into multi-source synthesized pages; merges, contradicts, refactors. Synthesis output may target either a private or shared wiki |
+| **SearchService (extended)** | Apply wiki score boost during ranking; federate retrieval across private + shared wiki indexes; treat all wiki pages as first-class memories |
+| **MemoryFiles (extended)** | Add wiki-aware file operations (read/write/list wiki pages) across private + shared roots |
 
 ---
 
@@ -390,7 +392,7 @@ The decision was logged in [memory/2026-03-22.md](../2026-03-22.md).
 
 ### 6.2 Link Resolution
 
-The WikiEngine resolves `[[slug]]` to `memory/wiki/<slug>.md` at render time. Broken links (slug doesn't exist) are surfaced by `recall wiki lint` (see §11).
+The WikiEngine resolves `[[slug]]` to `memory/wiki/<slug>.md` at render time. Broken links (slug doesn't exist) are surfaced by `recall wiki lint` (see §15).
 
 ### 6.3 Pointer Expansion (Recall)
 
@@ -643,25 +645,113 @@ Migration rules:
 
 Migration is invoked via `recall wiki migrate-typed-memories`. It is **idempotent** (re-running skips already-migrated files) and **non-destructive** (original typed memory files are moved to `memory/.archive/typed-memories/` rather than deleted).
 
-After migration, the WISDOM compaction logic (which historically read from typed memories) shifts source to wiki pages — see §11.
+After migration, the WISDOM compaction logic (which historically read from typed memories) shifts source to wiki pages — see §12.
 
 ---
 
-## 11. WISDOM.md Refactor
+## 11. Identity
+
+Every synthesis pass — daily log compaction, wiki stub creation, dreaming, WISDOM distillation — needs to know **what kind of agent is doing the synthesizing.** A software engineer summarizes a workday differently than a research scientist or a litigation attorney. Without an identity hint the LLM either treats everything as salient or applies a generic developer-shaped lens that misfits non-engineering agents.
+
+### 11.1 Definition
+
+**Identity is the agent's role**, expressed in one or two sentences. Examples:
+
+- "A software engineer focused on backend systems."
+- "A research scientist studying climate modeling."
+- "A financial advisor managing client portfolios."
+- "A litigation attorney specializing in contract disputes."
+
+That is the entire concept. Identity is **not**:
+
+- A list of "what to summarize" — the LLM derives that from the role
+- A list of "what to wiki-stub" — the LLM derives that from the role
+- A list of "what is WISDOM-worthy" — the LLM derives that from the role
+- The agent's persona, tone, or self-narrative — that is `SOUL.md`, separate from identity
+
+The role provides framing; the LLM's training does the rest. If a software engineer's daily log mentions a hallway chat with HR about insurance, the LLM should recognize that as off-role content even without an explicit "skip non-technical chats" rule.
+
+### 11.2 File Format and Location
+
+```
+<memory-root>/IDENTITY.md
+```
+
+A plain markdown file containing one or two sentences describing the role. No required frontmatter; no required structure beyond an H1 with the agent's display name. Example:
+
+```markdown
+# Beacon
+
+A software engineer responsible for the codebase — architecture, implementation, and internal quality. Writes and reviews TypeScript across the recall packages.
+```
+
+That is the entire file. The LLM reads it and adapts.
+
+### 11.3 How Identity Threads into Synthesis
+
+Every synthesis prompt — daily compaction, wiki stub generation, dreaming, WISDOM distillation — receives the identity content as a leading framing block:
+
+```text
+<IDENTITY>
+{{contents of IDENTITY.md}}
+</IDENTITY>
+
+<TASK>
+{{prompt-specific task description}}
+</TASK>
+
+<INPUT>
+{{daily logs / wiki pages / candidate facts / etc.}}
+</INPUT>
+```
+
+The synthesis prompts themselves do **not** restate role-specific filtering rules. The role does the work. This keeps prompt templates short and prevents drift between identity guidance and prompt templates.
+
+Specifically:
+
+- **Daily log compaction** (`Compactor`) — uses identity to decide what is worth retaining when collapsing day → week → month
+- **Wiki stub generation** — uses identity to decide whether an observation deserves a stub at all
+- **Dreaming synthesis** (`DreamEngine`) — uses identity to score candidates and shape page bodies
+- **WISDOM distillation** — uses identity to decide what reaches the principles tier
+
+### 11.4 Configuration
+
+```yaml
+# .recall.yaml
+identity:
+  path: IDENTITY.md      # default; relative to memory root
+  name: Beacon           # optional override (default: parsed from H1 of the file)
+```
+
+Identity is resolved at `MemoryService` construction. The resolved content is cached for the session and re-read only if the file mtime changes.
+
+### 11.5 Missing or Empty Identity
+
+If `IDENTITY.md` is missing or empty, synthesis falls back to a generic system role ("a knowledge-worker agent") and emits one warning at startup. No-identity is supported but produces lower-quality synthesis — providing one is always recommended.
+
+### 11.6 Identity and Shared Wikis
+
+Identity is **per-agent**, not per-wiki. When an agent writes to a shared wiki (§14), the agent's own identity drives the synthesis lens — there is no separate "shared-wiki identity."
+
+When dreaming or stubbing on a shared wiki, the identity context is the writing agent's, not the wiki's. Two different agents writing to the same shared wiki bring different lenses; the resulting page reflects the union of perspectives.
+
+---
+
+## 12. WISDOM.md Refactor
 
 The wiki absorbs topical content that has been creeping into WISDOM.md. WISDOM.md becomes principles-only plus a curated knowledge map.
 
-### 11.1 What stays in WISDOM.md
+### 12.1 What stays in WISDOM.md
 
 - **Principles** — General rules that apply across topics ("Plans, docs, and summaries should reduce ambiguity")
 - **Anti-patterns** — Things to avoid that span topics ("Practice drifts from templates")
 - **Knowledge Map** — A new section listing high-traffic wiki pages by category, providing entry points
 
-### 11.2 What moves to the wiki
+### 12.2 What moves to the wiki
 
 Anything topical: project state, system descriptions, references to specific tools or vendors. Today, WISDOM.md has 30 entries — most are principles and stay; a handful that drift toward topical (e.g., specific compaction strategies tied to Recall's design) become wiki pages with WISDOM.md retaining the *principle*.
 
-### 11.3 Knowledge Map section
+### 12.3 Knowledge Map section
 
 Appended to the bottom of WISDOM.md, regenerated by dreaming:
 
@@ -682,7 +772,7 @@ Entry points into the wiki (`memory/wiki/`).
 - `memory/wiki/index.md` for the full catalog
 ```
 
-### 11.4 Wisdom drift detection (extended)
+### 12.4 Wisdom drift detection (extended)
 
 The dreaming engine's wisdom drift signal (from `dreaming.md` §4.4) is updated to also propose **wiki pages for entries that drift toward topical**. Drift now has three outcomes:
 
@@ -692,7 +782,7 @@ The dreaming engine's wisdom drift signal (from `dreaming.md` §4.4) is updated 
 
 ---
 
-## 12. Surface Area Rules
+## 13. Surface Area Rules
 
 The wiki **collapses what was three durable layers into two**. The separation rule:
 
@@ -701,9 +791,9 @@ The wiki **collapses what was three durable layers into two**. The separation ru
 | **Raw logs** (`memory/YYYY-MM-DD.md`, weekly, monthly) | Immutable history — what happened, what was decided, what was discussed on a specific day | Append-only; never modified after the day ends |
 | **Wiki pages** (`memory/wiki/<slug>.md`) | Topical knowledge — everything the agent knows about a single subject, in stub or synthesized form | Stubs written by agent (real time); synthesized by dreaming; regenerable from raw logs |
 
-WISDOM.md is **not** a third durable layer — it is a derived view (principles + Knowledge Map) regenerated from the wiki and raw logs (see §11).
+WISDOM.md is **not** a third durable layer — it is a derived view (principles + Knowledge Map) regenerated from the wiki and raw logs (see §12).
 
-### 12.1 Decision rule
+### 13.1 Decision rule
 
 **When a fact appears, ask:**
 
@@ -712,14 +802,14 @@ WISDOM.md is **not** a third durable layer — it is a derived view (principles 
 
 That's it. Two questions. The "is this a typed memory or a wiki page?" judgment call is gone.
 
-### 12.2 Anti-duplication
+### 13.2 Anti-duplication
 
 - **Raw logs cite wiki pages, not the reverse for ephemeral observations.** A daily log entry that says "discussed compliance review with team" should reference `[[compliance-review]]` rather than restating the project context.
 - **Wiki stubs cite raw logs.** Every stub's `sources` frontmatter points to the daily log it originated from. Body content paraphrases the observation rather than copying the daily-log line verbatim.
 - **Synthesized pages cite stubs and raw logs.** When dreaming promotes a stub to a synthesized page, the prior stub body is the seed; new sources expand it rather than replacing it.
 - **Raw logs never get edited to align with wiki content.** The wiki adapts to the raw logs, not the other way around.
 
-### 12.3 What replaces the typed-memory mental model
+### 13.3 What replaces the typed-memory mental model
 
 Agents trained on the typed-memory pattern (`feedback_*`, `project_*`, etc.) should adopt the equivalent wiki workflow:
 
@@ -734,7 +824,160 @@ The per-category templates (§3.4) preserve the `**Why:** / **How to apply:**` d
 
 ---
 
-## 13. WikiEngine API
+## 14. Shared Wikis
+
+The wiki described in §1–§13 is **private to one agent** by default. This section adds optional **shared wikis** — co-maintained knowledge bases that one or more groups of agents read from and (with `member` role) write to. Shared wikis are the knowledge-sharing channel for teams.
+
+### 14.1 Motivation
+
+Some knowledge is naturally team-shared:
+
+- **Glossary entities** — services, vendors, tools every teammate references (e.g., `[[stripe]]`, `[[postgres]]`)
+- **Cross-cutting decisions** — architectural conventions, coding standards, naming rules every teammate enforces
+- **Themes spanning multiple agents** — recurring tensions or patterns that no single agent owns
+
+Per-agent wikis force every teammate to re-derive this from raw logs they may not even have read access to. A shared wiki lets one agent's synthesis inform another's recall — without merging the underlying eidetic logs (which remain private).
+
+### 14.2 Scope and Boundaries
+
+A shared wiki:
+
+- Lives in a **distinct memory root** at a configurable path (e.g., `.teammates/_team-wiki/`) physically separate from any agent's private root
+- Has its own `index.md`, its own `[[slug]]` namespace, and **its own Vectra index** (e.g., `.teammates/_team-wiki/.index/`)
+- Is read-write for `member` agents and read-only for `reader` agents (membership declared in config — see §14.6)
+- Does **not** receive raw logs — daily logs, weeklies, monthlies stay in each agent's private root. **The shared wiki is synthesis-only.**
+
+The synthesis-only rule keeps eidetic history private. Sharing is intentional and topical, never a side-effect of writing a daily log.
+
+### 14.3 Search Federation
+
+When an agent queries memory, the SearchService federates across:
+
+1. The agent's **private indexes** (raw logs, weeklies, monthlies, private wiki)
+2. The index of **each shared wiki** the agent is a member of or reader of
+
+Order of operations:
+
+```
+query → embed once → search each enabled index in parallel
+      → apply per-index content boosts → merge → rerank → top-K
+```
+
+The wiki score boost (§9.2) applies uniformly to private and shared wiki hits by default; per-shared-wiki overrides are supported (§14.6). The agent does not need to know which index produced a result to rank it; provenance is attached to each hit for downstream display:
+
+```typescript
+interface SearchResult {
+  // ... existing fields ...
+  source: {
+    root: "private" | string;   // shared wiki name, or "private"
+    path: string;               // path within the root
+  };
+}
+```
+
+Shared-wiki hits surface in result lists with a `[shared:<name>]` prefix in the default formatter; `--json` exposes the full `source` object.
+
+### 14.4 Authorship and Promotion
+
+Three write paths into a shared wiki:
+
+1. **Direct stub** — A `member` agent creates a stub directly in the shared wiki via `recall wiki stub <slug> --shared <name>`
+2. **Promotion from private** — An agent promotes an existing private page to a shared wiki via `recall wiki promote <slug> --to <name>`. The page body is **copied** to the shared wiki; the private version is replaced with a redirect stub pointing at the shared slug (so cross-references in private content keep resolving)
+3. **Dreaming synthesis** — A dreaming session running with shared-wiki write access can produce shared-wiki pages directly when the synthesis target is team-relevant
+
+For v1, paths 1 and 2 are required; path 3 is deferred to dreaming v0.3 (which will define when dreaming targets shared vs private wikis).
+
+**Source attribution.** Shared wiki pages may list sources from multiple agents. Sources are URI-prefixed to disambiguate roots:
+
+```yaml
+sources:
+  - private:scribe/memory/2026-04-12.md
+  - private:beacon/memory/2026-04-15.md
+  - shared:team-wiki/memory/proposals/2026-04-20.md
+```
+
+The `private:<agent>` prefix is informational — readers without access to that agent's private root will not be able to follow the link, but provenance is preserved.
+
+### 14.5 Slug Resolution Across Wikis
+
+Slug namespaces are **per-wiki**. A given `[[foo]]` link resolves only within the wiki it was written in.
+
+- Bare `[[slug]]` resolves within the **same wiki** the page lives in (a private page's `[[foo]]` → private wiki; a shared page's `[[foo]]` → that shared wiki)
+- Qualified `[[<wiki-name>:slug]]` resolves to a specific shared wiki (e.g., `[[team-wiki:auth-middleware]]`). The reserved name `private` is **not** addressable from a shared page — shared pages cannot reach into a specific agent's private wiki
+- Slug collisions across wikis are **allowed and expected** (different namespaces). At retrieval time the agent sees both; ranking decides which surfaces first
+
+**Lint extension.** `recall wiki lint` flags qualified `[[<wiki-name>:slug]]` references whose target wiki is not declared in the agent's config or whose slug doesn't exist in the target wiki.
+
+### 14.6 Configuration
+
+```yaml
+# .recall.yaml (per-agent)
+wiki:
+  enabled: true
+  scoreBoost: 1.3
+  shared:
+    - name: team-wiki
+      path: ../../_team-wiki      # relative to memory root, or absolute
+      role: member                # member | reader
+      scoreBoost: 1.4             # optional override for this shared wiki
+    - name: org-glossary
+      path: /shared/org-glossary
+      role: reader                # read-only — no stub/append/promote
+```
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| `name` | yes | Logical name; used in CLI flags and qualified slugs (`[[name:slug]]`) |
+| `path` | yes | Filesystem path to the shared memory root |
+| `role` | yes | `member` (read-write) or `reader` (read-only) |
+| `scoreBoost` | no | Per-wiki score boost override (defaults to top-level `wiki.scoreBoost`) |
+
+`name` must be unique across the agent's `wiki.shared` list. The reserved name `private` is forbidden.
+
+### 14.7 Lifecycle Operations
+
+The lifecycle defined in §7 applies to shared wikis with these additions:
+
+- **Promote** — `recall wiki promote <slug> --to <name>` copies a private page to the shared wiki and writes a redirect stub at the private location. Sources are preserved (carrying their `private:<agent>` prefix). Refuses if the agent's role for `<name>` is not `member`.
+- **Demote** is **not provided.** Once a page is shared, the canonical version is shared. If a team agrees to retire a shared page, members can delete it from the shared wiki via standard file operations; affected agents may then re-derive a private copy via `recall wiki rebuild`.
+- **Cross-wiki rename / merge** — Renames and merges happen *within* a wiki only. Cross-wiki movement requires explicit promote/delete sequences. Deferred to v2.
+- **Stub append** — `recall wiki append <slug> --shared <name> --source <s>` appends to a shared-wiki stub. Refused for `reader` role.
+
+### 14.8 Lint Across Wikis
+
+`recall wiki lint` defaults to the agent's private wiki. Add `--include-shared` to also lint each shared wiki the agent is a member or reader of. Cross-wiki broken-link detection (qualified `[[<name>:slug]]` references) is reported when `--include-shared` is set, since resolution requires loading the target wiki.
+
+### 14.9 Disabled / Misconfigured State
+
+Shared-wiki support is opt-in: `wiki.shared` is empty by default. When unset, all wiki operations target the agent's private wiki and search federates over private indexes only.
+
+When a shared wiki path is declared but unreachable (missing directory, missing `.index/`, permission denied):
+
+- The misconfiguration is reported at startup (one warning line per misconfigured entry)
+- That shared wiki is **excluded from search** and from any `recall wiki *` command for the duration of the session
+- Qualified `[[<name>:slug]]` references to that wiki render as broken links and are reported by lint
+
+Misconfiguration of one shared wiki never blocks operation of others or of the private wiki.
+
+### 14.10 Anti-Duplication Across Wikis
+
+The shared/private split adds a fourth surface-area question to §13.1: *who is this knowledge for?*
+
+| Audience | Wiki |
+|----------|------|
+| Just me (this agent) | Private wiki |
+| Me and my immediate teammates | Shared wiki at the team scope |
+| Wider org / cross-team | Shared wiki at the org scope |
+
+**Anti-duplication rules:**
+
+- **Don't keep a private copy of a shared page.** If a topic is on a shared wiki the agent has access to, the agent's private wiki should not duplicate it. Promotion (§14.4) ensures a redirect stub remains, so private references still resolve.
+- **Don't pre-share private stubs.** Stubs should be written privately first; promotion is an explicit, deliberate step. Dreaming may *propose* promotions but should not silently write to a shared wiki without the configured promotion path.
+- **Sources may cross roots.** A shared-wiki page citing `private:<other-agent>/memory/...` is fine — the other agent's private root is not accessed; only the URI is preserved for provenance.
+
+---
+
+## 15. WikiEngine API
 
 ```typescript
 export interface WikiConfig {
@@ -752,7 +995,24 @@ export interface WikiConfig {
 
   /** Days a page can go un-updated before being flagged stale (default: 90) */
   stalenessThresholdDays?: number;
+
+  /** Shared wikis the agent participates in (default: []) */
+  shared?: SharedWikiConfig[];
 }
+
+export interface SharedWikiConfig {
+  /** Logical name (used in CLI flags and qualified [[name:slug]] links) */
+  name: string;
+  /** Path to the shared memory root (relative to agent root, or absolute) */
+  path: string;
+  /** Access role for this agent */
+  role: "member" | "reader";
+  /** Optional per-shared-wiki score boost (defaults to top-level scoreBoost) */
+  scoreBoost?: number;
+}
+
+/** A wiki target for read/write operations. "private" or a configured shared name. */
+export type WikiTarget = "private" | string;
 
 export interface WikiPage {
   slug: string;
@@ -779,14 +1039,22 @@ export type WikiCategory =
 export class WikiEngine {
   constructor(service: MemoryService, config?: WikiConfig);
 
-  /** Read a wiki page by slug */
-  read(slug: string): Promise<WikiPage | null>;
+  /** List configured wiki targets (always includes "private"; adds each shared wiki name) */
+  targets(): WikiTarget[];
 
-  /** Write or overwrite a wiki page */
-  write(page: WikiPage): Promise<void>;
+  /** Read a wiki page by slug from the given target (default: "private") */
+  read(slug: string, target?: WikiTarget): Promise<WikiPage | null>;
 
-  /** Append a source + body fragment to an existing stub (agent-friendly path) */
-  append(slug: string, source: string, bodyFragment: string): Promise<WikiPage>;
+  /** Write or overwrite a wiki page in the given target. Refuses on reader role. */
+  write(page: WikiPage, target?: WikiTarget): Promise<void>;
+
+  /** Append a source + body fragment to an existing stub. Refuses on reader role. */
+  append(
+    slug: string,
+    source: string,
+    bodyFragment: string,
+    target?: WikiTarget
+  ): Promise<WikiPage>;
 
   /** Create a stub page from a category template (agent-friendly path) */
   stub(input: {
@@ -796,43 +1064,54 @@ export class WikiEngine {
     category: WikiCategory;
     source: string;
     body: string;
+    target?: WikiTarget;
   }): Promise<WikiPage>;
 
-  /** List all wiki page slugs */
-  list(): Promise<string[]>;
+  /** Promote a private page to a shared wiki: copies body, leaves redirect at private */
+  promote(slug: string, toShared: string): Promise<WikiPage>;
 
-  /** Regenerate index.md from current pages */
-  rebuildIndex(): Promise<void>;
+  /** List wiki page slugs in the given target (default: "private") */
+  list(target?: WikiTarget): Promise<string[]>;
 
-  /** Validate the wiki — broken links, orphans, stale, etc. */
-  lint(): Promise<WikiLintReport>;
+  /** List slugs across all enabled targets (private + shared), tagged with origin */
+  listAll(): Promise<{ target: WikiTarget; slug: string }[]>;
+
+  /** Regenerate index.md for the given target (default: "private") */
+  rebuildIndex(target?: WikiTarget): Promise<void>;
+
+  /** Validate one or all wikis — broken links, orphans, stale, cross-wiki refs */
+  lint(opts?: { includeShared?: boolean }): Promise<WikiLintReport>;
 
   /** Rebuild a single page from its declared sources */
-  rebuild(slug: string): Promise<WikiPage>;
+  rebuild(slug: string, target?: WikiTarget): Promise<WikiPage>;
 
-  /** Rebuild all pages */
-  rebuildAll(): Promise<WikiRebuildReport>;
+  /** Rebuild all pages in the given target */
+  rebuildAll(target?: WikiTarget): Promise<WikiRebuildReport>;
 
-  /** Apply a merge: combine src into dst, leave src as redirect */
-  merge(src: string, dst: string): Promise<void>;
+  /** Apply a merge within a single wiki target */
+  merge(src: string, dst: string, target?: WikiTarget): Promise<void>;
 
-  /** Apply a rename: src becomes redirect to new slug */
-  rename(oldSlug: string, newSlug: string): Promise<void>;
+  /** Apply a rename within a single wiki target */
+  rename(oldSlug: string, newSlug: string, target?: WikiTarget): Promise<void>;
 
-  /** Migrate legacy insight files into wiki pages */
+  /** Migrate legacy insight files into wiki pages (private only) */
   migrateInsights(): Promise<WikiMigrationReport>;
 
-  /** Migrate legacy typed memories into wiki pages */
+  /** Migrate legacy typed memories into wiki pages (private only) */
   migrateTypedMemories(): Promise<WikiTypedMigrationReport>;
 }
 
 export interface WikiLintReport {
-  brokenLinks: { from: string; toSlug: string }[];
+  brokenLinks: { from: string; toSlug: string; target: WikiTarget }[];
   orphans: string[];
   stalePages: { slug: string; updated: string; newestSource: string }[];
   missingCategory: string[];
   slugDrift: { file: string; declaredSlug: string }[];
   contradictionLoops: [string, string][];
+  /** Qualified [[name:slug]] references whose target wiki is unconfigured or missing */
+  unknownTargets: { from: string; targetName: string }[];
+  /** Per-target counts of pages scanned (only populated when includeShared=true) */
+  scanned: Record<string, number>;
 }
 
 export interface WikiRebuildReport {
@@ -862,7 +1141,7 @@ export interface WikiTypedMigrationReport {
 }
 ```
 
-### 13.1 MemoryService integration
+### 15.1 MemoryService integration
 
 ```typescript
 export interface MemoryServiceConfig {
@@ -876,59 +1155,78 @@ export interface MemoryServiceConfig {
 service.wiki: WikiEngine
 ```
 
-### 13.2 SearchService integration
+### 15.2 SearchService integration
 
-The search ranking step gains a per-document multiplier hook:
+The search ranking step gains a per-document multiplier hook and a per-target index list:
 
 ```typescript
 function applyContentTypeBoosts(
   hits: SearchResult[],
   boosts: Record<string, number>
 ): SearchResult[];
+
+interface FederatedSearchInput {
+  /** Targets to search; defaults to ["private", ...allEnabledSharedWikis] */
+  targets?: WikiTarget[];
+  /** Per-target wiki score boosts (overrides per-target config) */
+  contentBoosts?: Record<WikiTarget, number>;
+}
 ```
 
-`boosts` is sourced from config (e.g., `{ wiki: 1.3 }`). Per-query overrides via `QueryOptions.contentBoosts`.
+`boosts` is sourced from config (e.g., `{ wiki: 1.3 }`); `contentBoosts` is sourced per-target from `SharedWikiConfig.scoreBoost` with fallback to `WikiConfig.scoreBoost`. Per-query overrides via `QueryOptions.contentBoosts` and `QueryOptions.wikiTargets`.
 
 ---
 
-## 14. CLI
+## 16. CLI
 
-### 14.1 New Commands
+### 16.1 New Commands
 
 ```
-recall wiki list                          # List wiki pages
+recall wiki list                          # List private wiki pages
 recall wiki list --category project       # Filter by category
 recall wiki list --stubs                  # List only stubs (len(sources) == 1)
-recall wiki show <slug>                   # Print a wiki page
-recall wiki stub <slug> --category <c>    # Create a stub page (agent-friendly)
-recall wiki append <slug> --source <s>    # Append a source + body to a stub
-recall wiki lint                          # Validate the wiki
+recall wiki list --shared <name>          # List pages in a shared wiki
+recall wiki list --all                    # List across private + all shared wikis
+recall wiki show <slug>                   # Print a wiki page (private)
+recall wiki show <slug> --shared <name>   # Print a page from a shared wiki
+recall wiki stub <slug> --category <c>    # Create a private stub
+recall wiki stub <slug> --category <c> --shared <name>  # Stub directly in a shared wiki
+recall wiki append <slug> --source <s>    # Append to a private stub
+recall wiki append <slug> --source <s> --shared <name>  # Append to a shared stub
+recall wiki promote <slug> --to <name>    # Copy a private page to a shared wiki + redirect
+recall wiki targets                       # List configured wiki targets and roles
+recall wiki lint                          # Validate the private wiki
+recall wiki lint --include-shared         # Also lint shared wikis (member or reader)
 recall wiki lint --fix                    # Auto-fix where safe (rebuild index, etc.)
 recall wiki rebuild <slug>                # Regenerate a page from sources
-recall wiki rebuild --all                 # Regenerate everything
-recall wiki merge <src> <dst>             # Merge two pages
-recall wiki rename <old> <new>            # Rename a page
+recall wiki rebuild --all                 # Regenerate everything (private)
+recall wiki rebuild --all --shared <name> # Regenerate a shared wiki (member only)
+recall wiki merge <src> <dst>             # Merge two pages within a wiki
+recall wiki rename <old> <new>            # Rename within a wiki
 recall wiki migrate-insights              # Convert legacy dreaming insights to wiki
 recall wiki migrate-typed-memories        # Convert legacy typed memories to wiki
-recall wiki status                        # Page count (stub vs synthesized), lint summary, last update
+recall wiki status                        # Per-target page counts, roles, lint summary
 ```
 
-### 14.2 Updated Commands
+### 16.2 Updated Commands
 
 ```
 recall search <query> --no-wiki-boost              # Disable boost for this query
-recall search <query> --wiki-only                  # Only wiki pages
+recall search <query> --wiki-only                  # Only wiki pages (private + shared)
+recall search <query> --wiki-target private        # Restrict to private wiki only
+recall search <query> --wiki-target team-wiki      # Restrict to a specific shared wiki
+recall search <query> --no-shared                  # Skip all shared wikis for this query
 recall dream                                       # Now writes to wiki by default
 recall dream --no-wiki                             # Fall back to insight files (compat)
 ```
 
-### 14.3 Output formats
+### 16.3 Output formats
 
-All `recall wiki *` commands support `--json`. Default output is human-readable.
+All `recall wiki *` commands support `--json`. Default output is human-readable. Search results include a `source: { root, path }` field on every hit so callers can distinguish private from shared origins.
 
 ---
 
-## 15. Configuration
+## 17. Configuration
 
 ```yaml
 # .recall.yaml
@@ -938,6 +1236,14 @@ wiki:
   minSourcesForStub: 1         # Agent can stub on a single observation
   minSourcesForSynthesis: 3    # Dreaming promotes to synthesis at 3+ sources
   stalenessThresholdDays: 90
+  shared:                      # Optional — shared wikis the agent participates in
+    - name: team-wiki
+      path: ../../_team-wiki
+      role: member              # member | reader
+      scoreBoost: 1.4           # Optional per-wiki override
+    - name: org-glossary
+      path: /shared/org-glossary
+      role: reader
 ```
 
 Wiki is **opt-in**. When disabled:
@@ -947,63 +1253,75 @@ Wiki is **opt-in**. When disabled:
 - Search ignores wiki content type
 - CLI `recall wiki *` commands print "wiki disabled" and exit non-zero
 
+The `shared` list is optional and defaults to empty. See §14.6 for field details and §14.9 for misconfiguration handling.
+
 ---
 
-## 16. Storage Budget
+## 18. Storage Budget
 
 | Component | Size estimate (1 year) |
 |-----------|----------------------|
-| Wiki pages (~50 pages, 2–3 KB each) | ~150 KB |
-| `index.md` | <20 KB |
-| Vectra index growth (wiki chunks) | ~1 MB |
+| Private wiki pages (~50 pages, 2–3 KB each) | ~150 KB |
+| `index.md` (private) | <20 KB |
+| Vectra index growth (private wiki chunks) | ~1 MB |
+| Shared wiki pages (per shared wiki, ~50 pages) | ~150 KB |
+| Vectra index growth (per shared wiki) | ~1 MB |
 
-**Total additional storage:** <2 MB/year. Negligible compared to the existing baseline. Note that wiki pages partially *replace* insight files from dreaming v0.1, so net storage may be roughly flat.
+**Total additional storage:** <2 MB/year for the private wiki, plus <1.2 MB/year per shared wiki the agent participates in. Negligible compared to the existing baseline. Wiki pages partially *replace* insight files from dreaming v0.1, so net storage may be roughly flat. Shared wiki storage is shared across all members (only the index lives in each agent's resolution path; the source files live once in the shared root).
 
 ---
 
-## 17. Comparison: Recall Wiki vs Karpathy LLM Wiki
+## 19. Comparison: Recall Wiki vs Karpathy LLM Wiki
 
 | Aspect | Recall Wiki | Karpathy LLM Wiki |
 |--------|-------------|------------------|
 | **Generation trigger** | Dreaming pipeline (scheduled, signal-driven) | Manual ingest (user drops in source, agent updates wiki) |
 | **Source corpus** | Internal: raw logs, typed memories | External: articles, papers, podcasts, books |
 | **Maintenance loop** | Automatic (dreaming) + `recall wiki lint` | Conversational (user + agent in Obsidian) |
-| **Search** | Vectra index + score boost | Index file + optional CLI search tool |
-| **Cross-references** | `[[slug]]` resolved by WikiEngine | `[[slug]]` resolved by Obsidian |
+| **Search** | Vectra index + score boost; federated across private + shared wikis | Index file + optional CLI search tool |
+| **Cross-references** | `[[slug]]` and qualified `[[name:slug]]` resolved by WikiEngine | `[[slug]]` resolved by Obsidian |
 | **Schema** | Frontmatter-typed pages, fixed categories | User/agent-defined, conventions in CLAUDE.md |
-| **Provenance** | `sources: [...]` mandatory | `[ref:N]` citations encouraged |
+| **Provenance** | `sources: [...]` mandatory; URI prefixes preserve cross-root attribution | `[ref:N]` citations encouraged |
 | **Regeneration** | `recall wiki rebuild` from declared sources | Manual / re-ingest |
-| **Audience** | Single agent (within a memory root) | Single user (with agent assist) |
+| **Audience** | One agent's private wiki + opt-in shared wikis with `member`/`reader` roles | Single user (with agent assist) |
 | **Visualization** | Index file; future graph view | Obsidian graph view |
 
 The patterns are deeply compatible. Recall's wiki could be browsed in Obsidian if a user wanted — pages are plain markdown with `[[slug]]` links and frontmatter, and Obsidian handles those natively.
 
 ---
 
-## 18. Open Questions
+## 20. Open Questions
 
 ### Resolved in v0.2
 
-- ~~**Q5: What's the minimum `sources` count to create a page?**~~ — **Resolved.** Split into two thresholds: `minSourcesForStub: 1` (agent stubs in real time) and `minSourcesForSynthesis: 3` (dreaming promotes to full synthesis). See §13 and §15.
+- ~~**Q5: What's the minimum `sources` count to create a page?**~~ — **Resolved.** Split into two thresholds: `minSourcesForStub: 1` (agent stubs in real time) and `minSourcesForSynthesis: 3` (dreaming promotes to full synthesis). See §15 and §17.
 - ~~**Do we need typed memories if we have the wiki?**~~ — **Resolved (new in v0.2).** No. Typed memories are subsumed by wiki pages with the four typed categories (`user`, `feedback`, `project`, `reference`) mapping onto wiki categories (`entity`, `concept`, `project`, `reference`). The `<type>_<topic>.md` filename convention is retired. Migration via `recall wiki migrate-typed-memories` (§10.4).
+
+### Resolved in v0.3
+
+- ~~**Q4: Should the wiki support page-level access control (private vs sharable)?**~~ — **Resolved (new in v0.3).** Yes, but at the **wiki level**, not the page level. Each agent has a private wiki by default; groups of agents may opt into one or more shared wikis with `member` or `reader` roles. Page-level `private: true` frontmatter is not needed — moving a page between privacy scopes is the `recall wiki promote` operation, which is explicit and audited. See §14.
 
 ### Open
 
 | # | Question | Options | Notes |
 |---|----------|---------|-------|
-| 1 | Default `scoreBoost` value | (a) 1.3 — gentle preference (b) 1.5 — strong preference (c) 1.0 + filter-only — opt-in via query | Affects ranking behavior dramatically; needs benchmarking |
+| 1 | Default `scoreBoost` value | (a) 1.3 — gentle preference (b) 1.5 — strong preference (c) 1.0 + filter-only — opt-in via query | Affects ranking behavior dramatically; needs benchmarking. Applies to both private and shared wikis. |
 | 2 | Should wiki pages be chunked or embedded as single documents? | (a) Chunked (consistent with raw logs) (b) Single embedding per page (loses internal structure but preserves whole-page topicality) (c) Hybrid — page-level + chunk-level | Affects how partial matches behave. Stubs (1 paragraph) likely fit a single embedding; synthesized pages may want chunking. Hybrid is the natural answer but adds complexity. |
-| 3 | Where does the Knowledge Map live? | (a) Bottom of WISDOM.md (b) Separate `KNOWLEDGE.md` file (c) `memory/wiki/index.md` only | (a) leverages WISDOM's "always-loaded" property; (c) consolidates |
-| 4 | Should the wiki support page-level access control (private vs sharable)? | (a) No — all pages are equally local (b) `private: true` frontmatter to exclude from any future sharing | Premature for v1 but easy to add now if YES |
-| 6 | Should `[[slug]]` links be resolved at write time (denormalized) or read time? | (a) Write-time — fast read, brittle on rename (b) Read-time — slower read, robust on rename | (b) preferred; performance impact likely negligible |
+| 3 | Where does the Knowledge Map live? | (a) Bottom of WISDOM.md (b) Separate `KNOWLEDGE.md` file (c) `memory/wiki/index.md` only | (a) leverages WISDOM's "always-loaded" property; (c) consolidates. Open sub-question: should the Knowledge Map link into shared wikis as well? |
+| 6 | Should `[[slug]]` links be resolved at write time (denormalized) or read time? | (a) Write-time — fast read, brittle on rename (b) Read-time — slower read, robust on rename | (b) preferred; performance impact likely negligible. Cross-wiki qualified links (`[[name:slug]]`) must be read-time regardless. |
 | 7 | Should the wiki support multimedia (images, attachments)? | (a) Text only for v1 (b) Image references via standard markdown allowed but not curated | (a) keeps scope tight for v1 |
 | 8 | Migration of existing WISDOM.md entries | (a) Manual review pass — user approves each promotion (b) Automatic with confidence threshold (c) Status quo — only future dreaming touches WISDOM | (a) safest for the existing corpus |
 | 9 | Slug collisions during typed-memory migration | (a) Append category to slug (`testing-feedback`, `testing-project`) and warn (b) Fail loudly and require manual resolution (c) Merge body content under sub-headings | Default proposal: (a). Only triggers if two typed categories cover the same topic, which is rare in practice. |
 | 10 | Should agent-written stubs trigger immediate Vectra re-indexing? | (a) Yes — stub appears in search same turn (b) Debounced — re-index on next dreaming pass | (a) is the high-value path but adds latency to writes; (b) keeps writes cheap but creates a search lag |
+| 11 | Should shared wiki indexes live alongside the shared root or in each agent's index dir? | (a) Co-located in shared root (`<shared-root>/.index/`) — one index, all agents read it (b) Per-agent local copy — each agent indexes the shared root independently (c) Hybrid — shared root holds canonical index, agents may opt into a local copy | (a) saves storage and avoids drift but requires shared filesystem; (b) is simpler but each agent re-embeds the same content. Default proposal: (a) when path is local FS; (b) when path is remote/networked. |
+| 12 | Concurrent writes to a shared wiki | (a) File-level locking with retry (b) Last-write-wins with git as conflict resolver (c) Append-only journal with periodic compaction | Multiple agents may write to the same shared wiki simultaneously. (b) is consistent with raw logs being committed via git but loses non-trivial concurrent edits. (a) requires a lock file. Default proposal: (a) for stub creation, (b) for synthesis rewrites. |
+| 13 | Should dreaming target shared wikis in v1? | (a) No — dreaming writes to private wiki only; promotion is always agent-driven (b) Yes — dreaming writes to shared wikis when source corpus crosses agent boundaries (deferred from §14.4 path 3) | (a) is the v1 default per §14.4; (b) requires dreaming v0.3. Decision drives whether dreaming v0.2 has any shared-wiki awareness at all. |
+| 14 | Cross-wiki contradiction handling | (a) Per-wiki contradictions only (`contradicts:` lists same-wiki slugs) (b) Cross-wiki contradictions allowed via qualified slugs (`contradicts: [team-wiki:auth-middleware]`) | If a private page contradicts a shared page, where is that contradiction surfaced? (b) is more honest but adds resolution complexity. |
+| 15 | Should `recall wiki promote` carry over the page's edit history? | (a) No — promotion is a fresh page in the shared wiki, sources reference the private origin via `private:` URIs (b) Yes — the private page's git history is preserved across the move | (a) is simpler and matches the "redirect stub at private location" model. (b) requires git-aware tooling and is deferred. |
 
 ---
 
-## 19. Acceptance Criteria
+## 21. Acceptance Criteria
 
 ### Wiki Page Format
 
@@ -1017,19 +1335,22 @@ The patterns are deeply compatible. Recall's wiki could be browsed in Obsidian i
 
 ### WikiEngine
 
-- [ ] `read(slug)` returns parsed `WikiPage` or `null`
-- [ ] `write(page)` validates frontmatter and writes file
-- [ ] `stub(input)` creates a single-source page from the per-category template
-- [ ] `append(slug, source, fragment)` adds source + fragment to an existing page; advances `updated`
+- [ ] `read(slug)` returns parsed `WikiPage` or `null`; `read(slug, target)` reads from a shared wiki
+- [ ] `write(page)` validates frontmatter and writes file; refuses if target role is `reader`
+- [ ] `stub(input)` creates a single-source page from the per-category template; honors `target`
+- [ ] `append(slug, source, fragment)` adds source + fragment to an existing page; advances `updated`; refuses on reader role
 - [ ] `isStub(page)` returns true iff `len(sources) <= 1`
-- [ ] `list()` enumerates all wiki page slugs; supports `--stubs` filter
-- [ ] `rebuildIndex()` regenerates `index.md` deterministically
-- [ ] `lint()` reports broken links, orphans, stale pages, slug drift, contradiction loops
-- [ ] `rebuild(slug)` regenerates a page from declared sources via `MemoryModel`
-- [ ] `merge(src, dst)` combines pages and writes redirect stub for `src`
-- [ ] `rename(old, new)` writes redirect stub for `old`, body at `new`
-- [ ] `migrateInsights()` converts legacy `memory/dreams/insights/` files
-- [ ] `migrateTypedMemories()` converts legacy `memory/<type>_<topic>.md` files to `memory/wiki/<topic>.md` with category preserved; resolves collisions; archives originals; idempotent
+- [ ] `list()` enumerates pages in the given target; supports `--stubs` filter
+- [ ] `listAll()` enumerates pages across private + every accessible shared wiki, tagged with origin
+- [ ] `targets()` returns the configured wiki targets including their roles
+- [ ] `promote(slug, toShared)` copies a private page to the shared wiki and writes a redirect stub at the private location
+- [ ] `rebuildIndex(target)` regenerates `index.md` deterministically per target
+- [ ] `lint({ includeShared })` reports broken links, orphans, stale pages, slug drift, contradiction loops, and cross-wiki unknown-target references
+- [ ] `rebuild(slug, target)` regenerates a page from declared sources via `MemoryModel`
+- [ ] `merge(src, dst, target)` combines pages within a single target and writes redirect stub for `src`
+- [ ] `rename(old, new, target)` writes redirect stub for `old`, body at `new`, scoped to a single target
+- [ ] `migrateInsights()` converts legacy `memory/dreams/insights/` files (private only)
+- [ ] `migrateTypedMemories()` converts legacy `memory/<type>_<topic>.md` files to `memory/wiki/<topic>.md` with category preserved; resolves collisions; archives originals; idempotent (private only)
 
 ### Search Integration
 
@@ -1038,6 +1359,28 @@ The patterns are deeply compatible. Recall's wiki could be browsed in Obsidian i
 - [ ] Configurable score boost is applied at retrieval time
 - [ ] `--no-wiki-boost` and `--wiki-only` CLI flags work
 - [ ] `QueryOptions.contentBoosts` overrides config defaults per query
+- [ ] Search federates over private + every accessible shared wiki by default
+- [ ] Per-target boosts (`SharedWikiConfig.scoreBoost`) override the top-level boost when set
+- [ ] Each `SearchResult` carries a `source: { root, path }` field identifying its origin wiki
+- [ ] `--no-shared` and `--wiki-target <name>` CLI flags scope retrieval correctly
+- [ ] `QueryOptions.wikiTargets` overrides the federated default per query
+
+### Shared Wikis
+
+- [ ] An agent with no `wiki.shared` config behaves identically to v0.2 (private wiki only)
+- [ ] `wiki.shared` declares any number of shared wikis with `name`, `path`, `role`, optional `scoreBoost`
+- [ ] `member` role can stub, append, write, promote, merge, rename, and rebuild within the shared wiki
+- [ ] `reader` role can read and search but all write paths refuse with a clear error
+- [ ] Each shared wiki has its own `index.md` and its own Vectra index at `<shared-root>/.index/`
+- [ ] `recall wiki promote <slug> --to <name>` copies the private page body into the shared wiki, advances `updated`, and writes a redirect stub at the private location
+- [ ] Bare `[[slug]]` links resolve within the same wiki the page lives in (private or shared)
+- [ ] Qualified `[[<wiki-name>:slug]]` links resolve to the named shared wiki; the reserved name `private` is rejected from shared pages
+- [ ] Slug collisions across private and shared wikis are allowed; both surface in retrieval and rank independently
+- [ ] Sources may carry `private:<agent>/...` or `shared:<name>/...` URI prefixes; resolution failures degrade gracefully
+- [ ] A shared wiki with an unreachable path is reported at startup and excluded from search and CLI for the session, without affecting other wikis
+- [ ] `recall wiki targets` lists the agent's wiki targets with roles
+- [ ] `recall wiki lint --include-shared` validates each shared wiki the agent has access to
+- [ ] `recall wiki status` shows per-target counts of stubs/synthesized pages and last update time
 
 ### Dreaming Integration
 
@@ -1056,14 +1399,19 @@ The patterns are deeply compatible. Recall's wiki could be browsed in Obsidian i
 ### CLI
 
 - [ ] `recall wiki list / show / lint / rebuild / merge / rename / migrate-insights / status` all implemented
+- [ ] `recall wiki stub / append / promote / targets` all implemented
+- [ ] `--shared <name>`, `--include-shared`, `--all` flags route to the correct target
 - [ ] `--json` output supported on all wiki commands
-- [ ] `recall search` flags (`--no-wiki-boost`, `--wiki-only`) implemented
+- [ ] `recall search` flags (`--no-wiki-boost`, `--wiki-only`, `--wiki-target`, `--no-shared`) implemented
 
 ### Configuration
 
 - [ ] Wiki is opt-in (disabled by default)
 - [ ] `scoreBoost`, `minSourcesForStub`, `minSourcesForSynthesis`, `stalenessThresholdDays` configurable
+- [ ] `wiki.shared[]` accepts any number of shared-wiki entries with `name`, `path`, `role`, optional `scoreBoost`
+- [ ] The reserved name `private` is rejected as a shared-wiki name
 - [ ] Disabled state is graceful (no errors; wiki commands exit non-zero with clear message)
+- [ ] Misconfigured shared wiki (missing path, unreadable index) is reported at startup and excluded for the session without affecting other targets
 
 ### Typed-Memory Migration
 
@@ -1082,35 +1430,36 @@ The patterns are deeply compatible. Recall's wiki could be browsed in Obsidian i
 
 ---
 
-## 20. Implementation Sequencing
+## 22. Implementation Sequencing
 
 ### Phase A — Wiki File Layer
 
 1. Define page format, frontmatter schema, slug rules
-2. Implement `WikiEngine.read / write / list`
+2. Implement `WikiEngine.read / write / list` (with `target` parameter from the start)
 3. Implement `WikiEngine.stub / append` with per-category templates (§3.4)
-4. Implement `[[slug]]` link parser and resolver
+4. Implement `[[slug]]` link parser and resolver (bare + qualified `[[name:slug]]`)
 5. Implement `index.md` generator
-6. Add `WikiConfig` to `MemoryServiceConfig`
-7. CLI: `recall wiki list / show / stub / append / status`
+6. Add `WikiConfig` (including `shared[]`) to `MemoryServiceConfig`
+7. CLI: `recall wiki list / show / stub / append / targets / status`
 
-**Can ship independently. Agents can stub real-time wiki pages for testing before dreaming integration.**
+**Can ship independently. Agents can stub real-time wiki pages for testing before dreaming integration. The `target` parameter is plumbed through from day one even if shared wikis aren't enabled — saves a refactor later.**
 
 ### Phase B — Search Integration
 
 1. Index wiki pages in Vectra
 2. Add `contentType: "wiki"` and frontmatter fields to embedded text
 3. Implement score boost in ranking
-4. CLI: `recall search --no-wiki-boost / --wiki-only`
+4. Add `source: { root, path }` to every `SearchResult`
+5. CLI: `recall search --no-wiki-boost / --wiki-only`
 
-**Depends on A. Can be tested with hand-written pages.**
+**Depends on A. Can be tested with hand-written pages. Federation across multiple targets lands in Phase F.**
 
 ### Phase C — Lint and Maintenance
 
 1. Implement `lint()` (broken links, orphans, stale, drift)
 2. Implement `rebuildIndex()`
-3. Implement `merge / rename` with redirect stubs
-4. CLI: `recall wiki lint / rebuild`
+3. Implement `merge / rename` with redirect stubs (per-target)
+4. CLI: `recall wiki lint / rebuild / merge / rename`
 
 **Depends on A. Parallel with B.**
 
@@ -1122,7 +1471,7 @@ The patterns are deeply compatible. Recall's wiki could be browsed in Obsidian i
 4. Implement `migrateInsights()`
 5. CLI: `recall dream --no-wiki` compatibility flag
 
-**Depends on B and C, plus dreaming v0.2 (which absorbs this spec's requirements).**
+**Depends on B and C, plus dreaming v0.2 (which absorbs this spec's requirements). Dreaming targets the private wiki only in v1; shared-wiki dreaming is deferred (Q13).**
 
 ### Phase E — Typed-Memory Migration & WISDOM.md Refactor
 
@@ -1136,13 +1485,28 @@ The patterns are deeply compatible. Recall's wiki could be browsed in Obsidian i
 
 **Depends on A and D. The typed-memory migration (steps 1–3) can run as soon as Phase A lands; the WISDOM refactor (steps 4–7) depends on D.**
 
-**Phases A, B, C can run in parallel after A's surface API lands. The typed-memory migration sub-phase of E can run in parallel with B/C/D once A lands. The WISDOM refactor sub-phase of E depends on D.**
+### Phase F — Shared Wikis
+
+1. Plumb shared wiki targets through `WikiEngine` (read/write/list/stub/append per target)
+2. Implement per-target Vectra indexes at `<shared-root>/.index/`
+3. Implement search federation across private + all enabled shared wikis (depends on Phase B's `source` field)
+4. Implement role enforcement (`reader` refuses writes; `member` permits all)
+5. Implement `WikiEngine.promote(slug, toShared)` with redirect stub at private location
+6. Implement qualified `[[<name>:slug]]` resolver and lint detection of unknown targets
+7. Implement startup validation of shared wiki paths and graceful degradation on misconfiguration
+8. CLI: `recall wiki list --shared / --all`, `wiki promote`, `wiki lint --include-shared`, `recall search --wiki-target / --no-shared`
+
+**Depends on Phase A (file layer with `target` parameter) and Phase B (search). Phase F can run in parallel with C/D/E once A and B are stable. Resolution of Q11 (index location), Q12 (concurrency), and Q13 (dreaming targeting) is required before Phase F finalizes.**
+
+**Phases A, B, C can run in parallel after A's surface API lands. The typed-memory migration sub-phase of E can run in parallel with B/C/D once A lands. The WISDOM refactor sub-phase of E depends on D. Phase F depends on A and B; it is parallel to C, D, and E.**
 
 ---
 
-## 21. Changelog
+## 23. Changelog
 
 | Version | Date | Changes |
 |---|---|---|
 | 0.1 | 2026-04-26 | Initial draft — wiki page format, categories, naming, cross-references, lifecycle, search/dreaming/WISDOM integration, surface area separation rule, WikiEngine API, CLI, open questions, acceptance criteria, sequencing |
-| 0.2 | 2026-04-26 | **Collapse typed memories into wiki.** Added stub-vs-synthesized model (§3.3) and per-category templates (§3.4) preserving the typed-memory `**Why:** / **How to apply:**` discipline. Mapped `user`/`feedback`/`project`/`reference` typed categories onto wiki categories. Updated §1, §4, §5 (file layout drops `<type>_<topic>.md`), §7 (added stub creation + agent appends), §10 (added §10.4 typed-memory migration), §12 (surface area rule simplified to two layers — raw + wiki), §13 (split `minSourcesForCreate` into `minSourcesForStub` + `minSourcesForSynthesis`; added `stub()`, `append()`, `migrateTypedMemories()`), §14 (CLI: `wiki stub`, `wiki append`, `wiki migrate-typed-memories`, `wiki list --stubs`), §15 (config), §18 (resolved Q5; added Q9 collision handling, Q10 stub re-indexing latency), §19 (acceptance criteria for typed-memory migration), §20 (Phase E gains migration sub-phase, parallelizable with B/C/D). |
+| 0.2 | 2026-04-26 | **Collapse typed memories into wiki.** Added stub-vs-synthesized model (§3.3) and per-category templates (§3.4) preserving the typed-memory `**Why:** / **How to apply:**` discipline. Mapped `user`/`feedback`/`project`/`reference` typed categories onto wiki categories. Updated §1, §4, §5 (file layout drops `<type>_<topic>.md`), §7 (added stub creation + agent appends), §10 (added §10.4 typed-memory migration), §12 (surface area rule simplified to two layers — raw + wiki), §13 (split `minSourcesForCreate` into `minSourcesForStub` + `minSourcesForSynthesis`; added `stub()`, `append()`, `migrateTypedMemories()`), §14 (CLI: `wiki stub`, `wiki append`, `wiki migrate-typed-memories`, `wiki list --stubs`), §15 (config), §18 (resolved Q5; added Q9 collision handling, Q10 stub re-indexing latency), §19 (acceptance criteria for typed-memory migration), §20 (Phase E gains migration sub-phase, parallelizable with B/C/D). *(Section references in this entry are at the v0.2 numbering.)* |
+| 0.3 | 2026-04-27 | **Add shared wikis for group knowledge sharing.** Each agent has a private wiki by default; groups of agents may opt into one or more shared wikis with `member` or `reader` roles. Each shared wiki has its own Vectra index; search federates across private + all accessible shared wiki indexes. Added new §13 Shared Wikis (motivation, scope, search federation, authorship/promotion via `recall wiki promote`, slug resolution with qualified `[[<name>:slug]]` syntax, configuration, lifecycle ops, lint extension, disabled/misconfigured states, anti-duplication rules). Renumbered §13–§21 → §14–§22. Updated §1 overview (added private/shared distinction + bullet 9), §2 architecture (federated search layer + role enforcement), §14 WikiEngine API (added `targets()`, `listAll()`, `promote()`, `target` parameter on read/write/list/stub/append/rebuild/merge/rename; added `SharedWikiConfig`, `WikiTarget`; `WikiLintReport.unknownTargets` and `scanned`), §14.2 SearchService integration (added `FederatedSearchInput`, per-target boosts), §15 CLI (added `wiki promote / targets / list --shared / list --all`, `--shared <name>` and `--include-shared` flags, `recall search --wiki-target / --no-shared`), §16 config (example `shared:` block), §17 storage (per-shared-wiki estimate), §18 comparison (federated audience row), §19 (resolved Q4 at the wiki level; added Q11 index location, Q12 concurrency, Q13 dreaming targeting, Q14 cross-wiki contradictions, Q15 promote history), §20 acceptance (added Shared Wikis subsection; updated WikiEngine, Search Integration, CLI, Configuration subsections), §21 sequencing (added Phase F Shared Wikis, parallelizable with C/D/E once A/B stable). *(Section references in this entry are at the v0.3 numbering.)* |
+| 0.4 | 2026-04-27 | **Add Identity as a synthesis-framing concept.** Every synthesis pass — daily compaction, wiki stub generation, dreaming, WISDOM distillation — receives a leading `<IDENTITY>` block sourced from `<memory-root>/IDENTITY.md`. **Identity is just the role** ("a software engineer," "a research scientist," etc.) — one or two sentences, no embedded "what to summarize / wiki / wisdom" rules. The role provides framing; the LLM derives filtering from training. Added new §11 Identity (definition, file format, prompt threading, configuration, missing-identity fallback, identity-vs-shared-wiki rules). Renumbered §11–§22 → §12–§23. No other behavioral changes; spec content from v0.3 is preserved at the new numbering. *(Section references in v0.2 and v0.3 changelog entries above are preserved at their original-version numbering; references in this entry and in the body of the spec are at v0.4 numbering.)* |
