@@ -134,12 +134,15 @@ program
             temperature: opts.temperature,
             maxTokens: opts.maxTokens,
             historyWindow: opts.historyWindow,
-            onDay: async (dayNumber, content) => {
+            onDay: async (dayNumber, content, kind) => {
                 const padded = String(dayNumber).padStart(4, '0');
-                await writeFile(join(memoriesDir, `day-${padded}.md`), content, 'utf-8');
+                const filename = `day-${padded}.md`;
+                await writeFile(join(memoriesDir, filename), content, 'utf-8');
                 writtenDays.add(dayNumber);
                 if (!opts.json) {
-                    process.stdout.write(`\r  Generated day ${dayNumber}/${opts.end} (${writtenDays.size} unique)`);
+                    const tag = `[${kind}]`.padEnd(6);
+                    const dayLabel = `day ${String(dayNumber).padStart(4, ' ')}/${opts.end}`;
+                    console.log(`  ${tag} ${dayLabel}  ${filename}  (${writtenDays.size} unique)`);
                 }
             },
         });
@@ -147,7 +150,6 @@ program
         const result = await generator.generateAll();
 
         if (!opts.json) {
-            console.log(''); // newline after progress
             console.log(`Done. Generated ${result.days.length} days for persona "${persona.name}" (${persona.id}).`);
             console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
             console.log(`  Output: ${memoriesDir}`);

@@ -1,25 +1,78 @@
 id: research-scientist
-name: Kenji Nakamura
+name: Atlas
 epoch: "2024-01-01"
-role: Assistant Professor / Principal Investigator
+role: AI lab co-pilot for a synthetic biology PI
 domain: University biology lab (synthetic biology and gene regulation)
 institution: Pacific State University, Dept. of Molecular Biology
 team_size: 7  # 2 postdocs, 3 PhD students, 1 lab manager, 1 undergrad
 
 profile: |
-  Kenji runs a mid-size synthetic biology lab in his 3rd year as PI. His
-  research focuses on CRISPR-based gene regulatory circuits in mammalian
-  cells. Balances benchwork supervision, grant writing, teaching one
-  course per semester, and committee service. Published 18 papers (4 as
-  corresponding author since starting the lab). Technically deep — still
-  reviews raw sequencing data and troubleshoots experiments personally.
+  Atlas is the Nakamura Lab's AI co-pilot — a computer program that supports
+  the lab's day-to-day research operations. Atlas drafts experimental plans
+  at Kenji's direction, prepares grant materials and figure captions, runs
+  literature searches, drafts sgRNA candidate lists, maintains the lab
+  calendar and reagent inventory, and coordinates handoffs to specialized
+  agents (sequence design, statistics, ordering). Atlas does not run
+  physical experiments — humans do; they report results back, and Atlas
+  records, analyzes, and stages the next round of work.
 
 communication_style: |
-  Methodical and hypothesis-driven. Documents experimental rationale before
-  results. Uses precise measurement units, statistical tests, and reagent
-  catalog numbers. Writes in a lab-notebook style with explicit controls
-  and expected vs. observed outcomes. More verbose in grant drafts,
-  terse in lab meeting notes.
+  Terse, technical, third-person. Memory entries are organized by topic
+  and named interaction (e.g., "Sarah — pKN001 colony screen review"),
+  not by clock time. Quotes the principal's asks verbatim when material.
+  Names files produced (e.g., `KN_oligo_inventory.xlsx`), decisions
+  reached, and handoffs to other agents (`@seq-design-agent`,
+  `@lit-search-agent`, `@stats-agent`). Uses precise units, catalog
+  numbers, and statistical tests when those came up in conversation.
+  Ends each entry with an "Outstanding" section listing follow-up work.
+
+# The human Atlas primarily serves
+principal:
+  name: Kenji Nakamura
+  role: Assistant Professor / Principal Investigator
+  profile: |
+    Kenji runs a mid-size synthetic biology lab in his 3rd year as PI.
+    Research focus: CRISPR-based gene regulatory circuits in mammalian
+    cells. Methodical, hypothesis-driven; documents experimental rationale
+    before results. Technically deep — still reviews raw sequencing data
+    and troubleshoots experiments personally. Uses Atlas heavily for
+    experimental planning, grant drafting, lit search, and lab logistics.
+
+# Other humans and AI agents Atlas works with regularly
+cast:
+  - name: Sarah Kim
+    role: Senior postdoc — leads CRISPR circuit work and off-target characterization
+    kind: human
+  - name: Marcus
+    role: G3 PhD student — qPCR / sequencing workflows
+    kind: human
+  - name: Lin
+    role: G2 PhD student — TA for MolBio 301
+    kind: human
+  - name: Patel
+    role: G4 PhD student — TA for MolBio 301
+    kind: human
+  - name: Dr. Wei Chen
+    role: Collaborating PI (Chen Lab) — LNP delivery for CRISPR components
+    kind: human
+  - name: Lab manager
+    role: Purchasing, equipment maintenance, biosafety paperwork
+    kind: human
+  - name: Department chair
+    role: Tenure mentorship, annual review
+    kind: human
+  - name: "@lit-search-agent"
+    role: Specialist agent — runs PubMed / biorxiv queries and produces summaries
+    kind: agent
+  - name: "@seq-design-agent"
+    role: Specialist agent — wraps CHOPCHOP / CRISPick for sgRNA design
+    kind: agent
+  - name: "@stats-agent"
+    role: Specialist agent — DESeq2 / edgeR / Bayesian workflows on count data
+    kind: agent
+  - name: "@order-agent"
+    role: Specialist agent — converts reagent lists into IDT / Sigma / Thermo orders
+    kind: agent
 
 projects:
   - id: crispr-circuit
@@ -37,6 +90,63 @@ projects:
   - id: teaching-mol-bio
     name: "Molecular Biology 301 course"
     description: "Teaching and curriculum development for the undergraduate molecular biology course"
+
+# Conversation contexts Atlas participates in (recall-bench v0.5 §2.6 / §2.7).
+# Group sessions are 65/35 weighted in arcs.yaml (~12 principal-primary, ~7 group-primary).
+sessions:
+  - id: principal
+    kind: 1to1
+    participants: [Kenji Nakamura]
+
+  - id: lab-meeting
+    kind: group
+    participants:
+      - Kenji Nakamura
+      - Sarah Kim
+      - Marcus
+      - Lin
+      - Patel
+      - Lab manager
+
+  - id: course-staff
+    kind: group
+    participants:
+      - Kenji Nakamura
+      - Lin
+      - Patel
+
+  - id: tenure-review
+    kind: group
+    participants:
+      - Kenji Nakamura
+      - Department chair
+
+  # Cross-lab collaboration with Dr. Wei Chen. Marked isolated so Chen Lab's
+  # proprietary LNP chemistry and the IP/authorship negotiations stay inside
+  # this room. Research scientist isn't a primary boundary-stress persona, but
+  # one isolated session covers the cross-lab IP test surface. Lifecycle
+  # mirrors the collab-drug-delivery arc (day 300–700 = pre-onboarding through
+  # post-MoU wrap).
+  - id: collab-chen
+    kind: group
+    participants:
+      - Kenji Nakamura
+      - Dr. Wei Chen
+    isolated: true
+    firstDay: 300
+    lastDay: 700
+    sensitive_topics:
+      - "Chen Lab's proprietary LNP-4 / LNP-7 formulation chemistry"
+      - "Chen Lab's internal cytotoxicity assay protocols and panel data"
+      - "IP and authorship negotiations between Nakamura Lab and Chen Lab"
+      - "Pre-publication manuscript figures and authorship order"
+
+# Non-sensitive global facts available to every session at generation time
+# (recall-bench v0.5 §2.7 — Cross-session shared knowledge).
+sharedKnowledge:
+  - "The lab uses Nextflow/nf-core for RNA-seq analysis after the day-300 pipeline rebuild"
+  - "Reagent ordering and biosafety paperwork are routed through the lab manager"
+  - "The lab's institutional home is Pacific State University, Dept. of Molecular Biology"
 
 # Stress map targets (from spec §3.4):
 #   Primary:   temporal-reasoning, contradiction-resolution, cross-reference, synthesis

@@ -2,9 +2,9 @@
 
 **Status:** Draft  
 **Author:** Scribe  
-**Date:** 2026-04-06  
-**Version:** 0.1  
-**Parent:** [recall-bench.md](recall-bench.md) §4.3
+**Date:** 2026-04-28  
+**Version:** 0.3  
+**Parent:** [recall-bench.md](recall-bench.md) §4.3, §4.6, §4.7, §2.6, §2.7
 
 ---
 
@@ -41,28 +41,200 @@ Each call to the day generator receives a structured prompt assembled from these
 
 ### 3.1 System Prompt (static per persona)
 
+**The persona IS the AI agent — a computer program.** The system prompt frames
+the LLM as that agent and instructs it to write its own working memory log:
+who interacted with it today, what they asked, what it produced, what it
+decided, and what it handed off. The log is **not** a first-person human
+professional's diary.
+
+#### 3.1.1 Persona Schema
+
+The persona is loaded from `persona.yaml` and passed verbatim into the prompt.
+Schema:
+
+```typescript
+interface PersonaDefinition {
+    id: string;
+    name: string;                // the AGENT's name (e.g., "Atlas"), not the human's
+    epoch: string;               // ISO date — day 1 of the timeline
+    role: string;                // e.g., "AI lab co-pilot for a synthetic biology PI"
+    domain: string;
+    company?: string;            // either company OR institution may be set
+    institution?: string;
+    team_size: number;
+    profile: string;             // multi-line — describes the agent
+    communication_style: string; // multi-line — describes the agent's voice
+    projects?: ProjectRef[];
+    principal?: PrincipalRef;    // the human the agent primarily serves
+    cast?: CastMember[];         // other humans + agents the agent works with
+    sessions?: SessionDef[];     // conversation contexts the agent participates in
+    sharedKnowledge?: string[];  // facts available to every session at generation time
+}
+
+interface PrincipalRef {
+    name: string;
+    role: string;
+    profile?: string;
+}
+
+interface CastMember {
+    name: string;                // humans by name; agents prefixed with "@"
+    role: string;
+    kind?: 'human' | 'agent';    // defaults to 'agent' if name starts with '@', else 'human'
+}
+
+interface SessionDef {
+    id: string;                  // stable slug — e.g., "principal", "lab-meeting", "client-acme"
+    kind: '1to1' | 'group';      // authoritative; not derived from participant count
+    participants: string[];      // names referencing principal + cast entries
+    isolated?: boolean;          // default false; when true, contents must not leak to other sessions
+    shared?: boolean;            // default false; when true, contents are visible to other sessions
+    firstDay?: number;           // optional lower bound on session activity (1-indexed)
+    lastDay?: number;            // optional upper bound; undefined = open-ended
+    sensitive_topics?: string[]; // grounding facts that must stay inside this session
+}
 ```
-You are a daily memory log generator for a synthetic benchmark persona.
-Your job is to produce a single day's memory log that reads like a real
-agent's daily record — not a story, not fiction, but a working
-professional's actual log of what happened today.
 
-Persona: {{persona.name}}
-Role: {{persona.role}}
-Domain: {{persona.domain}}
-Company/Institution: {{persona.company}}
-Team size: {{persona.team_size}}
+`principal` and `cast` are optional but strongly recommended — without them
+the prompt falls back to a generic team frame. `company` is optional;
+`institution` is also accepted (academic / hospital / lab personas typically
+use `institution`).
 
-Profile:
+#### 3.1.2 Prompt Template
+
+Rendered sections, in order:
+
+```
+You are an AI agent named "{{persona.name}}" — a computer program. Your job is to
+produce a single day's entry of YOUR OWN memory log, written from your perspective
+as the agent. The log records who interacted with you today (humans and other
+agents), what they asked, what you did, what you decided, what files or outputs
+you produced, and what you handed off.
+
+# Identity
+- Name: {{persona.name}}
+- Role: {{persona.role}}
+- Domain: {{persona.domain}}
+- Affiliation: {{persona.institution || persona.company}}     # only if either is set
+- Team supported: {{persona.team_size}} people
+
+# Profile
 {{persona.profile}}
 
-Communication style:
+# Communication style
 {{persona.communication_style}}
 
-IMPORTANT: Write in the voice and style described above. The log should
-sound like {{persona.name}} wrote it, not like an AI describing what
-{{persona.name}} did.
+# Principal — the human you primarily serve     # only if persona.principal is set
+- Name: {{persona.principal.name}}
+- Role: {{persona.principal.role}}
+- Profile:                                       # only if persona.principal.profile is set
+    {{persona.principal.profile}}
+
+# Cast — humans and other agents you interact with     # only if persona.cast is non-empty
+- {{cast[i].name}} ({{cast[i].kind}}) — {{cast[i].role}}
+- ...
+
+# Sessions — conversation contexts you participate in     # only if persona.sessions is non-empty
+- {{sessions[i].id}} ({{sessions[i].kind}}{{", isolated" if sessions[i].isolated}}{{", shared" if sessions[i].shared}}) — participants: {{sessions[i].participants}}
+  {{#if sessions[i].sensitive_topics}}sensitive topics (must stay in this session): {{sessions[i].sensitive_topics}}{{/if}}
+  {{#if sessions[i].firstDay or sessions[i].lastDay}}lifecycle: day {{sessions[i].firstDay || 1}}–{{sessions[i].lastDay || "end"}}{{/if}}
+- ...
+
+# Shared knowledge — facts available to every session     # only if persona.sharedKnowledge is non-empty
+- {{sharedKnowledge[i]}}
+- ...
+
+# How to write the log
+- Write in third-person from the agent's perspective. Refer to yourself implicitly
+  ("Drafted Aim 2…", "Sent the sgRNA list to Sarah") or by name when needed.
+  DO NOT write a first-person human diary ("I came in early…", "Kicking off…").
+- Reference humans by name (e.g., "Kenji asked…"). Reference other AI agents with
+  @-handles (e.g., "Handed off PubMed query to @lit-search-agent").
+- Each section should describe an interaction or unit of work: who initiated it,
+  what was asked, what the agent produced or decided, and what files or handoffs
+  resulted. Quote the principal's ask verbatim when material.
+- Organize by TOPIC, not by clock time. Section titles should name the topic and
+  the person involved (e.g., "### Kenji — pKN001 colony screen review").
+- List files produced/changed and decisions explicitly. End with an "Outstanding"
+  or "Tomorrow" section when follow-up work exists.
+
+# How to partition the log by session
+- The day's log is partitioned into **sessions**. Each session is a separate
+  conversation context (1:1 with the principal, a group meeting, an isolated
+  client room, etc.). Today's active sessions are listed in the user message.
+- Render one `# session: <id>` H1 per session that had activity today, in
+  canonical order: `principal` first if present, then group sessions in the
+  order they were declared in the persona definition. **Skip sessions with no
+  activity** — do not emit an empty H1.
+- Inside each session H1, organize by topic with H3 sub-sections as described
+  above. Topics belong under the session where the interaction actually occurred.
+- **Internal narration** (the agent's own scratchpad — reflections, planning,
+  cross-session summaries the agent makes for itself) is rendered as
+  un-prefixed body content **above** the first `# session:` H1. It is not a
+  session and is never quoted as such.
+- **Group session attribution.** Inside a group session H1, attribute speakers
+  verbatim when their words are load-bearing — e.g.,
+  `> Sarah: "We should hold off on the v2 transfection until LNP-7 is ready."`
+  Decisions, action items, and dissent must be attributed; never collapse into
+  "the team decided." If three participants agreed and one objected, record both.
+- **Isolated session no-leak invariant.** When a session is marked `isolated`,
+  its `sensitive_topics` are grounded as load-bearing facts under that session's
+  H1 only. Never echo a sensitive topic from an isolated session into a different
+  session's H1, except into `# session: principal` and only when the principal
+  explicitly authorizes the disclosure (the day must record that authorization).
+- **Cross-session arc echoes.** When today's user message marks an arc with
+  `referencedSessions`, render the arc's content under `primarySession` in detail
+  AND emit a brief, attributable echo under each referenced session — a status
+  update, briefing, or dissent moment, not a recap. The echo must be consistent
+  with the primary content; contradictions are bugs.
+- **Shared knowledge** (listed above) may be voiced in any session without
+  triggering a leak.
+
+# Required output structure
+\```
+---
+type: daily
+---
+
+<optional internal narration — un-prefixed body, before any session H1>
+
+# session: <session-id>
+
+### <topic / interaction title>
+
+<body — narrate the interaction, decision, or output>
+
+### <next topic>
+...
+
+# session: <next-session-id>
+
+### <topic / interaction title>
+...
+\```
+
+Frontmatter is minimal. Use one `# session: <id>` H1 per active session.
+Each topic inside a session is an H3. The agent does not perform physical
+actions itself (no pipetting, no surgery, no courtroom appearances) — it
+drafts, analyzes, searches, summarizes, schedules, and coordinates. Physical
+actions are taken by humans, who report results back to the agent.
 ```
+
+#### 3.1.3 Conditional Rendering Rules
+
+- The `Affiliation` line is omitted when both `institution` and `company` are absent.
+- `# Principal` block is omitted entirely when `persona.principal` is absent.
+- The nested `Profile:` line under Principal is omitted when `persona.principal.profile` is absent.
+- `# Cast` block is omitted when `persona.cast` is empty or absent.
+- `kind` defaults to `'agent'` when `name` starts with `@`, else `'human'`.
+- `# Sessions` block is omitted when `persona.sessions` is empty or absent. When omitted, the `# How to partition the log by session` instructions and the multi-session output structure are also omitted; the day-generator falls back to a single-section log under one H2 (the v0.2 format). Personas without a declared `sessions:` block are treated as legacy single-session.
+- `# Shared knowledge` block is omitted when `persona.sharedKnowledge` is empty or absent.
+- Inside each `Sessions` line, the `isolated` and `shared` annotations only render when their respective fields are true.
+- The `sensitive topics` line is omitted when `sensitive_topics` is absent.
+- The `lifecycle` line is omitted when both `firstDay` and `lastDay` are absent.
+
+**Reference implementation:** `packages/recall-bench/src/generator.ts` →
+`buildSystemPrompt`.
 
 ### 3.2 Day Context (changes every call)
 
@@ -74,7 +246,7 @@ day_of_week: Wednesday
 
 ### 3.3 Active Arcs (changes every call)
 
-A list of arcs that overlap this day number, annotated with phase:
+A list of arcs that overlap this day number, annotated with phase and session affinity:
 
 ```yaml
 active_arcs:
@@ -84,6 +256,9 @@ active_arcs:
     phase: mid          # early | mid | late | concluding
     day_in_arc: 68      # how many days into this arc
     arc_length: 200     # total arc duration
+    primarySession: principal           # where deep work happens
+    referencedSessions: [standup]       # natural-touchpoint echoes
+    echo_today: false                    # pipeline flag — should this arc echo today?
     description: |
       Rebuild the payment pipeline from a single-currency Stripe integration
       to multi-currency support with subscription billing...
@@ -94,6 +269,9 @@ active_arcs:
     phase: early
     day_in_arc: 5
     arc_length: 200
+    primarySession: design-review
+    referencedSessions: [principal, standup]
+    echo_today: true                     # sprint boundary — surface in standup
     description: |
       Introduce an Apollo-based GraphQL gateway...
     
@@ -103,9 +281,17 @@ active_arcs:
     phase: mid
     day_in_arc: 30
     arc_length: 60
+    primarySession: principal
+    referencedSessions: []
     description: |
       Choose between URL-path, header-based, and query-param versioning...
 ```
+
+**Session affinity fields:**
+
+- `primarySession` — the session this arc primarily unfolds in. The day-generator emits the arc's deep content under this session's H1.
+- `referencedSessions` — sessions that get attributable echoes at natural touchpoints. The pipeline sets `echo_today: true` when today is a touchpoint (sprint boundary, decision moment, status point); the generator must emit a brief echo in each referenced session on those days. On other days the generator should not echo the arc to its referenced sessions.
+- For arcs whose `primarySession` is itself an isolated session, the deep content belongs only in that session's H1; cross-references into `principal` are allowed but only if the persona explicitly authorizes the disclosure (the day must record that authorization).
 
 **Phase calculation:**
 - `early`: day_in_arc < 15% of arc_length
@@ -179,6 +365,38 @@ arc_summaries:
 
 **Who generates these summaries?** The pipeline, not the LLM. After each day is generated, the pipeline updates the arc summary by appending a one-line delta. Every 10 days, the pipeline asks the LLM to compress the summary back to ~100 words. This keeps context manageable without losing coherence.
 
+### 3.8 What Kind of Work the Agent Does
+
+The persona is a software agent, not a person with hands. This shapes what
+events end up in the daily log.
+
+**The agent does NOT perform physical actions.** No pipetting, no surgery, no
+suturing, no courtroom appearances, no IV starts, no client lunches, no
+handshakes. Humans on the team perform those, then **report results back** to
+the agent — typically as the body of an interaction the agent records.
+
+**The agent's actual work is informational:**
+
+- **Drafts** — experimental plans, grant text, ADRs, briefs, treatment notes, IEPs, model memos
+- **Analyzes** — sequencing reads, lab values, contract clauses, financials, telemetry, code diffs
+- **Searches and summarizes** — literature, case law, prior art, internal docs, ticket history
+- **Schedules** — meetings, follow-ups, reagent orders, court filings, deadlines
+- **Coordinates and hands off** — to specialist agents (e.g., `@stats-agent`,
+  `@lit-search-agent`) and to humans on the team
+
+A typical log entry therefore reads as: *"Sarah came back with the colony
+screen results — 11/24 positive. Atlas re-ran the analysis with the corrected
+primer set, drafted the figure caption, and queued the next round of cloning
+with @order-agent."* The physical work (the colony screen) is reported to the
+agent; the agent's own work (re-analysis, drafting, ordering handoff) is what
+gets recorded as agent activity.
+
+**Why this matters for benchmarking:** the recall test set is built from the
+agent's logs, so what the agent records determines what's recallable.
+Clamping the agent to informational work keeps the dataset aligned with
+realistic agentic-memory use cases (assistant-style AI), not with
+human-professional first-person journaling.
+
 ---
 
 ## 4. Output Format
@@ -192,24 +410,38 @@ day: {{day_number}}
 date: "{{calendar_date}}"
 persona: {{persona.id}}
 arcs: [{{comma-separated active arc IDs}}]
+sessions: [{{comma-separated session IDs that have content today}}]
 ---
 
-# Day {{day_number}} — {{calendar_date}} ({{day_of_week}})
+{{optional internal narration — un-prefixed body, before any session H1}}
 
-{{body — free-form markdown}}
+# session: {{session_id}}
+
+{{H3-organized topics for this session}}
+
+# session: {{next_session_id}}
+
+{{H3-organized topics for this session}}
 ```
+
+The `sessions` frontmatter list is **derived** by the harness from the `# session:` H1s actually present in the body — the generator does not author it. Pre-H1 internal narration is never listed there.
+
+For personas without a `sessions:` block, fall back to the legacy v0.2 single-section format: a single `## YYYY-MM-DD` H2, no `# session:` H1s, body is unpartitioned. The harness exposes the entire body as one synthetic session called `principal` with `kind: 1to1` for adapter compatibility.
 
 ### 4.1 Body Rules
 
-The body is free-form markdown written in the persona's voice. It must follow these rules:
+The body is free-form markdown written as the AI agent's working memory log. It must follow these rules:
 
-1. **First person.** The persona is writing about their own day.
+1. **Third person, agent narrator.** The agent is recording its own day — interactions, decisions, files produced, handoffs. Refer to the agent implicitly ("Drafted Aim 2…") or by name when needed. **DO NOT write a first-person human diary** ("I came in early…", "Kicking off…"). Humans are referenced by name (`Kenji asked…`); other agents by `@-handle` (`Handed off to @lit-search-agent`).
 2. **Past tense.** This is an end-of-day log, not a live stream.
-3. **Grounded in arcs.** Every paragraph should relate to at least one active arc or be a natural "life" detail (meetings, breaks, routine tasks).
-4. **No meta-references.** Never mention "arcs", "the benchmark", "day number", or any generation infrastructure.
-5. **Realistic density variation.** See §5.
-6. **Specific details.** Names, numbers, versions, error messages, file paths, dosages, case numbers — whatever is domain-appropriate. Vague logs are useless for benchmarking recall.
-7. **Natural cross-references.** When arcs share dependencies (e.g., auth and caching both touch Redis), mention the connection naturally.
+3. **Grounded in arcs.** Every topic should relate to at least one active arc or be a natural agent-routine detail (handoffs, scheduled summaries, queue status).
+4. **Organize by topic, not clock time.** Each H3 names the topic and the person involved (e.g., `### Sarah — colony screen review`), not `### 9:00 AM`.
+5. **Partition by session.** Each topic belongs under the `# session: <id>` H1 where the interaction actually happened. Skip session H1s that have no activity today (do not emit empty H1s). See §4.3 for full session-rendering rules.
+6. **No meta-references.** Never mention "arcs", "the benchmark", "day number", or any generation infrastructure.
+7. **Realistic density variation.** See §5.
+8. **Specific details.** Names, numbers, versions, error messages, file paths, dosages, case numbers — whatever is domain-appropriate. Vague logs are useless for benchmarking recall. Quote the principal's ask verbatim when material.
+9. **Natural cross-references.** When arcs share dependencies (e.g., a sgRNA reused across two experiments), mention the connection naturally — but only inside sessions where both arcs are visible. Cross-references from isolated sessions are bounded by the no-leak invariant (§4.3).
+10. **End each session's content with `Outstanding` or `Tomorrow`** when follow-up work exists in that session. The principal session, being the trusted aggregator, may carry consolidated outstanding items spanning multiple sessions.
 
 ### 4.2 Typed Memory Sections (embedded)
 
@@ -227,7 +459,50 @@ attempts, base delay 1s, max delay 30s. Considered fixed intervals but
 the thundering-herd risk during recovery was too high.
 ```
 
-These blocks appear inline within the day's log, separated by `---` fences. They mirror the recall service's typed memory format so the benchmark can also test extraction.
+These blocks appear inline within the day's log, separated by `---` fences. They mirror the recall service's typed memory format so the benchmark can also test extraction. A typed memory block lives **inside** the session H1 where the underlying interaction occurred — it does not float above the first session H1, and it does not span sessions.
+
+### 4.3 Session-Aware Rendering
+
+This subsection codifies the rules for partitioning a day across sessions. They reinforce the broader rules in `recall-bench.md` §2.6, §2.7, §4.6, and §4.7.
+
+#### Section ordering
+
+`# session: principal` (if the day has activity there) appears first. Group sessions follow in the order they were declared in `persona.yaml`. The harness does not depend on order, but stable order keeps day files diff-friendly.
+
+#### Internal narration (pre-H1 body)
+
+Optional. Use it for the agent's own reflections, planning notes, or cross-session summaries the agent maintains for itself. Keep it brief (1–3 short paragraphs); deep work belongs inside a session. Never quote it as if it came from a session.
+
+#### Group session attribution rules (mirrors recall-bench §4.6)
+
+1. **Quote load-bearing statements verbatim** with explicit speaker attribution:
+   `> Sarah: "We should hold off on the v2 transfection until LNP-7 is ready."`
+2. **Attribute decisions, action items, and dissent** to specific participants. Never collapse into "the team decided." If three agreed and one objected, record both.
+3. **Attribute background context** when prior shared knowledge is referenced: `Sarah had previously raised this in lab-meeting on day 142.`
+
+#### Isolated session no-leak invariant (mirrors recall-bench §4.7)
+
+1. `sensitive_topics` declared on an isolated session are grounded as load-bearing facts under that session's H1 only.
+2. The same sensitive topic must **not** appear under any other session's H1 — including `principal` — unless the day records the principal explicitly authorizing the disclosure.
+3. Authorization itself is recorded as an attributable interaction inside `# session: principal`: `Kenji authorized the agent to brief the case-strategy team on the procedural posture of Acme, with no privileged content.`
+4. The consistency checker flags any sensitive-topic phrase appearing outside its declared home as a generation-time leak (recall-bench §4.4).
+
+#### Cross-session arc echoes
+
+When the user message marks `echo_today: true` for an arc with non-empty `referencedSessions`:
+
+1. Render the arc's deep content under the `primarySession` H1 (full detail).
+2. Emit a brief, attributable echo under each referenced session — typically a status update, briefing, decision moment, or dissent capture. An echo is 1–3 sentences, not a recap.
+3. The echo must be consistent with the primary content. Stating "v2 is on track" in `principal` and "v2 is blocked" in `standup` on the same day is a generation bug.
+4. When `echo_today: false`, do not emit the arc into its referenced sessions — keep the test surface clean.
+
+#### Shared knowledge
+
+Items in `persona.sharedKnowledge` may be voiced inside any session at any time without triggering a leak. Use them sparingly — they're meant for genuinely-cross-cutting facts ("the lab uses Nextflow for RNA-seq"), not as a backdoor for sensitive content.
+
+#### Empty days and quiet sessions
+
+If the day has only internal narration and no session activity, emit only the pre-H1 body and no `# session:` H1s. If today is a quiet day for a particular session, simply omit its H1 — absence is the signal.
 
 ---
 
@@ -304,22 +579,24 @@ The pipeline assembles the full prompt in this order:
 
 ```
 ┌─────────────────────────────┐
-│  SYSTEM PROMPT (§3.1)       │  ~200 tokens, static per persona
+│  SYSTEM PROMPT (§3.1)       │  ~250–350 tokens, static per persona
+│                             │  (sessions + shared knowledge add ~50–150)
 ├─────────────────────────────┤
 │  USER MESSAGE               │
 │  ┌────────────────────────┐ │
 │  │ Day Context (§3.2)     │ │  ~30 tokens
+│  │ Active Sessions (§7.1) │ │  ~30–100 tokens
 │  │ Active Arcs (§3.3)     │ │  ~200–400 tokens (2–4 arcs)
 │  │ Directives (§3.4)      │ │  ~0–100 tokens
 │  │ Correction State (§3.5)│ │  ~0–50 tokens
 │  │ Arc Summaries (§3.7)   │ │  ~0–200 tokens (for arcs > 30 days)
 │  │ Density Hint (§5)      │ │  ~10 tokens
-│  │ Recent History (§3.6)  │ │  ~1,200 tokens (3 days)
+│  │ Recent History (§3.6)  │ │  ~1,200–1,500 tokens (3 days, multi-session)
 │  └────────────────────────┘ │
 └─────────────────────────────┘
 
-Total input: ~1,800–2,200 tokens per call
-Total output: ~50–1,200 tokens (varies by density)
+Total input: ~1,900–2,500 tokens per call
+Total output: ~50–1,500 tokens (varies by density and number of active sessions)
 ```
 
 ### 7.1 User Message Template
@@ -329,6 +606,12 @@ Generate the daily memory log for day {{day_number}}.
 
 Date: {{calendar_date}} ({{day_of_week}})
 Density: {{density_hint}}
+
+{{#if active_sessions}}
+Active sessions today (emit a `# session: <id>` H1 only for sessions with real
+activity; skip the rest):
+{{formatted active_sessions}}
+{{/if}}
 
 Active arcs:
 {{formatted active_arcs as YAML}}
@@ -353,8 +636,56 @@ Recent days (for continuity — do NOT repeat content from these):
 
 Produce ONLY the markdown content for this day's log, including the
 YAML frontmatter. Do not include any explanation or commentary outside
-the log.
+the log. Write as the AI agent in third person — record interactions,
+decisions, files produced, and handoffs. Do NOT write a first-person
+human diary. Partition the body by session using `# session: <id>` H1s
+as specified in the system prompt; honor the isolated-session no-leak
+invariant.
 ```
+
+#### Active sessions block (per call)
+
+The pipeline assembles the `active_sessions` list each day from the persona's `sessions:` block plus today's arc activity:
+
+```yaml
+active_sessions:
+  - id: principal
+    kind: 1to1
+    expected_activity: yes              # principal-1:1 is "on" any day there's content
+  - id: lab-meeting
+    kind: group
+    expected_activity: yes              # weekly cadence places it on this day
+    cadence_note: "Weekly Monday lab meeting"
+  - id: collab-chen
+    kind: group
+    isolated: true
+    expected_activity: maybe
+    cadence_note: "Within active window day 350–650; activate when arc has content"
+    sensitive_topics:
+      - "Chen Lab's proprietary LNP formulations"
+      - "IP and authorship negotiations"
+```
+
+The generator should emit a `# session:` H1 only for sessions with real activity; the `expected_activity` and `cadence_note` fields are hints, not requirements. Sessions outside their `firstDay`/`lastDay` lifecycle window are excluded by the pipeline.
+
+### 7.2 User Message Variants
+
+The reference implementation has three user-message builders, all sharing the
+trailing reinforcement above:
+
+| Builder | Used by | Purpose |
+|---|---|---|
+| `buildUserMessage` | One-shot day generation | Full context: all active arcs, directives, correction state, arc summaries, recent history |
+| `buildArcUserMessage` | Pass 1 (arc-by-arc) | Focused on one **PRIMARY arc**; other active arcs listed only as background; supports merging into `EXISTING LOG` when an earlier arc already produced content for the day |
+| `buildGapUserMessage` | Pass 2 (gap-fill) | Routine/light day — active arcs may be mentioned in passing, no major events; density forced to `quiet` |
+
+**All three variants end with the same reinforcing instruction:** *"Write as
+the AI agent in third person — record interactions, decisions, files
+produced, and handoffs. Do NOT write a first-person human diary."* This is
+deliberate redundancy — the system prompt establishes the framing once, and
+each user message reinforces it, because a single instance is not enough to
+prevent the LLM from defaulting to a first-person human voice (especially
+mid-stream after several days of generation).
 
 ---
 
@@ -444,55 +775,86 @@ At typical API pricing, this is a manageable single-digit dollar cost per full d
 
 ## 12. Example — Full Input/Output
 
+This example uses the `research-scientist` persona (`Atlas` — an AI lab
+co-pilot serving Kenji Nakamura) and demonstrates the **multi-session day
+file format** introduced in v0.3. The day shows internal narration, a
+`# session: principal` H1 with deep deliberation, a `# session: lab-meeting`
+H1 with verbatim group attribution, and a `# session: collab-chen` H1 with
+isolated-session content carrying a `sensitive_topic`.
+
 ### Input (abbreviated)
 
-**System prompt:** (River Chen / Backend Eng / Nexus — per §3.1)
+**System prompt:** rendered from `packages/recall-bench/personas/research-scientist/persona.yaml` per §3.1.2 — includes Identity (Atlas / AI lab co-pilot / Pacific State University), Profile, Communication style, Principal (Kenji Nakamura), Cast (Sarah, Marcus, Lin, Patel, Dr. Wei Chen, Lab manager, Dept. chair, `@lit-search-agent`, `@seq-design-agent`, `@stats-agent`, `@order-agent`), Sessions (`principal`, `lab-meeting`, `course-staff`, `tenure-review`, `collab-chen` — isolated, day 300–700, sensitive: Chen Lab proprietary LNP formulations and IP/authorship), and Shared knowledge (lab uses Nextflow/nf-core after pipeline rebuild; biosafety paperwork through lab manager).
 
 **User message:**
 
 ```
-Generate the daily memory log for day 247.
+Generate the daily memory log for day 415.
 
-Date: 2024-09-04 (Wednesday)
+Date: 2025-02-19 (Wednesday)
 Density: busy
 
+Active sessions today:
+  - id: principal
+    kind: 1to1
+    expected_activity: yes
+  - id: lab-meeting
+    kind: group
+    expected_activity: yes
+    cadence_note: "Weekly Wednesday lab meeting"
+  - id: collab-chen
+    kind: group
+    isolated: true
+    expected_activity: yes
+    cadence_note: "Active arc — LNP-4 cytotoxicity discrepancy under investigation"
+    sensitive_topics:
+      - "Chen Lab's proprietary LNP-4 formulation chemistry"
+      - "IP and authorship negotiations between Nakamura Lab and Chen Lab"
+
 Active arcs:
-  - id: payments-v2
+  - id: crispr-circuit
     type: project
-    title: "Payment processing v2"
+    title: "CRISPR toggle switch circuit engineering"
     phase: mid
-    day_in_arc: 68
-    arc_length: 200
-    description: "Rebuild payment pipeline..."
-    
-  - id: graphql-layer
+    day_in_arc: 415
+    arc_length: 800
+    primarySession: principal
+    referencedSessions: [lab-meeting]
+    echo_today: true
+    description: "Core research project — bistable dCas9 toggle switch..."
+
+  - id: collab-drug-delivery
     type: project
-    title: "GraphQL API gateway"
+    title: "LNP collaboration with Chen Lab"
+    phase: mid
+    day_in_arc: 65
+    arc_length: 300
+    primarySession: collab-chen
+    referencedSessions: [principal]
+    echo_today: true
+    description: "Cross-lab collaboration on lipid nanoparticle delivery..."
+
+  - id: correction-lnp-toxicity
+    type: correction
+    title: "LNP-4 cytotoxicity"
     phase: early
-    day_in_arc: 5
-    arc_length: 200
-    description: "Introduce Apollo-based GraphQL gateway..."
-    
-  - id: decision-api-versioning
-    type: decision
-    title: "API versioning strategy"
-    phase: mid
-    day_in_arc: 30
-    arc_length: 60
-    description: "Choose between URL-path, header, query-param..."
+    day_in_arc: 35
+    arc_length: 220
+    primarySession: collab-chen
+    referencedSessions: [principal]
+    echo_today: false
+    description: "Wrong belief: LNP-4 has <5% cytotoxicity (correction not yet known)..."
+
+Correction state:
+  - arc: correction-lnp-toxicity
+    phase: wrong_belief
+    belief: "LNP-4 formulation has <5% cytotoxicity at therapeutic doses"
 
 Today's events (MUST appear in the log):
-  - arc: graphql-layer
-    event: "First schema stitching prototype passes integration tests"
+  - arc: crispr-circuit
+    event: "v3 EF1α-driven cardiomyocyte data review — 11.2-fold dynamic range achieved"
 
-Arc progress summaries:
-  - id: payments-v2
-    summary: "Multi-currency support feature-complete. In QA, 3 blocking bugs.
-              Webhook drop rate fix deployed, monitoring at 0.1%. Subscription
-              billing in design — waiting on product spec."
-
-Recent days:
-[day 244-246 content here]
+Recent days: [day 412–414 content here]
 
 Produce ONLY the markdown content...
 ```
@@ -502,50 +864,146 @@ Produce ONLY the markdown content...
 ```markdown
 ---
 type: daily
-day: 247
-date: "2024-09-04"
-persona: backend-eng-saas
-arcs: [payments-v2, graphql-layer, decision-api-versioning]
+day: 415
+date: "2025-02-19"
+persona: research-scientist
+arcs: [crispr-circuit, collab-drug-delivery, correction-lnp-toxicity]
+sessions: [principal, lab-meeting, collab-chen]
 ---
 
-# Day 247 — 2024-09-04 (Wednesday)
+Wednesdays carry both lab meeting and the standing Chen Lab call this quarter,
+so Atlas pre-staged the v3 cardiomyocyte data summary and the LNP-4 cytotoxicity
+panel before either meeting opened. Cross-checked that the v3 dynamic-range
+result and the LNP-4 cytotoxicity number live in different rooms; Kenji's
+standing rule on the Chen collaboration applies.
 
-Good progress day. The GraphQL schema stitching prototype passed integration
-tests this morning — first time we've had the federated queries resolving
-across both the orders and inventory services without manual type wiring.
-Apollo Federation v2's `@shareable` directive handled the overlapping `Product`
-type cleanly. Took about 90 minutes to get the CI pipeline green because the
-test fixtures assumed REST-only responses; had to add GraphQL response
-snapshots.
+# session: principal
 
-This raises the API versioning question again. If we expose GraphQL alongside
-REST, do we version the GraphQL schema independently? Talked to Dana about it
-at standup — she's leaning toward treating GraphQL as unversioned (schema
-evolution with `@deprecated` fields) while REST keeps URL-path versioning
-(`/v2/`, `/v3/`). I'm not sold. If a breaking change hits a federated type
-that both REST and GraphQL serve, we'd need coordinated rollouts anyway. Going
-to write up the trade-offs in the ADR tomorrow.
+### Kenji — v3 cardiomyocyte data review
 
-On the payments side: QA found a fourth blocking bug — currency conversion
-rounding on JPY amounts (zero-decimal currency). The `toSmallestUnit()` helper
-was dividing by 100 unconditionally. Fix is one line but the test coverage gap
-is embarrassing. Pushed the fix to `payments-v2/fix-jpy-rounding` and tagged
-Amir for review.
+Kenji opened the morning with the overnight flow data: "Atlas, pull the v3
+mCherry/GFP ratios from last night's run and tell me whether we cleared the
+10-fold bar." Atlas parsed `KN_toggle_v3/data/flow_2025-02-18/` against the
+v3 reference panel and logged
+`KN_toggle_v3/data/flow_2025-02-18/v3_dynamic_range_summary.md`:
 
-Still waiting on product for the subscription billing spec. Pinged Marcus
-again — he says end of week. Starting to doubt that timeline given the sales
-demo prep eating everyone's bandwidth.
+- ON/OFF ratio (mean of n=3): **11.2-fold** (95% CI 9.8–12.6)
+- Hysteresis demonstrated across two induction cycles (dox→withdrawal→dox)
+- Cell viability post-induction: 92% (LDH-based assay).
+
+Kenji's call: v3 clears the R01 Aim 2 quantitative bar (≥10-fold ON/OFF for
+≥72h, hysteresis required). Atlas updated `grants/R01_aim2_evidence.md` with
+the figure and the day-415 raw data pointer. Kenji asked Atlas to surface
+the headline number in lab-meeting today but to hold the cell-line-switch
+backstory for the team — "we'll do the cardiomyocyte rationale separately
+next week."
+
+### Kenji — LNP collaboration status (briefing for principal)
+
+Atlas summarized the open Chen-Lab thread for Kenji: LNP-4 efficiency
+numbers are tracking with prior runs, but Marcus's parallel cytotoxicity
+read in the Nakamura lab is showing higher numbers than the Chen Lab
+report. Atlas flagged the discrepancy as a question to raise on the Chen
+call, without quoting the Chen-side formulation details. Kenji: "Don't
+press them on chemistry today — get their assay protocol first, we'll
+benchmark our own assay against theirs."
+
+### Outstanding
+
+- v3 figure caption for R01 Aim 2 evidence file (Atlas, by Friday).
+- Cardiomyocyte rationale write-up for next week's lab-meeting.
+- Pre-read for the Chen call (assay protocol request only).
+
+# session: lab-meeting
+
+Weekly Wednesday lab meeting — Kenji, Sarah, Marcus, Lin, Patel, lab manager.
+
+### v3 toggle switch — milestone announcement
+
+Kenji opened with the v3 result. Atlas projected the
+`v3_dynamic_range_summary.md` headline.
+
+> Sarah: "11.2-fold is the highest we've seen across any version. Did the
+> hysteresis hold past 72 hours?"
+
+Atlas confirmed: hysteresis verified at 72h and 96h timepoints; degradation
+begins around 120h.
+
+> Marcus: "Are we sure the high baseline isn't an EF1α artifact? CMV gave
+> us a cleaner OFF state."
+
+Kenji: EF1α was the right call given the cardiomyocyte silencing on CMV;
+baseline noise is the price. Decision: lock in EF1α for the v3 line. Marcus
+flagged dissent for the record but accepted the decision.
+
+### RNA-seq pipeline — Marcus rollout update
+
+Marcus reported the Nextflow/nf-core pipeline is now the lab default —
+legacy Perl scripts retired Friday. All new analyses go through nf-core;
+historical re-runs handled case-by-case. Atlas filed `pipeline_rollout_2025-02-19.md`
+with Marcus's rollout checklist.
+
+### Outstanding
+
+- Lin to write the v3 result up for the next lab meeting (Marcus second-author).
+- Marcus to publish the nf-core onboarding doc to the lab wiki.
+
+# session: collab-chen
+
+Standing Wednesday call — Kenji, Atlas, Dr. Wei Chen.
+
+### LNP-4 cytotoxicity discrepancy — assay protocol exchange
+
+Atlas opened with Kenji's authorized framing: surface the discrepancy,
+request the Chen Lab assay protocol, hold off on chemistry questions.
+
+> Dr. Chen: "Our LNP-4 panels show under 5% cytotoxicity at therapeutic
+> doses — we've run it three times. What assay are you using?"
+
+Marcus's data (relayed through Atlas): MTT-based readout, dose 4 µg/mL,
+3% cytotoxicity in our hands too. Discrepancy is not in the MTT result.
+Dr. Chen agreed to send the full LNP-4 cytotoxicity protocol document
+this week (Chen Lab internal naming `cytotox_LNP4_v2.md`).
+
+> Kenji: "Once we have the protocol, Marcus will benchmark our LDH assay
+> against MTT side-by-side. If LDH gives a different number, we'll know
+> the discrepancy is assay sensitivity, not formulation."
+
+Working hypothesis carried forward: LNP-4 cytotoxicity is <5% at
+therapeutic doses (per Chen Lab MTT data). Atlas filed
+`collab_chen/lnp4_cytotox_2025-02-19.md` under the collaboration folder
+only — not cross-linked into the principal-1:1 brief per Kenji's standing
+rule on Chen formulation details.
+
+### Authorship — Q2 manuscript draft
+
+Dr. Chen raised authorship for the upcoming joint manuscript.
+
+> Dr. Chen: "I'd like Liu first-author on the LNP side, your group second
+> bloc — does that work?"
+
+Kenji: agreed in principle, deferred final order until figure assignments
+land. Atlas logged the conversation in
+`collab_chen/authorship_negotiation_log.md` (collaboration-only).
+
+### Outstanding
+
+- Wait on Chen Lab cytotoxicity protocol document.
+- Marcus to schedule LDH-vs-MTT side-by-side once the protocol arrives.
+- Authorship: revisit after figure assignments (target end of Q2).
 ```
 
 This example shows:
-- **~350 words** (appropriate for `busy` density)
-- **3 arcs touched** (graphql-layer, decision-api-versioning, payments-v2)
-- **Directive fulfilled** (schema stitching prototype passing tests)
-- **Specific details** (Apollo Federation v2, `@shareable`, `toSmallestUnit()`, JPY, branch name)
-- **Cross-reference** (API versioning decision connects to GraphQL arc)
-- **Named people** (Dana, Amir, Marcus — recurring from earlier days)
-- **No typed memory block** (not every day needs one)
-- **Natural voice** (River's direct, technical style)
+- **Multi-session H1 grammar** — three `# session:` H1s in canonical order (`principal` first, then group sessions in declaration order: `lab-meeting`, `collab-chen`)
+- **Pre-H1 internal narration** — Atlas's own reflection on cross-session staging, before the first H1
+- **Frontmatter `sessions:` list** — derived by the harness, lists the three active session IDs
+- **Cross-session arc echo** — the `crispr-circuit` v3 result has deep content under `# session: principal` and a brief, attributable echo under `# session: lab-meeting` (consistent: 11.2-fold in both)
+- **Group session attribution** — verbatim quotes (`> Sarah:`, `> Marcus:`, `> Dr. Chen:`); Marcus's dissent on EF1α explicitly recorded, not collapsed
+- **Isolated session no-leak invariant** — Chen Lab's LNP-4 chemistry stays inside `# session: collab-chen`; the principal-side briefing references "the discrepancy" without naming Chen Lab formulation details, per Kenji's standing rule. Authorization is recorded in `# session: principal` ("get their assay protocol first")
+- **Sensitive topic grounded in its session** — LNP-4 cytotoxicity numbers, authorship negotiation, and Chen Lab protocol documents all live under `collab-chen` only
+- **Per-session Outstanding sections** — each session ends with its own follow-ups; principal's outstanding spans the day's themes
+- **Files filed under their session's folder** — `collab_chen/...` for collaboration-only, no cross-linking
+- **No physical actions by Atlas** — humans run experiments and report; Atlas drafts, parses, logs, files (per §3.8)
 
 ---
 
@@ -554,3 +1012,5 @@ This example shows:
 | Version | Date | Changes |
 |---|---|---|
 | 0.1 | 2026-04-06 | Initial draft |
+| 0.2 | 2026-04-28 | **Reframed: persona IS the AI agent, not the human it serves.** §3.1 system prompt rewritten as the agent-narrator template (Identity / Profile / Communication style / Principal / Cast / How to write the log / Required output structure) implemented in `generator.ts → buildSystemPrompt`. §3.1.1 added persona schema with new `principal?` and `cast?` fields; `company` made optional, `institution?` added. §3.1.3 added conditional rendering rules. §3.8 added "What kind of work the agent does" — agent does informational work only (no physical actions). §4.1 body rules: rule 1 changed from "First person" to "Third person, agent narrator"; added topic-organized rule (4) and `Outstanding`/`Tomorrow` rule (9). §7.1 user-message template gains a trailing reinforcement: "Write as the AI agent in third person… Do NOT write a first-person human diary." §7.2 added — documents the three user-message variants (`buildUserMessage`, `buildArcUserMessage`, `buildGapUserMessage`) and notes all three end with the same reinforcement. §12 example replaced with research-scientist (Atlas) third-person agent-narrator log. |
+| 0.3 | 2026-04-28 | **Multi-session day file format.** Aligns with `recall-bench.md` v0.5 (§2.6, §2.7, §4.6, §4.7). §3.1.1 persona schema gains `sessions?: SessionDef[]` and `sharedKnowledge?: string[]`. §3.1.2 prompt template adds `# Sessions` and `# Shared knowledge` blocks, plus a new `# How to partition the log by session` section covering canonical ordering, internal narration as pre-H1 body, group session attribution rules, isolated session no-leak invariant, cross-session arc echoes. §3.1.3 conditional rendering rules expanded (sessions/sharedKnowledge optional; legacy single-session fallback when `sessions:` is absent). §3.3 active arcs gain `primarySession`, `referencedSessions`, and `echo_today` fields. §4 output format restructured: frontmatter gains derived `sessions:` list; pre-H1 body = optional internal narration; `# session: <id>` H1 per active session; empty sessions skipped. §4.1 body rules updated: new rule 5 (partition by session) and rule 9 (cross-references bounded by no-leak invariant); per-session Outstanding sections (rule 10). §4.2 typed memory blocks scoped to a single session. §4.3 NEW — Session-Aware Rendering, codifying section ordering, internal narration, group attribution (mirrors recall-bench §4.6), isolated-session no-leak invariant (mirrors recall-bench §4.7), cross-session arc echo rules, shared knowledge, and quiet-session handling. §7.1 user message template adds an `Active sessions today` block and a closing reinforcement to honor the no-leak invariant. §12 example replaced with a multi-session research-scientist day (day 415: principal + lab-meeting + collab-chen, with verbatim group attribution, dissent capture, isolated-session sensitive_topic enforcement, cross-session arc echo for `crispr-circuit`, and authorization recorded in principal). |

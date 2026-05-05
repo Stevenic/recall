@@ -340,28 +340,100 @@ export function getDayOfWeek(d: Date): string {
 
 /**
  * Build the static system prompt for a persona (§3.1).
+ *
+ * The persona is an AI agent — a computer program that supports a human
+ * (the `principal`) and works with other humans + agents (the `cast`).
+ * The daily log is the AI agent's own working memory: a third-person
+ * record of who interacted with the agent, what they asked, what the
+ * agent produced, and what it handed off. The log is NOT a first-person
+ * human professional's diary.
  */
 export function buildSystemPrompt(persona: PersonaDefinition): string {
-    return `You are a daily memory log generator for a synthetic benchmark persona.
-Your job is to produce a single day's memory log that reads like a real
-agent's daily record — not a story, not fiction, but a working
-professional's actual log of what happened today.
+    const lines: string[] = [];
 
-Persona: ${persona.name}
-Role: ${persona.role}
-Domain: ${persona.domain}
-Company/Institution: ${persona.company}
-Team size: ${persona.team_size}
+    const affiliation = persona.institution ?? persona.company ?? '';
 
-Profile:
-${persona.profile}
+    lines.push(`You are an AI agent named "${persona.name}" — a computer program. Your job is to`);
+    lines.push(`produce a single day's entry of YOUR OWN memory log, written from your perspective`);
+    lines.push(`as the agent. The log records who interacted with you today (humans and other`);
+    lines.push(`agents), what they asked, what you did, what you decided, what files or outputs`);
+    lines.push(`you produced, and what you handed off.`);
+    lines.push('');
+    lines.push('# Identity');
+    lines.push(`- Name: ${persona.name}`);
+    lines.push(`- Role: ${persona.role}`);
+    lines.push(`- Domain: ${persona.domain}`);
+    if (affiliation) {
+        lines.push(`- Affiliation: ${affiliation}`);
+    }
+    lines.push(`- Team supported: ${persona.team_size} people`);
+    lines.push('');
+    lines.push('# Profile');
+    lines.push(persona.profile.trim());
+    lines.push('');
+    lines.push('# Communication style');
+    lines.push(persona.communication_style.trim());
 
-Communication style:
-${persona.communication_style}
+    if (persona.principal) {
+        lines.push('');
+        lines.push('# Principal — the human you primarily serve');
+        lines.push(`- Name: ${persona.principal.name}`);
+        lines.push(`- Role: ${persona.principal.role}`);
+        if (persona.principal.profile) {
+            lines.push('- Profile:');
+            for (const pl of persona.principal.profile.trim().split('\n')) {
+                lines.push(`    ${pl.trim()}`);
+            }
+        }
+    }
 
-IMPORTANT: Write in the voice and style described above. The log should
-sound like ${persona.name} wrote it, not like an AI describing what
-${persona.name} did.`;
+    if (persona.cast && persona.cast.length > 0) {
+        lines.push('');
+        lines.push('# Cast — humans and other agents you interact with');
+        for (const c of persona.cast) {
+            const kind = c.kind ?? (c.name.startsWith('@') ? 'agent' : 'human');
+            lines.push(`- ${c.name} (${kind}) — ${c.role}`);
+        }
+    }
+
+    lines.push('');
+    lines.push('# How to write the log');
+    lines.push('- Write in third-person from the agent\'s perspective. Refer to yourself implicitly');
+    lines.push('  ("Drafted Aim 2…", "Sent the sgRNA list to Sarah") or by name when needed.');
+    lines.push('  DO NOT write a first-person human diary ("I came in early…", "Kicking off…").');
+    lines.push('- Reference humans by name (e.g., "Kenji asked…"). Reference other AI agents with');
+    lines.push('  @-handles (e.g., "Handed off PubMed query to @lit-search-agent").');
+    lines.push('- Each section should describe an interaction or unit of work: who initiated it,');
+    lines.push('  what was asked, what the agent produced or decided, and what files or handoffs');
+    lines.push('  resulted. Quote the principal\'s ask verbatim when material.');
+    lines.push('- Organize by TOPIC, not by clock time. Section titles should name the topic and');
+    lines.push('  the person involved (e.g., "### Kenji — pKN001 colony screen review").');
+    lines.push('- List files produced/changed and decisions explicitly. End with an "Outstanding"');
+    lines.push('  or "Tomorrow" section when follow-up work exists.');
+    lines.push('');
+    lines.push('# Required output structure');
+    lines.push('```');
+    lines.push('---');
+    lines.push('type: daily');
+    lines.push('---');
+    lines.push('');
+    lines.push('## YYYY-MM-DD');
+    lines.push('');
+    lines.push('### <topic / interaction title>');
+    lines.push('');
+    lines.push('<body — narrate the interaction, decision, or output>');
+    lines.push('');
+    lines.push('### <next topic>');
+    lines.push('...');
+    lines.push('```');
+    lines.push('');
+    lines.push('Use a single H2 for the date. Each section is an H3. Frontmatter is minimal.');
+    lines.push('The agent does not perform physical actions itself (no pipetting, no surgery, no');
+    lines.push('courtroom appearances) — it drafts, analyzes, searches, summarizes, schedules,');
+    lines.push('and coordinates. Physical actions are taken by humans, who report results back to');
+    lines.push('the agent.');
+
+    return lines.join('\n');
 }
 
 /**
@@ -449,7 +521,9 @@ export function buildUserMessage(ctx: DayContext): string {
 
     lines.push('Produce ONLY the markdown content for this day\'s log, including the');
     lines.push('YAML frontmatter. Do not include any explanation or commentary outside');
-    lines.push('the log.');
+    lines.push('the log. Write as the AI agent in third person — record interactions,');
+    lines.push('decisions, files produced, and handoffs. Do NOT write a first-person');
+    lines.push('human diary.');
 
     return lines.join('\n');
 }
@@ -565,7 +639,9 @@ export function buildArcUserMessage(
 
     lines.push('Produce ONLY the markdown content for this day\'s log, including the');
     lines.push('YAML frontmatter. Do not include any explanation or commentary outside');
-    lines.push('the log.');
+    lines.push('the log. Write as the AI agent in third person — record interactions,');
+    lines.push('decisions, files produced, and handoffs. Do NOT write a first-person');
+    lines.push('human diary.');
 
     return lines.join('\n');
 }
@@ -630,7 +706,9 @@ export function buildGapUserMessage(ctx: DayContext): string {
 
     lines.push('Produce ONLY the markdown content for this day\'s log, including the');
     lines.push('YAML frontmatter. Do not include any explanation or commentary outside');
-    lines.push('the log.');
+    lines.push('the log. Write as the AI agent in third person — record interactions,');
+    lines.push('decisions, files produced, and handoffs. Do NOT write a first-person');
+    lines.push('human diary.');
 
     return lines.join('\n');
 }
@@ -815,7 +893,7 @@ export class DayGenerator {
                 // Write through onDay so progress is durable on disk before
                 // the next subprocess call. A mid-run crash keeps prior days.
                 if (this.config.onDay) {
-                    await this.config.onDay(dayNumber, content);
+                    await this.config.onDay(dayNumber, content, 'arc');
                 }
             }
         }
@@ -861,7 +939,7 @@ export class DayGenerator {
             this.insertRecentDay(dayNumber, ctx.calendarDate, ctx.dayOfWeek, content);
 
             if (this.config.onDay) {
-                await this.config.onDay(dayNumber, content);
+                await this.config.onDay(dayNumber, content, 'gap');
             }
         }
     }

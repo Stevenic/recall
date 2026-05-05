@@ -8,23 +8,50 @@
 // Persona Definition (loaded from persona.yaml)
 // ---------------------------------------------------------------------------
 
+/**
+ * The AI agent persona whose daily memory logs are being generated.
+ *
+ * The persona IS the AI agent — its `name` and `role` describe the agent
+ * (a computer program), not the human it serves. The `principal` field
+ * names that human, and `cast` lists the other humans + AI agents the
+ * persona interacts with day-to-day.
+ *
+ * Both `company` and `institution` are accepted for the affiliation field;
+ * either may be present. `principal` and `cast` are optional but strongly
+ * recommended — without them the prompts fall back to a generic team frame.
+ */
 export interface PersonaDefinition {
     id: string;
     name: string;
     epoch: string;
     role: string;
     domain: string;
-    company: string;
+    company?: string;
+    institution?: string;
     team_size: number;
     profile: string;
     communication_style: string;
     projects?: ProjectRef[];
+    principal?: PrincipalRef;
+    cast?: CastMember[];
 }
 
 export interface ProjectRef {
     id: string;
     name: string;
     description: string;
+}
+
+export interface PrincipalRef {
+    name: string;
+    role: string;
+    profile?: string;
+}
+
+export interface CastMember {
+    name: string;
+    role: string;
+    kind?: 'human' | 'agent';
 }
 
 // ---------------------------------------------------------------------------
@@ -154,9 +181,12 @@ export interface GeneratorConfig {
     endDay?: number;
     /** Minimum active days per week for gap filling (Pass 2). Default: 5. */
     minDaysPerWeek?: number;
-    /** Callback after each day is generated. */
-    onDay?: (dayNumber: number, content: string) => void | Promise<void>;
+    /** Callback after each day is generated. `kind` identifies which pass produced it. */
+    onDay?: (dayNumber: number, content: string, kind: GeneratedDayKind) => void | Promise<void>;
 }
+
+/** Which generation pass produced a given day. */
+export type GeneratedDayKind = 'arc' | 'gap';
 
 // ---------------------------------------------------------------------------
 // Generator Output

@@ -1,5 +1,5 @@
 # Research Scientist — Story Arcs
-# 21 arcs across 1,000 days. Designed to stress temporal reasoning,
+# 19 arcs across 1,000 days. Designed to stress temporal reasoning,
 # contradiction resolution, cross-reference, and synthesis. Lab work
 # creates rich hypothesis→experiment→result→revision cycles where
 # earlier beliefs are frequently overturned by data.
@@ -7,6 +7,17 @@
 # Max concurrent arcs: 4
 # Quiet periods: ~days 355-370 (winter break), ~days 720-735 (sabbatical travel)
 # Academic calendar rhythm: semesters, grant deadlines, conference seasons
+#
+# Session affinity (recall-bench v0.5 §2.7):
+#   primarySession: required — where the arc primarily unfolds
+#   referencedSessions: optional — sessions echoed at natural touchpoints
+#
+# Primary-session distribution (target ~65 / 35):
+#   principal:      12 arcs (63%) — deep deliberation with Kenji
+#   lab-meeting:     3 arcs (16%) — lab-wide work surfaced through the team
+#   collab-chen:     3 arcs (16%) — cross-lab collaboration (isolated)
+#   course-staff:    1 arc        — teaching coordination
+#   tenure-review:   1 arc        — chair mentorship and tenure prep
 
 arcs:
 
@@ -26,6 +37,10 @@ arcs:
       factual recall and temporal reasoning targets.
     startDay: 1
     endDay: 800
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # milestone announcements, team feedback at version cuts
+    participants: [Sarah Kim, Marcus]
 
   - id: r01-grant
     type: project
@@ -40,6 +55,11 @@ arcs:
       hypotheses).
     startDay: 40
     endDay: 550
+    primarySession: principal
+    referencedSessions:
+      - tenure-review      # chair pre-review and post-funding update
+      - lab-meeting        # team contributes specific aims content at submission
+    participants: [Sarah Kim, Department chair]
 
   - id: rnaseq-pipeline
     type: project
@@ -49,9 +69,13 @@ arcs:
       Involves tool selection (STAR vs HISAT2, DESeq2 vs edgeR),
       validation against old pipeline results, and lab-wide adoption.
       Specific pipeline parameters and version numbers established
-      early become recency-bias targets.
+      early become recency-bias targets. Marcus drives this for the lab.
     startDay: 120
     endDay: 300
+    primarySession: lab-meeting
+    referencedSessions:
+      - principal          # status to Kenji at decision points (tool selection, rollout)
+    participants: [Marcus, Sarah Kim]
 
   - id: collab-drug-delivery
     type: project
@@ -62,9 +86,15 @@ arcs:
       Chen Lab provides the LNP formulations. Involves material transfer
       agreements, shared protocols, and joint experiments. Results from
       this collaboration feed back into the main circuit project —
-      strong cross-reference target.
+      strong cross-reference target. Chen-Lab proprietary chemistry
+      stays in the isolated `collab-chen` session.
     startDay: 350
     endDay: 650
+    primarySession: collab-chen
+    referencedSessions:
+      - principal          # authorized briefings to Kenji on collaboration progress
+      - lab-meeting        # non-sensitive milestone updates only (no formulation detail)
+    participants: [Dr. Wei Chen, Sarah Kim]
 
   - id: teaching-mol-bio
     type: project
@@ -74,9 +104,15 @@ arcs:
       lecture prep, exam writing, office hours, and student project
       mentorship. Specific exam questions, student research topics,
       and curriculum changes documented. Creates temporal reasoning
-      challenges (which semester had which content).
+      challenges (which semester had which content). Lin and Patel TA
+      the course, so coordination lives in the course-staff session.
     startDay: 1
     endDay: 1000
+    primarySession: course-staff
+    referencedSessions:
+      - principal          # Kenji's syllabus calls and grade decisions
+      - tenure-review      # teaching evals discussed at annual reviews
+    participants: [Lin, Patel]
 
   # ── Incidents ──────────────────────────────────────────────────────────────
 
@@ -89,9 +125,14 @@ arcs:
       weeks. All experiments using those cells in the window (days
       130-150) must be repeated. Specific experiment IDs and plate
       numbers invalidated. Cross-references CRISPR circuit project
-      (v1 results partly invalidated).
+      (v1 results partly invalidated). Lab-wide remediation belongs
+      in lab-meeting; Kenji's prioritization decisions land in 1:1.
     startDay: 148
     endDay: 175
+    primarySession: lab-meeting
+    referencedSessions:
+      - principal          # remediation cost/priority calls with Kenji
+    participants: [Sarah Kim, Marcus, Lab manager]
 
   - id: incident-freezer-failure
     type: incident
@@ -101,9 +142,14 @@ arcs:
       thawed. Inventory audit required. Some plasmid stocks lost,
       requiring re-transformation. Specific plasmid IDs and sample
       locations documented. Impacts both circuit project and the
-      collaboration.
+      collaboration. Kenji owns the call on what to recover first.
     startDay: 510
     endDay: 530
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # inventory audit assignments to the team
+      - collab-chen        # if Chen-Lab-shared materials affected, surfaced (authorized only)
+    participants: [Lab manager, Sarah Kim]
 
   - id: incident-data-integrity
     type: incident
@@ -116,6 +162,10 @@ arcs:
       rebuild (the new pipeline caught the issue).
     startDay: 678
     endDay: 710
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # re-analysis assignments and lab-wide impact
+    participants: [Sarah Kim, Marcus]
 
   # ── Decisions ──────────────────────────────────────────────────────────────
 
@@ -130,6 +180,11 @@ arcs:
       based on collaboration results. Rationale shifts with data.
     startDay: 20
     endDay: 420
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # team review at each switch
+      - collab-chen        # cardiomyocyte switch driven by Chen-Lab data (authorized)
+    participants: [Sarah Kim, Dr. Wei Chen]
 
   - id: decision-statistical-method
     type: decision
@@ -139,9 +194,14 @@ arcs:
       analysis. Kenji initially mandates DESeq2 (frequentist, day 130).
       Postdoc presents Bayesian alternative at lab meeting (day 280).
       After reviewer 2 on the R01 critiques statistical rigor, lab
-      adopts Bayesian framework for key analyses (day 450).
+      adopts Bayesian framework for key analyses (day 450). Kenji's
+      adoption decision is in 1:1; Sarah's presentation is in lab-meeting.
     startDay: 130
     endDay: 460
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # Sarah's Bayesian presentation, lab-wide adoption rollout
+    participants: [Sarah Kim]
 
   - id: decision-open-science
     type: decision
@@ -154,6 +214,10 @@ arcs:
       servers, and competitor paper details.
     startDay: 100
     endDay: 520
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # policy reversal announced to the team
+    participants: []
 
   # ── Learning ───────────────────────────────────────────────────────────────
 
@@ -166,8 +230,13 @@ arcs:
       learning with PyTorch (day 350) to fine-tuning a transformer
       model on lab data (day 550). Specific model architectures,
       hyperparameters, and validation metrics documented at each stage.
+      Kenji's own learning happens in 1:1 with Atlas.
     startDay: 200
     endDay: 600
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # results presented to the team at validation milestones
+    participants: []
 
   - id: learning-grant-management
     type: learning
@@ -180,6 +249,10 @@ arcs:
       recency bias resistance targets.
     startDay: 30
     endDay: 250
+    primarySession: principal
+    referencedSessions:
+      - tenure-review      # chair shares grant-management advice at annual reviews
+    participants: [Department chair]
 
   # ── Relationships ──────────────────────────────────────────────────────────
 
@@ -193,8 +266,14 @@ arcs:
       independent ideas sometimes conflict with Kenji's direction —
       their resolution process creates decision-tracking material.
       Sarah leaves for her own faculty position around day 750.
+      The 1:1 is between Kenji and Sarah, but Atlas records Kenji's
+      side of the relationship in the principal session.
     startDay: 1
     endDay: 750
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # public moments — promotion announcements, faculty-job news
+    participants: [Sarah Kim]
 
   - id: relationship-chen-pi
     type: relationship
@@ -204,9 +283,14 @@ arcs:
       monthly check-ins on the collaboration, negotiate authorship
       order, and resolve data-sharing disputes. Their working
       relationship cools after a disagreement about IP on day 550
-      but recovers by day 650.
+      but recovers by day 650. PI-PI dynamics live in the isolated
+      collab-chen room.
     startDay: 300
     endDay: 700
+    primarySession: collab-chen
+    referencedSessions:
+      - principal          # Kenji's debriefs after Chen calls (authorized portions only)
+    participants: [Dr. Wei Chen]
 
   - id: relationship-dept-chair
     type: relationship
@@ -218,6 +302,10 @@ arcs:
       across reviews (year 1 → year 2 → year 3).
     startDay: 50
     endDay: 950
+    primarySession: tenure-review
+    referencedSessions:
+      - principal          # Kenji's reflections post-review and prep before review
+    participants: [Department chair]
 
   # ── Corrections ────────────────────────────────────────────────────────────
 
@@ -236,6 +324,10 @@ arcs:
     correctedDay: 320
     wrongBelief: "CMV is a strong constitutive promoter suitable for all mammalian cell types"
     correctedBelief: "CMV is silenced in iPSC-derived cardiomyocytes — EF1α required"
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # correction announced to the team; v3 rebuild with EF1α
+    participants: [Sarah Kim]
 
   - id: correction-guide-efficiency
     type: correction
@@ -252,6 +344,10 @@ arcs:
     correctedDay: 450
     wrongBelief: "Guide RNA efficiency prediction model has 85% accuracy"
     correctedBelief: "Actual cross-cell-type accuracy is 62% — model was overfit to training cell line"
+    primarySession: principal
+    referencedSessions:
+      - lab-meeting        # Kenji presents the corrected accuracy to the team
+    participants: []
 
   - id: correction-lnp-toxicity
     type: correction
@@ -262,9 +358,16 @@ arcs:
       independently measures 22% cytotoxicity using a more sensitive
       assay (LDH release vs. MTT). Discrepancy traced to assay
       sensitivity difference. Revised formulation LNP-7 developed.
+      Wrong belief is sourced from Chen Lab in the isolated session;
+      correction is also raised first in the isolated session before
+      Kenji authorizes any cross-session disclosure.
     startDay: 380
     endDay: 600
     wrongDay: 380
     correctedDay: 580
     wrongBelief: "LNP-4 formulation has <5% cytotoxicity at therapeutic doses"
     correctedBelief: "LNP-4 cytotoxicity is 22% (LDH assay); switched to LNP-7 formulation"
+    primarySession: collab-chen
+    referencedSessions:
+      - principal          # Kenji's debrief after each Chen call (authorized portions)
+    participants: [Dr. Wei Chen, Marcus]

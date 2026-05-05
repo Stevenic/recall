@@ -433,6 +433,53 @@ describe('buildSystemPrompt', () => {
         expect(prompt).toContain('Experienced backend engineer');
         expect(prompt).toContain('Direct and technical');
     });
+
+    it('frames the persona as an AI agent narrator (not a human diarist)', () => {
+        const prompt = buildSystemPrompt(testPersona);
+        expect(prompt).toContain('AI agent');
+        expect(prompt).toContain('computer program');
+        expect(prompt).toContain('third-person');
+        // Must steer the LLM away from first-person human style.
+        expect(prompt).toMatch(/Do NOT write a first-person/i);
+    });
+
+    it('renders principal and cast when supplied', () => {
+        const persona: PersonaDefinition = {
+            ...testPersona,
+            principal: {
+                name: 'Kenji Nakamura',
+                role: 'Assistant Professor / PI',
+                profile: 'Runs a synthetic biology lab.',
+            },
+            cast: [
+                { name: 'Sarah Kim', role: 'Senior postdoc', kind: 'human' },
+                { name: '@lit-search-agent', role: 'Literature search agent', kind: 'agent' },
+            ],
+        };
+        const prompt = buildSystemPrompt(persona);
+        expect(prompt).toContain('Principal');
+        expect(prompt).toContain('Kenji Nakamura');
+        expect(prompt).toContain('Cast');
+        expect(prompt).toContain('Sarah Kim (human)');
+        expect(prompt).toContain('@lit-search-agent (agent)');
+    });
+
+    it('falls back gracefully when principal and cast are absent', () => {
+        const prompt = buildSystemPrompt(testPersona);
+        expect(prompt).not.toContain('# Principal');
+        expect(prompt).not.toContain('# Cast');
+    });
+
+    it('uses institution when company is absent', () => {
+        const persona: PersonaDefinition = {
+            ...testPersona,
+            company: undefined,
+            institution: 'Pacific State University',
+        };
+        const prompt = buildSystemPrompt(persona);
+        expect(prompt).toContain('Pacific State University');
+        expect(prompt).not.toContain('Nexus');
+    });
 });
 
 describe('buildUserMessage', () => {
@@ -646,6 +693,37 @@ describe('DayGenerator', () => {
         // Token totals should accumulate
         expect(result.totalInputTokens).toBeGreaterThan(0);
         expect(result.totalOutputTokens).toBeGreaterThan(0);
+    });
+
+    it('passes the generation kind (arc vs gap) to onDay', async () => {
+        const model: GeneratorModel = {
+            async complete() {
+                return { text: 'Day content.', inputTokens: 50, outputTokens: 20 };
+            },
+        };
+
+        // testArcs covers days 10-20; force gap fill in the rest of the window.
+        const invocations: Array<{ day: number; kind: string }> = [];
+        const generator = new DayGenerator(testPersona, testArcs, model, {
+            startDay: 1,
+            endDay: 30,
+            minDaysPerWeek: 5,
+            onDay: async (dayNumber, _content, kind) => {
+                invocations.push({ day: dayNumber, kind });
+            },
+        });
+
+        await generator.generateAll();
+
+        const arcInvocations = invocations.filter(i => i.kind === 'arc');
+        const gapInvocations = invocations.filter(i => i.kind === 'gap');
+
+        expect(arcInvocations.length).toBeGreaterThan(0);
+        expect(gapInvocations.length).toBeGreaterThan(0);
+        // Every invocation must carry one of the two kinds.
+        for (const inv of invocations) {
+            expect(inv.kind === 'arc' || inv.kind === 'gap').toBe(true);
+        }
     });
 
     it('fires onDay incrementally so progress survives mid-run failures', async () => {
