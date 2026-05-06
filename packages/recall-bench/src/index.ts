@@ -89,6 +89,25 @@ export type {
 export { CliGeneratorModel, isCliAgentName, CLI_AGENT_NAMES } from './cli-generator-model.js';
 export type { CliAgentName, CliGeneratorModelConfig } from './cli-generator-model.js';
 
+// OpenAI Generator Model (Chat Completions API)
+export {
+    OpenAiGeneratorModel,
+    isOpenAiSpec,
+    parseOpenAiSpec,
+    OPENAI_PREFIX,
+    OPENAI_DEFAULT_MODEL,
+} from './openai-generator-model.js';
+export type { OpenAiGeneratorModelConfig, OpenAiClientLike } from './openai-generator-model.js';
+
+// LLM Judge (wraps any GeneratorModel into a JudgeModel for harness `run`)
+export {
+    LlmJudge,
+    formatJudgeInputs,
+    parseJudgeOutput,
+    LLM_JUDGE_SYSTEM_PROMPT,
+} from './llm-judge.js';
+export type { LlmJudgeConfig } from './llm-judge.js';
+
 // Persona Creator
 export { PersonaCreator, parsePersonaYaml, parseArcsYaml, serializePersonaYaml, serializeArcsYaml } from './persona-creator.js';
 

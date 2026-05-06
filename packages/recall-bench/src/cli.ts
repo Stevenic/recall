@@ -15,6 +15,8 @@ import { DayGenerator, loadPersonaDefinition, loadArcs, deriveSiblingDir } from 
 import { PersonaCreator, serializePersonaYaml, serializeArcsYaml } from './persona-creator.js';
 import { ConversationGenerator, serializeConversation, serializeConversationJson } from './conversation-generator.js';
 import { CliGeneratorModel, isCliAgentName, CLI_AGENT_NAMES } from './cli-generator-model.js';
+import { OpenAiGeneratorModel, isOpenAiSpec, parseOpenAiSpec } from './openai-generator-model.js';
+import { LlmJudge } from './llm-judge.js';
 import { GrpcMemoryAdapter } from './grpc-memory-adapter.js';
 import type { GeneratorModel } from './generator-types.js';
 import type { HarnessConfig, TimeRangeKey, JudgeModel, MemorySystemAdapter } from './types.js';
@@ -38,7 +40,7 @@ program
     .description('Run a benchmark against a memory system adapter')
     .requiredOption('--adapter <url|path>', 'gRPC URL (grpc://host:port) or path to adapter module')
     .requiredOption('--data <dir>', 'Path to dataset directory containing persona folders')
-    .option('--judge <path>', 'Path to judge module (must export default JudgeModel)')
+    .option('--judge <spec>', `Judge selector: a model spec (${CLI_AGENT_NAMES.join(', ')}, openai, openai:<model-id>) wrapped in an LLM judge, or a path to a JS module exporting a JudgeModel. Default: stub judge that returns zeros.`)
     .option('--personas <ids...>', 'Persona IDs to benchmark (default: all)')
     .option('--ranges <ranges...>', 'Time ranges to evaluate (30d, 90d, 6mo, 1y, full)', parseRanges)
     .option('--seed <n>', 'Shuffle seed (0 = no shuffle)', parseIntArg, 42)
@@ -50,7 +52,7 @@ program
     .action(async (opts) => {
         const adapter = await resolveAdapter(opts.adapter, opts.grpcTimeout);
         const judge = opts.judge
-            ? await loadModule<JudgeModel>(opts.judge)
+            ? await resolveJudge(opts.judge, opts.timeout)
             : createStubJudge();
 
         const config: HarnessConfig = {
@@ -110,7 +112,7 @@ program
     .command('generate')
     .description('Generate daily memory logs for a persona using an LLM')
     .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + arcs file)')
-    .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
+    .requiredOption('--model <name|path>', `Model selector: a CLI agent name (${CLI_AGENT_NAMES.join(', ')}), an OpenAI spec ('openai' or 'openai:<model-id>'; reads OPENAI_API_KEY), or a path to a JS module exporting a GeneratorModel`)
     .option('--arcs <filename>', 'Arcs file within the persona dir; convention: arcs-<NNN>d.yaml labeled by intended corpus duration (default: arcs-1000d.yaml)', 'arcs-1000d.yaml')
     .option('--memories-dir <dirname>', 'Memory output dir name within the persona dir; defaults to "memories" or "memories-<suffix>" derived from --arcs')
     .option('--days <n>', 'Total days to generate; sets --start 1 --end <n>. Mutually exclusive with --start/--end.', parseIntArg)
@@ -182,7 +184,7 @@ program
     .command('create-persona')
     .description('Create a new persona and story arcs from a text prompt using an LLM')
     .requiredOption('--prompt <text>', 'Description of the persona to create')
-    .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
+    .requiredOption('--model <name|path>', `Model selector: a CLI agent name (${CLI_AGENT_NAMES.join(', ')}), an OpenAI spec ('openai' or 'openai:<model-id>'; reads OPENAI_API_KEY), or a path to a JS module exporting a GeneratorModel`)
     .requiredOption('--persona <dir>', 'Persona directory to write persona.yaml and arcs-1000d.yaml into')
     .option('--epoch <date>', 'Epoch date for the persona timeline', '2024-01-01')
     .option('--temperature <n>', 'Generation temperature', parseFloatArg, 0.7)
@@ -256,7 +258,7 @@ program
     .command('generate-conversations')
     .description('Generate conversation history for each day from existing daily logs (Pass 2)')
     .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + memories dir)')
-    .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
+    .requiredOption('--model <name|path>', `Model selector: a CLI agent name (${CLI_AGENT_NAMES.join(', ')}), an OpenAI spec ('openai' or 'openai:<model-id>'; reads OPENAI_API_KEY), or a path to a JS module exporting a GeneratorModel`)
     .option('--memories-dir <dirname>', 'Memory input dir name within the persona dir (default: "memories-1000d"; pair with the suffix used at generate time, e.g., "memories-180d")', 'memories-1000d')
     .option('--conversations-dir <dirname>', 'Conversation output dir name within the persona dir (default: "conversations" or derived from --memories-dir suffix)')
     .option('--days <n>', 'Total days to generate; sets --start 1 --end <n>. Mutually exclusive with --start/--end.', parseIntArg)
@@ -357,12 +359,38 @@ async function loadModule<T>(modulePath: string): Promise<T> {
 }
 
 /**
+ * Resolve a --judge value to a JudgeModel.
+ *
+ * Accepts the same syntax as --model (CLI agent name, openai spec, or
+ * JS module path). Model specs are wrapped in an LLM judge; module paths
+ * load a custom JudgeModel directly.
+ */
+async function resolveJudge(spec: string, timeout?: number): Promise<JudgeModel> {
+    if (isCliAgentName(spec) || isOpenAiSpec(spec)) {
+        const model = await resolveModel(spec, timeout);
+        return new LlmJudge(model);
+    }
+    return loadModule<JudgeModel>(spec);
+}
+
+/**
  * Resolve a --model value to a GeneratorModel.
- * Accepts a CLI agent name (claude, codex, copilot) or a path to a JS module.
+ * Accepts:
+ *   - CLI agent name: claude, codex, copilot (subprocess to local CLI)
+ *   - OpenAI spec: `openai` (default model) or `openai:<model-id>` (e.g.
+ *     `openai:gpt-4o`, `openai:gpt-5`, `openai:o3-mini`). Reads OPENAI_API_KEY
+ *     from the environment.
+ *   - Path to a JS module that default-exports a GeneratorModel
  */
 async function resolveModel(nameOrPath: string, timeout?: number): Promise<GeneratorModel> {
     if (isCliAgentName(nameOrPath)) {
         return new CliGeneratorModel({ agent: nameOrPath, timeout });
+    }
+    if (isOpenAiSpec(nameOrPath)) {
+        const { model } = parseOpenAiSpec(nameOrPath);
+        const config: { model: string; timeout?: number } = { model };
+        if (timeout !== undefined) config.timeout = timeout;
+        return new OpenAiGeneratorModel(config);
     }
     const abs = resolve(nameOrPath);
     const mod = await import(abs);

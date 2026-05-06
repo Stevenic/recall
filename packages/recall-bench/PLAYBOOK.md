@@ -18,6 +18,21 @@ Read these before starting. Don't restate them — reference them by `§` when y
 3. **`docs/recall-bench.md`** — operator-facing docs. Authoritative for CLI usage, resume behavior, Windows tree-kill, coding-agent quirks.
 4. **`packages/recall-bench/personas/<id>/persona.yaml`** and the chosen arcs file — see § Arc-file variants below.
 
+## 1b. Model selectors
+
+`--model` (and `--judge` for the harness) accepts:
+
+| Selector | Backend | Notes |
+|---|---|---|
+| `claude` / `codex` / `copilot` | local CLI subprocess | Per-call cost depends on the CLI agent's underlying model; `--temperature` and `--max-tokens` are ignored for these (per `docs/recall-bench.md` "Coding-agent quirks") |
+| `openai` | OpenAI Chat Completions API | Uses default model `gpt-4o-mini`. Reads `OPENAI_API_KEY` from the environment. Supports `--temperature` and `--max-tokens`. |
+| `openai:<model-id>` | same | Pin a specific model: `openai:gpt-4o`, `openai:gpt-5`, `openai:o3-mini`, etc. |
+| `<path-to-js-module>` | custom | Module's default export must implement `GeneratorModel` (or `JudgeModel` for `--judge`) |
+
+For `--judge` only, model selectors are wrapped in `LlmJudge` (in `src/llm-judge.ts`) — a generic LLM-backed judge that asks the model to score correctness/completeness/hallucination per spec §5.3 and parses strict JSON output. Override the judge prompt by passing a custom JudgeModel module path instead.
+
+**Cost note:** generation across 1,000 days × ~3 invocations/day × N personas means thousands of LLM calls. Pick the cheapest model that meets quality bar (`openai:gpt-4o-mini` for generation; `openai:gpt-4o` or stronger for the judge). For the judge specifically, use `--temperature 0` (default in `LlmJudge`) so re-scoring is reproducible.
+
 ## 1a. Arc-file variants (varying-length corpora)
 
 Every arcs file is labeled by intended corpus duration. Convention:

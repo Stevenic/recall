@@ -120,7 +120,7 @@ npx recall-bench create-persona \
 | Flag | Default | Description |
 |---|---|---|
 | `--prompt <text>` | required | Description of the persona to create |
-| `--model <name\|path>` | required | `claude`, `codex`, `copilot`, or path to a JS module |
+| `--model <name\|path>` | required | `claude`, `codex`, `copilot` (CLI subprocess), `openai` or `openai:<model-id>` (OpenAI Chat Completions; reads `OPENAI_API_KEY`), or path to a JS module |
 | `--out <dir>` | required | Output directory |
 | `--epoch <date>` | `2024-01-01` | Starting date for the persona timeline |
 | `--temperature <n>` | `0.7` | Generation temperature |
@@ -147,7 +147,7 @@ The generator uses a sliding history window and arc state tracking to produce co
 | Flag | Default | Description |
 |---|---|---|
 | `--persona <dir>` | required | Directory containing `persona.yaml` and `arcs-1000d.yaml` |
-| `--model <name\|path>` | required | `claude`, `codex`, `copilot`, or path to a JS module |
+| `--model <name\|path>` | required | `claude`, `codex`, `copilot` (CLI subprocess), `openai` or `openai:<model-id>` (OpenAI Chat Completions; reads `OPENAI_API_KEY`), or path to a JS module |
 | `--out <dir>` | required | Output directory for `day-NNNN.md` files |
 | `--start <n>` | `1` | Starting day number (for resuming interrupted runs) |
 | `--end <n>` | `1000` | Ending day number |
@@ -173,7 +173,7 @@ npx recall-bench generate-conversations \
 | Flag | Default | Description |
 |---|---|---|
 | `--persona <dir>` | required | Directory containing `persona.yaml` |
-| `--model <name\|path>` | required | `claude`, `codex`, `copilot`, or path to a JS module |
+| `--model <name\|path>` | required | `claude`, `codex`, `copilot` (CLI subprocess), `openai` or `openai:<model-id>` (OpenAI Chat Completions; reads `OPENAI_API_KEY`), or path to a JS module |
 | `--days <dir>` | required | Directory containing `day-NNNN.md` files |
 | `--out <dir>` | required | Output directory for conversation files |
 | `--format <fmt>` | `markdown` | Output format: `markdown` or `json` |
@@ -505,7 +505,19 @@ The judge model scores each answer on three dimensions:
 
 **Composite score** = correctness + completeness + hallucination (max 6).
 
-Provide a judge module that exports a `JudgeModel`:
+There are two ways to plug a judge into `--judge`:
+
+**Option 1 — Use a built-in LLM judge.** Pass any model selector (`claude`, `codex`, `copilot`, `openai`, or `openai:<model-id>`) and recall-bench wraps it in `LlmJudge` — a generic judge that asks the LLM to score along the three dimensions and parses strict JSON output. The judge prompt is in `src/llm-judge.ts` (`LLM_JUDGE_SYSTEM_PROMPT`).
+
+```bash
+# OpenAI judge (reads OPENAI_API_KEY from env)
+npx recall-bench run --adapter ./my-adapter.js --data ./dataset --judge openai:gpt-4o
+
+# Claude judge via local CLI
+npx recall-bench run --adapter ./my-adapter.js --data ./dataset --judge claude
+```
+
+**Option 2 — Provide a custom judge module.** Pass a path to a JS module that default-exports a `JudgeModel`:
 
 ```typescript
 // my-judge.ts
