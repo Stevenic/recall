@@ -123,7 +123,7 @@ Each evaluation point gets a **completely fresh** adapter lifecycle. Q&A pairs a
 Recall Bench uses **personas** — synthetic identities with realistic professional backgrounds spanning 1,000 days of activity. Each persona has:
 
 - **Identity** (`persona.yaml`) — name, role, domain, company, communication style
-- **Story arcs** (`arcs.yaml`) — overlapping narrative threads (projects, incidents, decisions, learning, relationships, corrections) that drive what happens each day
+- **Story arcs** (`arcs-1000d.yaml`) — overlapping narrative threads (projects, incidents, decisions, learning, relationships, corrections) that drive what happens each day
 - **Daily logs** (`memories/day-NNNN.md`) — 1,000 markdown files, one per day
 - **Q&A pairs** (`qa/questions.yaml`) — evaluation questions with reference answers, categories, difficulty levels, and relevant day numbers
 
@@ -155,7 +155,7 @@ Datasets are generated using a **two-pass LLM pipeline**:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 1: create-persona                                         │
-│  Prompt → persona.yaml + arcs.yaml                              │
+│  Prompt → persona.yaml + arcs-1000d.yaml                              │
 ├─────────────────────────────────────────────────────────────────┤
 │  Step 2: generate  (Pass 1)                                     │
 │  Process arcs in order → generate day-by-day logs               │

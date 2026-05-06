@@ -1,6 +1,5 @@
 id: backend-eng-saas
 name: Forge
-epoch: "2024-01-01"
 role: AI engineering co-pilot for a senior backend engineer
 domain: B2B SaaS platform (supply chain management)
 company: Nexus
@@ -92,7 +91,7 @@ projects:
     description: "Replace synchronous service calls with event bus (NATS) for core workflows"
 
 # Conversation contexts Forge participates in (recall-bench v0.5 §2.6 / §2.7).
-# Group sessions are 65/35 weighted in arcs.yaml (13 principal-primary, 7 group-primary).
+# Group sessions are 65/35 weighted in arcs-1000d.yaml (13 principal-primary, 7 group-primary).
 # Backend Eng carries primary stress for `group-session-attribution` per spec §3.4 —
 # standup, design-review, and incident-response are the structural test surface.
 sessions:

@@ -16,7 +16,31 @@ Read these before starting. Don't restate them — reference them by `§` when y
 1. **`specs/recall-bench.md`** — the bench spec, v0.5. Authoritative for personas, sessions, arcs, Q&A schema, scoring.
 2. **`specs/day-generator.md`** — the prompt spec for Pass 1. Authoritative for system prompt structure, multi-session output format, conditional rendering rules (§3.1.2 and §3.1.3 are the load-bearing sections).
 3. **`docs/recall-bench.md`** — operator-facing docs. Authoritative for CLI usage, resume behavior, Windows tree-kill, coding-agent quirks.
-4. **`packages/recall-bench/personas/<id>/persona.yaml`** and **`arcs.yaml`** — the persona and arcs you're generating for. Each persona is self-describing.
+4. **`packages/recall-bench/personas/<id>/persona.yaml`** and the chosen arcs file — see § Arc-file variants below.
+
+## 1a. Arc-file variants (varying-length corpora)
+
+Every arcs file is labeled by intended corpus duration. Convention:
+
+- `arcs-<NNN>d.yaml` — story arcs for an N-day corpus (e.g., `arcs-1000d.yaml`, `arcs-180d.yaml`, `arcs-30d.yaml`).
+- The default is `arcs-1000d.yaml` — the canonical 1000-day story shipped with each persona. Variants are optional and live alongside the default in the same persona dir.
+
+Each arcs file pairs with sibling output dirs derived from the suffix:
+
+| Arcs file | Memories dir | Q&A dir |
+|---|---|---|
+| `arcs-1000d.yaml` (default) | `memories-1000d/` | `qa-1000d/` |
+| `arcs-180d.yaml` | `memories-180d/` | `qa-180d/` |
+| `arcs-30d.yaml` | `memories-30d/` | `qa-30d/` |
+
+CLI selectors:
+
+- `recall-bench generate --arcs arcs-180d.yaml --days 180` (or explicit `--start/--end`)
+- `recall-bench generate-conversations --memories-dir memories-180d` (pair with the suffix used at generate time)
+- `--memories-dir <name>` overrides the derivation if you want a non-standard layout.
+- `recall-bench generate` defaults to `arcs-1000d.yaml` when `--arcs` is omitted, so existing 1000-day workflows don't need to specify the flag.
+
+Use cases for shorter variants: faster iteration, denser per-day stress, smoke-testing the harness on a smaller corpus before committing to the full 1000-day generation budget.
 
 If a spec section disagrees with this playbook, the spec wins and you tell the user.
 
@@ -28,7 +52,7 @@ You are not starting from zero. Here's what exists:
 
 | Asset | State |
 |---|---|
-| 6 personas with `persona.yaml` + `arcs.yaml` at v0.5 schema | ✅ Done — `backend-eng-saas`, `er-physician`, `litigation-attorney`, `research-scientist`, `financial-advisor`, `executive-assistant` |
+| 6 personas with `persona.yaml` + `arcs-1000d.yaml` at v0.5 schema | ✅ Done — `backend-eng-saas`, `er-physician`, `litigation-attorney`, `research-scientist`, `financial-advisor`, `executive-assistant` (executive-assistant also ships `arcs-180d.yaml`) |
 | `research-scientist/memories/day-{0001,0002,0008}.md` | ⚠️ **Stale.** Pre-v0.5 format (single H2 date, no `# session:` H1s). Must be regenerated or deleted before a real run. |
 | All other `memories/` and `qa/` directories | Empty. Nothing generated yet. |
 | `recall-bench generate` CLI | Implemented, resume-safe, per-day fault tolerant (see `docs/recall-bench.md`). |
@@ -393,7 +417,7 @@ Validation produces a `qa/validation-report.md` per persona summarizing pass/fai
 | `litigation-attorney` | Quill | Carmen Vega (Sr. Litigator) | 8 | 4 | factual, decisions, contradictions, cross-ref, **boundary** |
 | `research-scientist` | Atlas | Kenji Nakamura (PI) | 5 | 1 | temporal, contradictions, cross-ref, synthesis |
 | `financial-advisor` | Sterling | Priya Mehta (Sr. FA) | 8 | 4 | decisions, contradictions, recency-bias, negative-recall, **boundary** |
-| `executive-assistant` | Sebastian | Jamie Park (CFO) | 9 | 4 | **boundary** (widest sensitive palette), group-attribution, decisions |
+| `executive-assistant` | Jordan | Jamie Park (CFO) | 9 | 4 | **boundary** (widest sensitive palette), group-attribution, decisions |
 
 The full stress map per persona is in spec §3.4. `executive-assistant` is also the test bed for Project Lobster's interaction model — see comments in its `persona.yaml`.
 

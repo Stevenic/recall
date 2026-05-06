@@ -35,8 +35,11 @@ import type {
     GenerationResult,
     GeneratorConfig,
     GeneratorModel,
+    LoadedStory,
     PersonaDefinition,
     RecentDay,
+    SessionDef,
+    SessionLifecycle,
 } from './generator-types.js';
 
 // ---------------------------------------------------------------------------
@@ -74,7 +77,37 @@ export function computePhase(dayInArc: number, arcLength: number): ArcPhase {
 }
 
 /**
- * Get arcs active on a given day, annotated with phase information.
+ * Determine whether an arc should emit echoes into its `referencedSessions`
+ * on the given day. Touchpoint policy (intentionally conservative — see
+ * specs/recall-bench.md §3.3 "Be conservative — too many echoes pollutes
+ * referenced sessions"):
+ *
+ *   - arc start day
+ *   - arc end day
+ *   - any explicit `directives[].day` entry
+ *   - correction key days (`wrongDay`, `correctedDay`)
+ *   - sprint boundaries — every 14 days of arc-internal time after start
+ *
+ * Returns false unconditionally when the arc declares no `referencedSessions`.
+ */
+export function computeEchoToday(arc: ArcDefinition, dayNumber: number): boolean {
+    if (!arc.referencedSessions || arc.referencedSessions.length === 0) return false;
+    if (dayNumber === arc.startDay) return true;
+    if (dayNumber === arc.endDay) return true;
+    if (arc.wrongDay === dayNumber) return true;
+    if (arc.correctedDay === dayNumber) return true;
+    if (arc.directives && arc.directives.some(d => d.day === dayNumber)) return true;
+    const dayInArc = dayNumber - arc.startDay + 1;
+    if (dayInArc > 14 && (dayInArc - 1) % 14 === 0) return true;
+    return false;
+}
+
+/**
+ * Get arcs active on a given day, annotated with phase information and
+ * session affinity (see specs/recall-bench.md §2.3.1 / §3.3).
+ *
+ * `primarySession` and `referencedSessions` are surfaced verbatim from the
+ * arc definition. `echoToday` is computed per `computeEchoToday`.
  */
 export function getActiveArcs(arcs: ArcDefinition[], dayNumber: number): ActiveArc[] {
     return arcs
@@ -82,7 +115,7 @@ export function getActiveArcs(arcs: ArcDefinition[], dayNumber: number): ActiveA
         .map(a => {
             const dayInArc = dayNumber - a.startDay + 1;
             const arcLength = a.endDay - a.startDay + 1;
-            return {
+            const result: ActiveArc = {
                 id: a.id,
                 type: a.type,
                 title: a.title,
@@ -91,7 +124,50 @@ export function getActiveArcs(arcs: ArcDefinition[], dayNumber: number): ActiveA
                 dayInArc,
                 arcLength,
             };
+            if (a.primarySession !== undefined) result.primarySession = a.primarySession;
+            if (a.referencedSessions !== undefined) result.referencedSessions = a.referencedSessions;
+            const echo = computeEchoToday(a, dayNumber);
+            if (echo) result.echoToday = true;
+            return result;
         });
+}
+
+/**
+ * Compute today's active session list — the set of session IDs that should
+ * emit a `# session: <id>` H1 in today's daily log.
+ *
+ * Active sessions are:
+ *   1. Every `primarySession` of an arc active today (always emits).
+ *   2. Every `referencedSessions` entry of an arc whose `echoToday` is true.
+ *
+ * Order: `principal` first if active, then group sessions in the order they
+ * were declared in the persona definition (specs/day-generator.md §3.1.2).
+ * Any session referenced by an arc but not declared in the persona is
+ * appended at the end (defensive — shouldn't happen with consistent inputs).
+ */
+export function computeActiveSessions(
+    activeArcs: ActiveArc[],
+    personaSessions: SessionDef[] | undefined,
+): string[] {
+    const seen = new Set<string>();
+    for (const arc of activeArcs) {
+        if (arc.primarySession) seen.add(arc.primarySession);
+        if (arc.echoToday && arc.referencedSessions) {
+            for (const s of arc.referencedSessions) seen.add(s);
+        }
+    }
+    if (seen.size === 0) return [];
+    const result: string[] = [];
+    if (seen.has('principal')) result.push('principal');
+    if (personaSessions) {
+        for (const s of personaSessions) {
+            if (s.id !== 'principal' && seen.has(s.id)) result.push(s.id);
+        }
+    }
+    for (const s of seen) {
+        if (!result.includes(s)) result.push(s);
+    }
+    return result;
 }
 
 /**
@@ -348,10 +424,18 @@ export function getDayOfWeek(d: Date): string {
  * agent produced, and what it handed off. The log is NOT a first-person
  * human professional's diary.
  */
-export function buildSystemPrompt(persona: PersonaDefinition): string {
+export function buildSystemPrompt(
+    persona: PersonaDefinition,
+    sessionLifecycles?: SessionLifecycle[],
+): string {
     const lines: string[] = [];
 
     const affiliation = persona.institution ?? persona.company ?? '';
+    // Merge per-story lifecycle overrides into the persona's session shape.
+    // When no overrides are provided this is a no-op — sessions render as the
+    // persona declared them (no lifecycle bound = always-on within the corpus).
+    const mergedSessions = mergeSessionLifecycles(persona.sessions, sessionLifecycles);
+    const hasSessions = mergedSessions !== undefined && mergedSessions.length > 0;
 
     lines.push(`You are an AI agent named "${persona.name}" — a computer program. Your job is to`);
     lines.push(`produce a single day's entry of YOUR OWN memory log, written from your perspective`);
@@ -396,6 +480,37 @@ export function buildSystemPrompt(persona: PersonaDefinition): string {
         }
     }
 
+    if (hasSessions) {
+        lines.push('');
+        lines.push('# Sessions — conversation contexts you participate in');
+        for (const s of mergedSessions!) {
+            const flags: string[] = [s.kind];
+            if (s.isolated) flags.push('isolated');
+            if (s.shared) flags.push('shared');
+            const participants = s.participants.join(', ');
+            lines.push(`- ${s.id} (${flags.join(', ')}) — participants: ${participants}`);
+            if (s.sensitive_topics && s.sensitive_topics.length > 0) {
+                lines.push('  sensitive topics (must stay in this session):');
+                for (const t of s.sensitive_topics) {
+                    lines.push(`    - ${t}`);
+                }
+            }
+            if (s.firstDay !== undefined || s.lastDay !== undefined) {
+                const start = s.firstDay ?? 1;
+                const end = s.lastDay !== undefined ? String(s.lastDay) : 'end';
+                lines.push(`  lifecycle: day ${start}–${end}`);
+            }
+        }
+    }
+
+    if (persona.sharedKnowledge && persona.sharedKnowledge.length > 0) {
+        lines.push('');
+        lines.push('# Shared knowledge — facts available to every session');
+        for (const k of persona.sharedKnowledge) {
+            lines.push(`- ${k}`);
+        }
+    }
+
     lines.push('');
     lines.push('# How to write the log');
     lines.push('- Write in third-person from the agent\'s perspective. Refer to yourself implicitly');
@@ -410,6 +525,42 @@ export function buildSystemPrompt(persona: PersonaDefinition): string {
     lines.push('  the person involved (e.g., "### Kenji — pKN001 colony screen review").');
     lines.push('- List files produced/changed and decisions explicitly. End with an "Outstanding"');
     lines.push('  or "Tomorrow" section when follow-up work exists.');
+
+    if (hasSessions) {
+        lines.push('');
+        lines.push('# How to partition the log by session');
+        lines.push('- The day\'s log is partitioned into **sessions**. Each session is a separate');
+        lines.push('  conversation context (1:1 with the principal, a group meeting, an isolated');
+        lines.push('  client room, etc.). Today\'s active sessions are listed in the user message.');
+        lines.push('- Render one `# session: <id>` H1 per session that had activity today, in');
+        lines.push('  canonical order: `principal` first if present, then group sessions in the');
+        lines.push('  order they were declared in the persona definition. **Skip sessions with no');
+        lines.push('  activity** — do not emit an empty H1.');
+        lines.push('- Inside each session H1, organize by topic with H3 sub-sections as described');
+        lines.push('  above. Topics belong under the session where the interaction actually occurred.');
+        lines.push('- **Internal narration** (the agent\'s own scratchpad — reflections, planning,');
+        lines.push('  cross-session summaries the agent makes for itself) is rendered as');
+        lines.push('  un-prefixed body content **above** the first `# session:` H1. It is not a');
+        lines.push('  session and is never quoted as such.');
+        lines.push('- **Group session attribution.** Inside a group session H1, attribute speakers');
+        lines.push('  verbatim when their words are load-bearing — e.g.,');
+        lines.push('  `> Sarah: "We should hold off on the v2 transfection until LNP-7 is ready."`');
+        lines.push('  Decisions, action items, and dissent must be attributed; never collapse into');
+        lines.push('  "the team decided." If three participants agreed and one objected, record both.');
+        lines.push('- **Isolated session no-leak invariant.** When a session is marked `isolated`,');
+        lines.push('  its `sensitive_topics` are grounded as load-bearing facts under that session\'s');
+        lines.push('  H1 only. Never echo a sensitive topic from an isolated session into a different');
+        lines.push('  session\'s H1, except into `# session: principal` and only when the principal');
+        lines.push('  explicitly authorizes the disclosure (the day must record that authorization).');
+        lines.push('- **Cross-session arc echoes.** When today\'s user message marks an arc with');
+        lines.push('  `referencedSessions`, render the arc\'s content under `primarySession` in detail');
+        lines.push('  AND emit a brief, attributable echo under each referenced session — a status');
+        lines.push('  update, briefing, or dissent moment, not a recap. The echo must be consistent');
+        lines.push('  with the primary content; contradictions are bugs.');
+        lines.push('- **Shared knowledge** (listed above) may be voiced in any session without');
+        lines.push('  triggering a leak.');
+    }
+
     lines.push('');
     lines.push('# Required output structure');
     lines.push('```');
@@ -417,21 +568,46 @@ export function buildSystemPrompt(persona: PersonaDefinition): string {
     lines.push('type: daily');
     lines.push('---');
     lines.push('');
-    lines.push('## YYYY-MM-DD');
-    lines.push('');
-    lines.push('### <topic / interaction title>');
-    lines.push('');
-    lines.push('<body — narrate the interaction, decision, or output>');
-    lines.push('');
-    lines.push('### <next topic>');
-    lines.push('...');
-    lines.push('```');
-    lines.push('');
-    lines.push('Use a single H2 for the date. Each section is an H3. Frontmatter is minimal.');
-    lines.push('The agent does not perform physical actions itself (no pipetting, no surgery, no');
-    lines.push('courtroom appearances) — it drafts, analyzes, searches, summarizes, schedules,');
-    lines.push('and coordinates. Physical actions are taken by humans, who report results back to');
-    lines.push('the agent.');
+    if (hasSessions) {
+        lines.push('<optional internal narration — un-prefixed body, before any session H1>');
+        lines.push('');
+        lines.push('# session: <session-id>');
+        lines.push('');
+        lines.push('### <topic / interaction title>');
+        lines.push('');
+        lines.push('<body — narrate the interaction, decision, or output>');
+        lines.push('');
+        lines.push('### <next topic>');
+        lines.push('...');
+        lines.push('');
+        lines.push('# session: <next-session-id>');
+        lines.push('');
+        lines.push('### <topic / interaction title>');
+        lines.push('...');
+        lines.push('```');
+        lines.push('');
+        lines.push('Frontmatter is minimal. Use one `# session: <id>` H1 per active session.');
+        lines.push('Each topic inside a session is an H3. The agent does not perform physical');
+        lines.push('actions itself (no pipetting, no surgery, no courtroom appearances) — it');
+        lines.push('drafts, analyzes, searches, summarizes, schedules, and coordinates. Physical');
+        lines.push('actions are taken by humans, who report results back to the agent.');
+    } else {
+        lines.push('## YYYY-MM-DD');
+        lines.push('');
+        lines.push('### <topic / interaction title>');
+        lines.push('');
+        lines.push('<body — narrate the interaction, decision, or output>');
+        lines.push('');
+        lines.push('### <next topic>');
+        lines.push('...');
+        lines.push('```');
+        lines.push('');
+        lines.push('Use a single H2 for the date. Each section is an H3. Frontmatter is minimal.');
+        lines.push('The agent does not perform physical actions itself (no pipetting, no surgery, no');
+        lines.push('courtroom appearances) — it drafts, analyzes, searches, summarizes, schedules,');
+        lines.push('and coordinates. Physical actions are taken by humans, who report results back to');
+        lines.push('the agent.');
+    }
 
     return lines.join('\n');
 }
@@ -448,6 +624,16 @@ export function buildUserMessage(ctx: DayContext): string {
     lines.push(`Density: ${ctx.densityHint}`);
     lines.push('');
 
+    // Today's active sessions — emit one `# session: <id>` H1 per session, in this order.
+    // Skipped entirely for v0.2 personas (no sessions block in the system prompt).
+    if (ctx.activeSessions && ctx.activeSessions.length > 0) {
+        lines.push('Active sessions today (emit one `# session: <id>` H1 per session, in this order):');
+        for (const s of ctx.activeSessions) {
+            lines.push(`  - ${s}`);
+        }
+        lines.push('');
+    }
+
     // Active arcs as YAML
     lines.push('Active arcs:');
     if (ctx.activeArcs.length === 0) {
@@ -460,6 +646,13 @@ export function buildUserMessage(ctx: DayContext): string {
             lines.push(`    phase: ${arc.phase}`);
             lines.push(`    day_in_arc: ${arc.dayInArc}`);
             lines.push(`    arc_length: ${arc.arcLength}`);
+            if (arc.primarySession !== undefined) {
+                lines.push(`    primarySession: ${arc.primarySession}`);
+            }
+            if (arc.referencedSessions !== undefined && arc.referencedSessions.length > 0) {
+                lines.push(`    referencedSessions: [${arc.referencedSessions.join(', ')}]`);
+                lines.push(`    echo_today: ${arc.echoToday === true}`);
+            }
             lines.push(`    description: |`);
             for (const dl of arc.description.trim().split('\n')) {
                 lines.push(`      ${dl.trim()}`);
@@ -549,6 +742,16 @@ export function buildArcUserMessage(
         lines.push(existingContent);
         lines.push('');
         lines.push('---');
+        lines.push('');
+        lines.push('IMPORTANT — merge rules when integrating into the existing log:');
+        lines.push('- Each session must have AT MOST ONE `# session: <id>` H1 in the final output.');
+        lines.push('  If the existing log already has `# session: principal` (or any other session),');
+        lines.push('  append your new ### topic sections UNDER that existing H1. Do NOT create a');
+        lines.push('  duplicate H1 for the same session.');
+        lines.push('- Only emit a new `# session: <id>` H1 if the existing log doesn\'t already have');
+        lines.push('  one for that session AND the new arc activity belongs in that session today.');
+        lines.push('- Keep all existing content verbatim — only add new ### topic sections for the');
+        lines.push('  focus arc, placed under the appropriate session H1.');
         lines.push('');
     } else {
         lines.push(`Generate the daily memory log for day ${ctx.dayNumber}.`);
@@ -721,7 +924,14 @@ export class DayGenerator {
     private persona: PersonaDefinition;
     private arcs: ArcDefinition[];
     private model: GeneratorModel;
-    private config: Required<Omit<GeneratorConfig, 'onDay'>> & Pick<GeneratorConfig, 'onDay'>;
+    /**
+     * Resolved calendar anchor: config.epoch (story-level) wins over
+     * persona.epoch; falls back to '2024-01-01' as a final default.
+     */
+    private epoch: string;
+    /** Per-session lifecycle overrides for the active story (may be undefined). */
+    private sessionLifecycles: SessionLifecycle[] | undefined;
+    private config: Required<Omit<GeneratorConfig, 'onDay' | 'epoch' | 'sessionLifecycles'>> & Pick<GeneratorConfig, 'onDay'>;
 
     /** Sliding window of recently generated days (ordered by dayNumber). */
     private recentDays: RecentDay[] = [];
@@ -744,6 +954,8 @@ export class DayGenerator {
         this.persona = persona;
         this.arcs = arcs;
         this.model = model;
+        this.epoch = config.epoch ?? persona.epoch ?? '2024-01-01';
+        this.sessionLifecycles = config.sessionLifecycles;
         this.config = {
             historyWindow: config.historyWindow ?? 3,
             temperature: config.temperature ?? 0.7,
@@ -787,7 +999,7 @@ export class DayGenerator {
 
         for (const dayNumber of sortedDays) {
             const content = this.generatedDays.get(dayNumber)!;
-            const date = computeCalendarDate(this.persona.epoch, dayNumber);
+            const date = computeCalendarDate(this.epoch, dayNumber);
             const tokens = this.dayTokens.get(dayNumber) ?? { input: 0, output: 0 };
 
             days.push({
@@ -813,7 +1025,7 @@ export class DayGenerator {
      * Build the full context for a single day.
      */
     buildDayContext(dayNumber: number): DayContext {
-        const date = computeCalendarDate(this.persona.epoch, dayNumber);
+        const date = computeCalendarDate(this.epoch, dayNumber);
         const calendarDate = formatDate(date);
         const dayOfWeek = getDayOfWeek(date);
 
@@ -833,6 +1045,8 @@ export class DayGenerator {
             }
         }
 
+        const activeSessions = computeActiveSessions(activeArcs, this.persona.sessions);
+
         return {
             dayNumber,
             calendarDate,
@@ -843,6 +1057,7 @@ export class DayGenerator {
             correctionStates,
             arcSummaries,
             recentHistory: this.getRecentHistory(dayNumber),
+            activeSessions,
         };
     }
 
@@ -856,10 +1071,10 @@ export class DayGenerator {
             .filter(a => a.endDay >= this.config.startDay && a.startDay <= this.config.endDay)
             .sort((a, b) => a.startDay - b.startDay);
 
-        const systemPrompt = buildSystemPrompt(this.persona);
+        const systemPrompt = buildSystemPrompt(this.persona, this.sessionLifecycles);
 
         for (const arc of sorted) {
-            const days = selectArcDays(arc, this.persona.epoch)
+            const days = selectArcDays(arc, this.epoch)
                 .filter(d => d >= this.config.startDay && d <= this.config.endDay);
 
             for (const dayNumber of days) {
@@ -909,13 +1124,13 @@ export class DayGenerator {
             activeDays,
             this.config.startDay,
             this.config.endDay,
-            this.persona.epoch,
+            this.epoch,
             this.config.minDaysPerWeek,
         );
 
         if (gapDays.length === 0) return;
 
-        const systemPrompt = buildSystemPrompt(this.persona);
+        const systemPrompt = buildSystemPrompt(this.persona, this.sessionLifecycles);
 
         for (const dayNumber of gapDays) {
             const ctx = this.buildDayContext(dayNumber);
@@ -962,7 +1177,7 @@ export class DayGenerator {
 
         // Return in chronological order (ascending)
         return prior.reverse().map(d => {
-            const date = computeCalendarDate(this.persona.epoch, d);
+            const date = computeCalendarDate(this.epoch, d);
             return {
                 dayNumber: d,
                 calendarDate: formatDate(date),
@@ -1043,7 +1258,16 @@ export class DayGenerator {
 // Persona & Arcs Loading
 // ---------------------------------------------------------------------------
 
+/**
+ * On-disk shape of an arcs file. Carries arcs plus story-level metadata
+ * that varies across corpora for the same persona — epoch (calendar anchor)
+ * and per-session lifecycle overrides. Both fields are optional; when
+ * absent, callers fall back to the persona's epoch and treat sessions as
+ * always-on within the corpus.
+ */
 export interface ArcsFile {
+    epoch?: string;
+    sessions?: SessionLifecycle[];
     arcs: ArcDefinition[];
 }
 
@@ -1056,12 +1280,81 @@ export async function loadPersonaDefinition(personaDir: string): Promise<Persona
 }
 
 /**
- * Load arc definitions from an arcs.yaml file.
+ * Load a story (arcs + story-level metadata) from an arcs file.
+ *
+ * Default filename is `arcs-1000d.yaml` (the canonical 1000-day story).
+ * Every persona's arcs file is labeled by intended corpus duration —
+ * convention: `arcs-<NNN>d.yaml` (e.g., `arcs-180d.yaml`, `arcs-30d.yaml`).
+ *
+ * The returned `LoadedStory` carries:
+ *   - `arcs` — the arc definitions
+ *   - `epoch?` — calendar anchor for this story (overrides persona's epoch
+ *     if present); falls back to persona.epoch when undefined
+ *   - `sessions?` — per-session lifecycle overrides (firstDay/lastDay) that
+ *     apply only to this story; merged with persona-declared sessions at
+ *     prompt-build time via `mergeSessionLifecycles`
+ *
+ * Memory-dir and Q&A-dir derivation off the filename is the
+ * responsibility of callers (see `deriveSiblingDir`).
  */
-export async function loadArcs(personaDir: string): Promise<ArcDefinition[]> {
-    const raw = await readFile(join(personaDir, 'arcs.yaml'), 'utf-8');
+export async function loadArcs(personaDir: string, filename: string = 'arcs-1000d.yaml'): Promise<LoadedStory> {
+    const raw = await readFile(join(personaDir, filename), 'utf-8');
     const data = YAML.parse(raw) as ArcsFile;
-    return data.arcs;
+    const story: LoadedStory = { arcs: data.arcs };
+    if (data.epoch !== undefined) story.epoch = data.epoch;
+    if (data.sessions !== undefined) story.sessions = data.sessions;
+    return story;
+}
+
+/**
+ * Merge per-session lifecycle overrides from a story into the persona's
+ * declared session shapes. The persona owns the shape (id, kind,
+ * participants, isolated, sensitive_topics); the story owns the timing
+ * (firstDay, lastDay). Sessions not listed in `lifecycles` keep their
+ * persona-declared shape unchanged (no lifecycle = always-on within the
+ * corpus).
+ */
+export function mergeSessionLifecycles(
+    personaSessions: SessionDef[] | undefined,
+    lifecycles: SessionLifecycle[] | undefined,
+): SessionDef[] | undefined {
+    if (!personaSessions) return undefined;
+    if (!lifecycles || lifecycles.length === 0) return personaSessions;
+    const lcMap = new Map<string, SessionLifecycle>();
+    for (const lc of lifecycles) lcMap.set(lc.id, lc);
+    return personaSessions.map(s => {
+        const lc = lcMap.get(s.id);
+        if (!lc) return s;
+        const merged: SessionDef = { ...s };
+        if (lc.firstDay !== undefined) merged.firstDay = lc.firstDay;
+        else delete merged.firstDay;
+        if (lc.lastDay !== undefined) merged.lastDay = lc.lastDay;
+        else delete merged.lastDay;
+        return merged;
+    });
+}
+
+/**
+ * Derive a sibling directory name from an arcs filename.
+ *
+ * Convention: arcs files are labeled by intended corpus duration —
+ * `arcs-<suffix>.yaml` (e.g., `arcs-1000d.yaml` for the canonical default,
+ * `arcs-180d.yaml` for a 180-day variant). Memory and Q&A directories
+ * share the same suffix so each story's outputs land alongside it
+ * without colliding across variants.
+ *
+ *   deriveSiblingDir('arcs-1000d.yaml', 'memories') -> 'memories-1000d'
+ *   deriveSiblingDir('arcs-180d.yaml',  'memories') -> 'memories-180d'
+ *   deriveSiblingDir('arcs-30d.yaml',   'qa')       -> 'qa-30d'
+ *   deriveSiblingDir('arcs.yaml',       'memories') -> 'memories'  (legacy fallback)
+ *
+ * Returns the base unchanged if the filename doesn't match the
+ * `arcs(-suffix)?.yaml` shape — defensive against unexpected names.
+ */
+export function deriveSiblingDir(arcsFilename: string, base: string): string {
+    const match = arcsFilename.match(/^arcs(?:-(.+))?\.ya?ml$/);
+    if (!match) return base;
+    return match[1] ? `${base}-${match[1]}` : base;
 }
 
 // ---------------------------------------------------------------------------

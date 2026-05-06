@@ -1,6 +1,5 @@
 id: er-physician
 name: Pulse
-epoch: "2024-01-01"
 role: AI clinical co-pilot for an emergency physician
 domain: Urban trauma center (Level I)
 institution: Metropolitan General Hospital
@@ -98,6 +97,7 @@ projects:
 
 # Conversation contexts Pulse participates in (recall-bench v0.5 §2.6 / §2.7).
 # Group sessions are 65/35 weighted in arcs.yaml (14 principal-primary, 7 group-primary).
+# Group sessions are 65/35 weighted in arcs-1000d.yaml (14 principal-primary, 7 group-primary).
 # ER Physician is non-boundary-stressed; no isolated sessions in v1.
 sessions:
   - id: principal

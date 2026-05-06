@@ -23,7 +23,14 @@
 export interface PersonaDefinition {
     id: string;
     name: string;
-    epoch: string;
+    /**
+     * Calendar anchor — when day 1 of the story happens in real-world time.
+     * As of v0.6 this lives in the arcs file (`epoch:` at the top) so different
+     * stories for the same persona can anchor differently. Kept on
+     * PersonaDefinition as an optional fallback for legacy persona files
+     * that haven't migrated.
+     */
+    epoch?: string;
     role: string;
     domain: string;
     company?: string;
@@ -34,6 +41,8 @@ export interface PersonaDefinition {
     projects?: ProjectRef[];
     principal?: PrincipalRef;
     cast?: CastMember[];
+    sessions?: SessionDef[];
+    sharedKnowledge?: string[];
 }
 
 export interface ProjectRef {
@@ -54,8 +63,28 @@ export interface CastMember {
     kind?: 'human' | 'agent';
 }
 
+/**
+ * A conversation context the agent participates in. Sessions partition every
+ * daily memory log; a day's content is rendered under one `# session: <id>`
+ * H1 per session that had activity. See specs/recall-bench.md §2.6 / §2.7
+ * and specs/day-generator.md §3.1.1.
+ *
+ * Reserved slug: `principal` is the principal-agent 1:1 session (kind = 1to1).
+ * All other slugs are persona-defined.
+ */
+export interface SessionDef {
+    id: string;
+    kind: '1to1' | 'group';
+    participants: string[];
+    isolated?: boolean;
+    shared?: boolean;
+    firstDay?: number;
+    lastDay?: number;
+    sensitive_topics?: string[];
+}
+
 // ---------------------------------------------------------------------------
-// Arc Definition (loaded from arcs.yaml)
+// Arc Definition (loaded from arcs-<NNN>d.yaml; default arcs-1000d.yaml)
 // ---------------------------------------------------------------------------
 
 export type ArcType = 'project' | 'incident' | 'decision' | 'learning' | 'relationship' | 'correction';
@@ -72,6 +101,20 @@ export interface ArcDefinition {
     /** Key events that MUST appear on specific days. */
     directives?: ArcDirective[];
 
+    /**
+     * Session affinity — see specs/recall-bench.md §2.3.1 and §2.7.
+     * `primarySession` names the session where the arc primarily unfolds;
+     * the day-generator emits the arc's deep content under that session's H1.
+     * `referencedSessions[]` lists sessions that get attributable echoes
+     * at natural touchpoints (sprint boundaries, decision moments).
+     * For arcs whose `primarySession` is itself isolated, sensitive content
+     * must NOT appear in `referencedSessions` unless explicitly authorized.
+     */
+    primarySession?: string;
+    referencedSessions?: string[];
+    /** Cast members involved (informational only). */
+    participants?: string[];
+
     // Correction arc fields
     wrongDay?: number;
     correctedDay?: number;
@@ -82,6 +125,31 @@ export interface ArcDefinition {
 export interface ArcDirective {
     day: number;
     event: string;
+}
+
+/**
+ * Story-level override for a session's lifecycle. Lives in the arcs file,
+ * not the persona file — different stories anchor differently in time and
+ * activate sensitive sessions on different schedules. Sessions not listed
+ * in the story keep their persona-declared shape with no lifecycle bound
+ * (always-on within the corpus).
+ */
+export interface SessionLifecycle {
+    id: string;
+    firstDay?: number;
+    lastDay?: number;
+}
+
+/**
+ * The loaded shape of an arcs file. Returned by `loadArcs`. Carries the
+ * arcs themselves plus story-level metadata that varies across corpora
+ * for the same persona — epoch (calendar anchor) and per-session
+ * lifecycle overrides.
+ */
+export interface LoadedStory {
+    arcs: ArcDefinition[];
+    epoch?: string;
+    sessions?: SessionLifecycle[];
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +164,21 @@ export interface ActiveArc {
     phase: ArcPhase;
     dayInArc: number;
     arcLength: number;
+    /**
+     * Session affinity surfaced from the arc definition (see ArcDefinition).
+     * The day-generator uses these to route content under the correct
+     * `# session: <id>` H1 and to emit echoes only at natural touchpoints.
+     */
+    primarySession?: string;
+    referencedSessions?: string[];
+    /**
+     * Set true only on touchpoint days — sprint boundaries, decision
+     * moments, arc start, arc end, explicit `directives[].day` entries.
+     * On these days the generator emits brief attributable echoes under
+     * each `referencedSessions` H1; otherwise echoes are suppressed.
+     * See specs/recall-bench.md §3.3.
+     */
+    echoToday?: boolean;
 }
 
 export type DensityHint = 'quiet' | 'normal' | 'busy' | 'dense';
@@ -131,6 +214,14 @@ export interface DayContext {
     correctionStates: CorrectionState[];
     arcSummaries: ArcSummary[];
     recentHistory: RecentDay[];
+    /**
+     * Session IDs that should emit `# session: <id>` H1s in today's log.
+     * Computed from active arcs' `primarySession` plus any
+     * `referencedSessions` of arcs whose `echoToday` is true. Ordered with
+     * `principal` first, then group sessions in persona declaration order.
+     * Optional for backwards compatibility with v0.2 personas (no sessions).
+     */
+    activeSessions?: string[];
 }
 
 export interface RecentDay {
@@ -179,6 +270,18 @@ export interface GeneratorConfig {
     startDay?: number;
     /** Ending day number. Default: 1000. */
     endDay?: number;
+    /**
+     * Calendar anchor — overrides PersonaDefinition.epoch. Set this from
+     * the loaded story file's `epoch` so the same persona can drive
+     * different stories with different real-world start dates.
+     */
+    epoch?: string;
+    /**
+     * Per-session lifecycle overrides for this story (from the loaded arcs
+     * file's top-level `sessions:` block). Merged with persona-declared
+     * sessions at prompt-build time.
+     */
+    sessionLifecycles?: SessionLifecycle[];
     /** Minimum active days per week for gap filling (Pass 2). Default: 5. */
     minDaysPerWeek?: number;
     /** Callback after each day is generated. `kind` identifies which pass produced it. */

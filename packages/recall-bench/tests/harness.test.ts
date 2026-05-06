@@ -46,8 +46,8 @@ async function buildTestDataset(dir: string, personaId: string, dayCount: number
     relevant_days: number[];
 }>) {
     const personaDir = join(dir, personaId);
-    const memoriesDir = join(personaDir, 'memories');
-    const qaDir = join(personaDir, 'qa');
+    const memoriesDir = join(personaDir, 'memories-1000d');
+    const qaDir = join(personaDir, 'qa-1000d');
     await mkdir(memoriesDir, { recursive: true });
     await mkdir(qaDir, { recursive: true });
 
@@ -58,8 +58,8 @@ async function buildTestDataset(dir: string, personaId: string, dayCount: number
         epoch: '2024-01-01',
     }));
 
-    // arcs.yaml
-    await writeFile(join(personaDir, 'arcs.yaml'), YAML.stringify({
+    // arcs-1000d.yaml (default canonical-duration arcs file)
+    await writeFile(join(personaDir, 'arcs-1000d.yaml'), YAML.stringify({
         arcs: [
             { id: 'arc-1', startDay: 1, endDay: 50 },
             { id: 'arc-2', startDay: 20, endDay: 100 },

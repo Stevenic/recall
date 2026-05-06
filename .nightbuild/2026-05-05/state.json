@@ -1,0 +1,114 @@
+{
+  "schema_version": 4,
+  "phase": "night-1-complete",
+  "iteration": 8,
+  "last_completed_step": "phase-c-ea-1-10-partial",
+  "consecutive_blocked": 0,
+  "stopped_at": "2026-05-06T06:08:00Z",
+  "stop_reason": "night_complete_partial",
+  "stop_summary": "Night 1 of 10. EA chunk 1-10 yielded 2 days (1, 8) before two 10-min claude CLI timeouts; killed at 06:07Z to avoid further wasted budget. Bug fix validated. Resume Night 2 with --start 1 --end 10 (merge missing arcs into 1 and 8, add 2-7/9/10), --timeout 300000.",
+  "boot_error": null,
+  "started_at": "2026-05-06T01:29:18Z",
+  "stopped_at": null,
+  "stop_reason": null,
+  "stop_summary": null,
+  "epic": {
+    "name": "ea-corpus-10-night",
+    "current_night": 1,
+    "total_nights_target": 10,
+    "ledger": ".nightbuild/ea-corpus-epic.md"
+  },
+  "run_dir": ".nightbuild/2026-05-05",
+  "nightbuild_md_sha": "a52aada31528b8c6023d74b8057970bbc7104bcc",
+  "tick_in_progress": false,
+  "head_at_tick_start": null,
+  "tokens_total": 0,
+  "usd_estimate": 0.0,
+  "morning_ready": false,
+  "morning_ready_at": null,
+  "stretch_completed": [],
+  "inputs": {
+    "parent_branch": "main",
+    "persona_id": "executive-assistant",
+    "smoke_persona_id": "research-scientist",
+    "chunk_size_days": 50,
+    "budget_max_usd": null,
+    "usd_per_mtok": null
+  },
+  "secrets": {},
+  "todo": [
+    "boot",
+    "phase-a-day-generator-v05",
+    "phase-b-smoke-research-scientist",
+    "phase-c-ea-generation",
+    "phase-d-morning-readiness"
+  ],
+  "phases_done": ["phase-a-day-generator-v05", "phase-b-validate-bug-fix"],
+  "deliverables": {
+    "phase-a-substeps-1-2": {
+      "commit": "8dc7c7168f2d676acb2a86f102a0473d74f183bc",
+      "files_changed": [
+        "packages/recall-bench/src/generator-types.ts",
+        "packages/recall-bench/src/generator.ts"
+      ],
+      "verification": "tsc clean, 122/122 tests pass, 8/8 prompt-build smoke markers"
+    },
+    "phase-a-substeps-3-4": {
+      "commit": "9653ee07ac45fa4b07e6185beb067c256e3ffdcc",
+      "files_changed": [
+        "packages/recall-bench/src/generator-types.ts",
+        "packages/recall-bench/src/generator.ts"
+      ],
+      "verification": "tsc clean, 122/122 tests pass, 5/5 user-message smoke tests pass (incl. backwards compat)"
+    },
+    "phase-b-step-1-deletions": {
+      "commit": "91e81ff3702c768d44e756dc52a07b525a9e2f26",
+      "files_changed": [
+        "packages/recall-bench/personas/research-scientist/memories/day-0001.md",
+        "packages/recall-bench/personas/research-scientist/memories/day-0002.md",
+        "packages/recall-bench/personas/research-scientist/memories/day-0008.md"
+      ],
+      "verification": "3 stale pre-v0.5 days deleted"
+    },
+    "phase-b-merge-rules-fix": {
+      "commit": "6e42b72c8c149c72b595e693c0fd9783bc62dc4c",
+      "files_changed": [
+        "packages/recall-bench/src/generator.ts"
+      ],
+      "verification": "tsc clean; bug observed in 5/5 partial smoke days (each had 2x '# session: principal' H1s); fix is prompt-level addition to buildArcUserMessage merge branch; LLM-output-level validation deferred to tomorrow's smoke"
+    }
+  },
+  "history": [
+    {
+      "iteration": 1,
+      "phase": "phase-a-day-generator-v05",
+      "step": "phase-a-substeps-1-2",
+      "commit": "8dc7c7168f2d676acb2a86f102a0473d74f183bc",
+      "outcome": "ok"
+    },
+    {
+      "iteration": 2,
+      "phase": "phase-a-day-generator-v05",
+      "step": "phase-a-substeps-3-4",
+      "commit": "9653ee07ac45fa4b07e6185beb067c256e3ffdcc",
+      "outcome": "ok",
+      "phase_complete": true
+    },
+    {
+      "iteration": 3,
+      "phase": "phase-b-smoke-research-scientist",
+      "step": "phase-b-step-1-deletions",
+      "commit": "91e81ff3702c768d44e756dc52a07b525a9e2f26",
+      "outcome": "ok",
+      "note": "smoke subprocess b0d2u7jgt launched in background; inspection on next tick"
+    },
+    {
+      "iteration": 4,
+      "phase": "phase-b-smoke-research-scientist",
+      "step": "phase-b-blocked",
+      "commit": "6e42b72c8c149c72b595e693c0fd9783bc62dc4c",
+      "outcome": "blocked",
+      "note": "smoke killed mid-run; format validated (v0.5 multi-session); duplicate-H1 bug found and fixed in prompt; speed-strategy decision required from user"
+    }
+  ]
+}

@@ -74,14 +74,17 @@ A dataset is a directory of personas. Each persona contains daily memory logs an
 ```
 dataset/
 ├── backend-eng-saas/
-│   ├── persona.yaml           # Identity and profile
-│   ├── arcs.yaml              # Narrative arc definitions
-│   ├── memories/
-│   │   ├── day-0001.md        # Daily memory logs
+│   ├── persona.yaml             # Identity and profile
+│   ├── arcs-1000d.yaml          # Narrative arc definitions (canonical 1000-day story)
+│   ├── arcs-180d.yaml           # Optional shorter variant (e.g., 180-day story)
+│   ├── memories-1000d/
+│   │   ├── day-0001.md          # Daily memory logs (paired with arcs-1000d.yaml)
 │   │   ├── day-0002.md
-│   │   └── ...                # Up to 1,000 files
-│   └── qa/
-│       └── questions.yaml     # Q&A evaluation pairs
+│   │   └── ...                  # Up to 1,000 files
+│   ├── memories-180d/           # Optional sibling dir for the 180-day variant
+│   │   └── ...
+│   └── qa-1000d/
+│       └── questions.yaml       # Q&A evaluation pairs (paired with arcs-1000d.yaml)
 ├── er-physician/
 │   └── ...
 └── ...
@@ -102,7 +105,7 @@ npx recall-bench create-persona \
   --out ./dataset/my-persona
 ```
 
-This creates `persona.yaml` and `arcs.yaml` in the output directory.
+This creates `persona.yaml` and `arcs-1000d.yaml` in the output directory.
 
 To generate arcs separately for an existing persona:
 
@@ -143,7 +146,7 @@ The generator uses a sliding history window and arc state tracking to produce co
 **Options:**
 | Flag | Default | Description |
 |---|---|---|
-| `--persona <dir>` | required | Directory containing `persona.yaml` and `arcs.yaml` |
+| `--persona <dir>` | required | Directory containing `persona.yaml` and `arcs-1000d.yaml` |
 | `--model <name\|path>` | required | `claude`, `codex`, `copilot`, or path to a JS module |
 | `--out <dir>` | required | Output directory for `day-NNNN.md` files |
 | `--start <n>` | `1` | Starting day number (for resuming interrupted runs) |

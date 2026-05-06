@@ -3,7 +3,7 @@
  *
  * Given a free-text description of a persona, uses an LLM to produce:
  *   1. A PersonaDefinition (persona.yaml)
- *   2. A set of ArcDefinitions (arcs.yaml)
+ *   2. A set of ArcDefinitions (arcs-1000d.yaml)
  *
  * The generated arcs follow the same constraints as hand-authored ones:
  *   - Max 4 concurrent arcs at any point
@@ -251,7 +251,7 @@ export function serializePersonaYaml(persona: PersonaDefinition): string {
 }
 
 /**
- * Serialize arc definitions to YAML string (for writing arcs.yaml).
+ * Serialize arc definitions to YAML string (for writing arcs-1000d.yaml).
  */
 export function serializeArcsYaml(arcs: ArcDefinition[]): string {
     return YAML.stringify({ arcs }, { lineWidth: 100 });

@@ -19,6 +19,13 @@
 #   consult-tox:       1 arc        — tox service buildout
 #   resident-rounds:   1 arc        — curriculum redesign
 
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2026-01-01"
+
+# No sessions block — er-physician has no isolated sessions; all sessions are
+# full-stream within the corpus.
+
 arcs:
 
   # ── Projects ───────────────────────────────────────────────────────────────

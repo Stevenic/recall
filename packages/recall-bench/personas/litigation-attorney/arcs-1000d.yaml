@@ -25,6 +25,26 @@
 #   pro-bono:             1 arc        — non-isolated legal-aid coordination
 #   partner-review:       0 arcs       — receives status echoes only
 
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2026-01-01"
+
+sessions:
+  # Per-client matter lifecycles. Other sessions (principal, case-strategy,
+  # partner-review, pro-bono) are full-stream.
+  - id: client-nexgen
+    firstDay: 1
+    lastDay: 350
+  - id: client-coastal
+    firstDay: 150
+    lastDay: 500
+  - id: client-datastream
+    firstDay: 380
+    lastDay: 700
+  - id: client-helix
+    firstDay: 550
+    lastDay: 850
+
 arcs:
 
   # ── Projects (Cases) ───────────────────────────────────────────────────────
