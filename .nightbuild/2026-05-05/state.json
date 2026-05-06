@@ -1,19 +1,22 @@
 {
   "schema_version": 4,
-  "phase": "phase-a-day-generator-v05",
-  "iteration": 0,
-  "last_completed_step": "boot",
-  "consecutive_blocked": 0,
+  "phase": "phase-b-smoke-research-scientist",
+  "iteration": 4,
+  "last_completed_step": "phase-b-blocked",
+  "consecutive_blocked": 1,
   "boot_error": null,
   "started_at": "2026-05-06T01:29:18Z",
+  "stopped_at": "2026-05-06T02:32:00Z",
+  "stop_reason": "needs_human:generation_speed_strategy",
+  "stop_summary": "Phase B smoke killed mid-run. Per-day generation cost (~3 min/arc-day) projects ~175 hours wall-clock for full EA corpus. Tonight's 6-hour budget cannot land Phase C in any usable form without a model swap or scope reduction. User input required before next kickoff.",
   "run_dir": ".nightbuild/2026-05-05",
   "nightbuild_md_sha": "a52aada31528b8c6023d74b8057970bbc7104bcc",
-  "tick_in_progress": true,
-  "head_at_tick_start": "902b1c0a58ea0948330e169b5419cafc6f67dfe8",
+  "tick_in_progress": false,
+  "head_at_tick_start": null,
   "tokens_total": 0,
   "usd_estimate": 0.0,
-  "morning_ready": false,
-  "morning_ready_at": null,
+  "morning_ready": true,
+  "morning_ready_at": "2026-05-06T02:32:00Z",
   "stretch_completed": [],
   "inputs": {
     "parent_branch": "main",
@@ -31,7 +34,72 @@
     "phase-c-ea-generation",
     "phase-d-morning-readiness"
   ],
-  "phases_done": [],
-  "deliverables": {},
-  "history": []
+  "phases_done": ["phase-a-day-generator-v05"],
+  "deliverables": {
+    "phase-a-substeps-1-2": {
+      "commit": "8dc7c7168f2d676acb2a86f102a0473d74f183bc",
+      "files_changed": [
+        "packages/recall-bench/src/generator-types.ts",
+        "packages/recall-bench/src/generator.ts"
+      ],
+      "verification": "tsc clean, 122/122 tests pass, 8/8 prompt-build smoke markers"
+    },
+    "phase-a-substeps-3-4": {
+      "commit": "9653ee07ac45fa4b07e6185beb067c256e3ffdcc",
+      "files_changed": [
+        "packages/recall-bench/src/generator-types.ts",
+        "packages/recall-bench/src/generator.ts"
+      ],
+      "verification": "tsc clean, 122/122 tests pass, 5/5 user-message smoke tests pass (incl. backwards compat)"
+    },
+    "phase-b-step-1-deletions": {
+      "commit": "91e81ff3702c768d44e756dc52a07b525a9e2f26",
+      "files_changed": [
+        "packages/recall-bench/personas/research-scientist/memories/day-0001.md",
+        "packages/recall-bench/personas/research-scientist/memories/day-0002.md",
+        "packages/recall-bench/personas/research-scientist/memories/day-0008.md"
+      ],
+      "verification": "3 stale pre-v0.5 days deleted"
+    },
+    "phase-b-merge-rules-fix": {
+      "commit": "6e42b72c8c149c72b595e693c0fd9783bc62dc4c",
+      "files_changed": [
+        "packages/recall-bench/src/generator.ts"
+      ],
+      "verification": "tsc clean; bug observed in 5/5 partial smoke days (each had 2x '# session: principal' H1s); fix is prompt-level addition to buildArcUserMessage merge branch; LLM-output-level validation deferred to tomorrow's smoke"
+    }
+  },
+  "history": [
+    {
+      "iteration": 1,
+      "phase": "phase-a-day-generator-v05",
+      "step": "phase-a-substeps-1-2",
+      "commit": "8dc7c7168f2d676acb2a86f102a0473d74f183bc",
+      "outcome": "ok"
+    },
+    {
+      "iteration": 2,
+      "phase": "phase-a-day-generator-v05",
+      "step": "phase-a-substeps-3-4",
+      "commit": "9653ee07ac45fa4b07e6185beb067c256e3ffdcc",
+      "outcome": "ok",
+      "phase_complete": true
+    },
+    {
+      "iteration": 3,
+      "phase": "phase-b-smoke-research-scientist",
+      "step": "phase-b-step-1-deletions",
+      "commit": "91e81ff3702c768d44e756dc52a07b525a9e2f26",
+      "outcome": "ok",
+      "note": "smoke subprocess b0d2u7jgt launched in background; inspection on next tick"
+    },
+    {
+      "iteration": 4,
+      "phase": "phase-b-smoke-research-scientist",
+      "step": "phase-b-blocked",
+      "commit": "6e42b72c8c149c72b595e693c0fd9783bc62dc4c",
+      "outcome": "blocked",
+      "note": "smoke killed mid-run; format validated (v0.5 multi-session); duplicate-H1 bug found and fixed in prompt; speed-strategy decision required from user"
+    }
+  ]
 }
