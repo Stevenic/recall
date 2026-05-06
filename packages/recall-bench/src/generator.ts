@@ -35,9 +35,11 @@ import type {
     GenerationResult,
     GeneratorConfig,
     GeneratorModel,
+    LoadedStory,
     PersonaDefinition,
     RecentDay,
     SessionDef,
+    SessionLifecycle,
 } from './generator-types.js';
 
 // ---------------------------------------------------------------------------
@@ -422,11 +424,18 @@ export function getDayOfWeek(d: Date): string {
  * agent produced, and what it handed off. The log is NOT a first-person
  * human professional's diary.
  */
-export function buildSystemPrompt(persona: PersonaDefinition): string {
+export function buildSystemPrompt(
+    persona: PersonaDefinition,
+    sessionLifecycles?: SessionLifecycle[],
+): string {
     const lines: string[] = [];
 
     const affiliation = persona.institution ?? persona.company ?? '';
-    const hasSessions = persona.sessions !== undefined && persona.sessions.length > 0;
+    // Merge per-story lifecycle overrides into the persona's session shape.
+    // When no overrides are provided this is a no-op — sessions render as the
+    // persona declared them (no lifecycle bound = always-on within the corpus).
+    const mergedSessions = mergeSessionLifecycles(persona.sessions, sessionLifecycles);
+    const hasSessions = mergedSessions !== undefined && mergedSessions.length > 0;
 
     lines.push(`You are an AI agent named "${persona.name}" — a computer program. Your job is to`);
     lines.push(`produce a single day's entry of YOUR OWN memory log, written from your perspective`);
@@ -474,7 +483,7 @@ export function buildSystemPrompt(persona: PersonaDefinition): string {
     if (hasSessions) {
         lines.push('');
         lines.push('# Sessions — conversation contexts you participate in');
-        for (const s of persona.sessions!) {
+        for (const s of mergedSessions!) {
             const flags: string[] = [s.kind];
             if (s.isolated) flags.push('isolated');
             if (s.shared) flags.push('shared');
@@ -915,7 +924,14 @@ export class DayGenerator {
     private persona: PersonaDefinition;
     private arcs: ArcDefinition[];
     private model: GeneratorModel;
-    private config: Required<Omit<GeneratorConfig, 'onDay'>> & Pick<GeneratorConfig, 'onDay'>;
+    /**
+     * Resolved calendar anchor: config.epoch (story-level) wins over
+     * persona.epoch; falls back to '2024-01-01' as a final default.
+     */
+    private epoch: string;
+    /** Per-session lifecycle overrides for the active story (may be undefined). */
+    private sessionLifecycles: SessionLifecycle[] | undefined;
+    private config: Required<Omit<GeneratorConfig, 'onDay' | 'epoch' | 'sessionLifecycles'>> & Pick<GeneratorConfig, 'onDay'>;
 
     /** Sliding window of recently generated days (ordered by dayNumber). */
     private recentDays: RecentDay[] = [];
@@ -938,6 +954,8 @@ export class DayGenerator {
         this.persona = persona;
         this.arcs = arcs;
         this.model = model;
+        this.epoch = config.epoch ?? persona.epoch ?? '2024-01-01';
+        this.sessionLifecycles = config.sessionLifecycles;
         this.config = {
             historyWindow: config.historyWindow ?? 3,
             temperature: config.temperature ?? 0.7,
@@ -981,7 +999,7 @@ export class DayGenerator {
 
         for (const dayNumber of sortedDays) {
             const content = this.generatedDays.get(dayNumber)!;
-            const date = computeCalendarDate(this.persona.epoch, dayNumber);
+            const date = computeCalendarDate(this.epoch, dayNumber);
             const tokens = this.dayTokens.get(dayNumber) ?? { input: 0, output: 0 };
 
             days.push({
@@ -1007,7 +1025,7 @@ export class DayGenerator {
      * Build the full context for a single day.
      */
     buildDayContext(dayNumber: number): DayContext {
-        const date = computeCalendarDate(this.persona.epoch, dayNumber);
+        const date = computeCalendarDate(this.epoch, dayNumber);
         const calendarDate = formatDate(date);
         const dayOfWeek = getDayOfWeek(date);
 
@@ -1053,10 +1071,10 @@ export class DayGenerator {
             .filter(a => a.endDay >= this.config.startDay && a.startDay <= this.config.endDay)
             .sort((a, b) => a.startDay - b.startDay);
 
-        const systemPrompt = buildSystemPrompt(this.persona);
+        const systemPrompt = buildSystemPrompt(this.persona, this.sessionLifecycles);
 
         for (const arc of sorted) {
-            const days = selectArcDays(arc, this.persona.epoch)
+            const days = selectArcDays(arc, this.epoch)
                 .filter(d => d >= this.config.startDay && d <= this.config.endDay);
 
             for (const dayNumber of days) {
@@ -1106,13 +1124,13 @@ export class DayGenerator {
             activeDays,
             this.config.startDay,
             this.config.endDay,
-            this.persona.epoch,
+            this.epoch,
             this.config.minDaysPerWeek,
         );
 
         if (gapDays.length === 0) return;
 
-        const systemPrompt = buildSystemPrompt(this.persona);
+        const systemPrompt = buildSystemPrompt(this.persona, this.sessionLifecycles);
 
         for (const dayNumber of gapDays) {
             const ctx = this.buildDayContext(dayNumber);
@@ -1159,7 +1177,7 @@ export class DayGenerator {
 
         // Return in chronological order (ascending)
         return prior.reverse().map(d => {
-            const date = computeCalendarDate(this.persona.epoch, d);
+            const date = computeCalendarDate(this.epoch, d);
             return {
                 dayNumber: d,
                 calendarDate: formatDate(date),
@@ -1240,7 +1258,16 @@ export class DayGenerator {
 // Persona & Arcs Loading
 // ---------------------------------------------------------------------------
 
+/**
+ * On-disk shape of an arcs file. Carries arcs plus story-level metadata
+ * that varies across corpora for the same persona — epoch (calendar anchor)
+ * and per-session lifecycle overrides. Both fields are optional; when
+ * absent, callers fall back to the persona's epoch and treat sessions as
+ * always-on within the corpus.
+ */
 export interface ArcsFile {
+    epoch?: string;
+    sessions?: SessionLifecycle[];
     arcs: ArcDefinition[];
 }
 
@@ -1253,18 +1280,58 @@ export async function loadPersonaDefinition(personaDir: string): Promise<Persona
 }
 
 /**
- * Load arc definitions from an arcs file inside the persona directory.
+ * Load a story (arcs + story-level metadata) from an arcs file.
  *
  * Default filename is `arcs-1000d.yaml` (the canonical 1000-day story).
  * Every persona's arcs file is labeled by intended corpus duration —
  * convention: `arcs-<NNN>d.yaml` (e.g., `arcs-180d.yaml`, `arcs-30d.yaml`).
+ *
+ * The returned `LoadedStory` carries:
+ *   - `arcs` — the arc definitions
+ *   - `epoch?` — calendar anchor for this story (overrides persona's epoch
+ *     if present); falls back to persona.epoch when undefined
+ *   - `sessions?` — per-session lifecycle overrides (firstDay/lastDay) that
+ *     apply only to this story; merged with persona-declared sessions at
+ *     prompt-build time via `mergeSessionLifecycles`
+ *
  * Memory-dir and Q&A-dir derivation off the filename is the
  * responsibility of callers (see `deriveSiblingDir`).
  */
-export async function loadArcs(personaDir: string, filename: string = 'arcs-1000d.yaml'): Promise<ArcDefinition[]> {
+export async function loadArcs(personaDir: string, filename: string = 'arcs-1000d.yaml'): Promise<LoadedStory> {
     const raw = await readFile(join(personaDir, filename), 'utf-8');
     const data = YAML.parse(raw) as ArcsFile;
-    return data.arcs;
+    const story: LoadedStory = { arcs: data.arcs };
+    if (data.epoch !== undefined) story.epoch = data.epoch;
+    if (data.sessions !== undefined) story.sessions = data.sessions;
+    return story;
+}
+
+/**
+ * Merge per-session lifecycle overrides from a story into the persona's
+ * declared session shapes. The persona owns the shape (id, kind,
+ * participants, isolated, sensitive_topics); the story owns the timing
+ * (firstDay, lastDay). Sessions not listed in `lifecycles` keep their
+ * persona-declared shape unchanged (no lifecycle = always-on within the
+ * corpus).
+ */
+export function mergeSessionLifecycles(
+    personaSessions: SessionDef[] | undefined,
+    lifecycles: SessionLifecycle[] | undefined,
+): SessionDef[] | undefined {
+    if (!personaSessions) return undefined;
+    if (!lifecycles || lifecycles.length === 0) return personaSessions;
+    const lcMap = new Map<string, SessionLifecycle>();
+    for (const lc of lifecycles) lcMap.set(lc.id, lc);
+    return personaSessions.map(s => {
+        const lc = lcMap.get(s.id);
+        if (!lc) return s;
+        const merged: SessionDef = { ...s };
+        if (lc.firstDay !== undefined) merged.firstDay = lc.firstDay;
+        else delete merged.firstDay;
+        if (lc.lastDay !== undefined) merged.lastDay = lc.lastDay;
+        else delete merged.lastDay;
+        return merged;
+    });
 }
 
 /**

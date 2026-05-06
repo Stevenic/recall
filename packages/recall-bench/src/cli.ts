@@ -124,7 +124,7 @@ program
     .action(async (opts) => {
         const personaDir = resolve(opts.persona);
         const persona = await loadPersonaDefinition(personaDir);
-        const arcs = await loadArcs(personaDir, opts.arcs);
+        const story = await loadArcs(personaDir, opts.arcs);
         const model = await resolveModel(opts.model, opts.timeout);
 
         // Resolve --days shorthand. If supplied, it overrides --start/--end.
@@ -140,12 +140,14 @@ program
         await mkdir(memoriesDir, { recursive: true });
 
         const writtenDays = new Set<number>();
-        const generator = new DayGenerator(persona, arcs, model, {
+        const generator = new DayGenerator(persona, story.arcs, model, {
             startDay,
             endDay,
             temperature: opts.temperature,
             maxTokens: opts.maxTokens,
             historyWindow: opts.historyWindow,
+            epoch: story.epoch,
+            sessionLifecycles: story.sessions,
             onDay: async (dayNumber, content, kind) => {
                 const padded = String(dayNumber).padStart(4, '0');
                 const filename = `day-${padded}.md`;

@@ -56,10 +56,11 @@ export async function loadPersona(
     const arcsRaw = await readFile(join(personaDir, arcsFile), 'utf-8');
     const arcsData = YAML.parse(arcsRaw) as ArcFile;
 
-    // Load persona.yaml for epoch date
+    // Load persona.yaml for epoch fallback (story-level epoch wins).
     const personaRaw = await readFile(join(personaDir, 'persona.yaml'), 'utf-8');
     const personaData = YAML.parse(personaRaw) as PersonaFile;
-    const epoch = new Date(personaData.epoch ?? '2024-01-01');
+    const epochString = arcsData.epoch ?? personaData.epoch ?? '2024-01-01';
+    const epoch = new Date(epochString);
 
     // Derive sibling dirs from the arcs filename suffix
     const memoriesDirName = deriveSiblingDir(arcsFile, 'memories');
@@ -134,6 +135,7 @@ export async function listPersonas(dataDir: string): Promise<string[]> {
 // ---------------------------------------------------------------------------
 
 interface ArcFile {
+    epoch?: string;
     arcs: Array<{
         id: string;
         startDay: number;

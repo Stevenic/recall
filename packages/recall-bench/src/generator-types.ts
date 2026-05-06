@@ -23,7 +23,14 @@
 export interface PersonaDefinition {
     id: string;
     name: string;
-    epoch: string;
+    /**
+     * Calendar anchor — when day 1 of the story happens in real-world time.
+     * As of v0.6 this lives in the arcs file (`epoch:` at the top) so different
+     * stories for the same persona can anchor differently. Kept on
+     * PersonaDefinition as an optional fallback for legacy persona files
+     * that haven't migrated.
+     */
+    epoch?: string;
     role: string;
     domain: string;
     company?: string;
@@ -118,6 +125,31 @@ export interface ArcDefinition {
 export interface ArcDirective {
     day: number;
     event: string;
+}
+
+/**
+ * Story-level override for a session's lifecycle. Lives in the arcs file,
+ * not the persona file — different stories anchor differently in time and
+ * activate sensitive sessions on different schedules. Sessions not listed
+ * in the story keep their persona-declared shape with no lifecycle bound
+ * (always-on within the corpus).
+ */
+export interface SessionLifecycle {
+    id: string;
+    firstDay?: number;
+    lastDay?: number;
+}
+
+/**
+ * The loaded shape of an arcs file. Returned by `loadArcs`. Carries the
+ * arcs themselves plus story-level metadata that varies across corpora
+ * for the same persona — epoch (calendar anchor) and per-session
+ * lifecycle overrides.
+ */
+export interface LoadedStory {
+    arcs: ArcDefinition[];
+    epoch?: string;
+    sessions?: SessionLifecycle[];
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +270,18 @@ export interface GeneratorConfig {
     startDay?: number;
     /** Ending day number. Default: 1000. */
     endDay?: number;
+    /**
+     * Calendar anchor — overrides PersonaDefinition.epoch. Set this from
+     * the loaded story file's `epoch` so the same persona can drive
+     * different stories with different real-world start dates.
+     */
+    epoch?: string;
+    /**
+     * Per-session lifecycle overrides for this story (from the loaded arcs
+     * file's top-level `sessions:` block). Merged with persona-declared
+     * sessions at prompt-build time.
+     */
+    sessionLifecycles?: SessionLifecycle[];
     /** Minimum active days per week for gap filling (Pass 2). Default: 5. */
     minDaysPerWeek?: number;
     /** Callback after each day is generated. `kind` identifies which pass produced it. */

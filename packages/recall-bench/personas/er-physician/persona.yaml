@@ -1,6 +1,5 @@
 id: er-physician
 name: Pulse
-epoch: "2024-01-01"
 role: AI clinical co-pilot for an emergency physician
 domain: Urban trauma center (Level I)
 institution: Metropolitan General Hospital

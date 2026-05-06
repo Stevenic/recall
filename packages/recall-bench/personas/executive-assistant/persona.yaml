@@ -1,6 +1,5 @@
 id: executive-assistant
 name: Jordan
-epoch: "2026-01-01"
 role: AI executive assistant for a senior tech-company executive
 domain: Large technology company; matrixed leadership, cross-functional product work, customer escalations, confidential business rhythms, hybrid/onsite logistics
 company: Mosaic Systems
@@ -100,7 +99,7 @@ cast:
     role: Treasurer — capital structure, debt issuance, FX, cash management
     kind: human
   - name: Tomás Reyes
-    role: Corporate Controller — close, consolidation, technical accounting (departs at day ~245)
+    role: Corporate Controller — close, consolidation, technical accounting
     kind: human
   - name: Yuki Tanaka
     role: VP, FP&A — forecast, budget, variance, scenario modeling
@@ -109,7 +108,7 @@ cast:
     role: VP, Investor Relations — sell-side coverage, earnings prep, investor day
     kind: human
   - name: Wei Zhang
-    role: Acting / new Controller after Tomás's departure (joins ~day 320)
+    role: Corporate Controller (joins later in some stories as Tomás's replacement; arrival timing is story-specific)
     kind: human
 
   # ─── Peer executives (ELT) ───────────────────────────────────────────────
@@ -290,8 +289,8 @@ sessions:
       - Beth Rivera
       - Vikram Mehta           # comp committee chair (board)
     isolated: true
-    firstDay: 1
-    lastDay: 1000
+    # firstDay / lastDay are story-specific and live in the active arcs file's
+    # `sessions:` block. See arcs-1000d.yaml or arcs-180d.yaml.
     sensitive_topics:
       - "Individual executive base, bonus, and equity grant amounts (CEO, COO, CRO, CMO, CHRO, GC, Jamie's own comp)"
       - "Officer-level performance ratings, bonus modifier rationale, and reorg/restructuring decisions"
@@ -307,8 +306,8 @@ sessions:
       - Rashid Patel
       - Sandra Ramirez         # banker
     isolated: true
-    firstDay: 100
-    lastDay: 400
+    # firstDay / lastDay are story-specific (Condor lifecycle differs across
+    # 1000d and 180d variants); live in the active arcs file.
     sensitive_topics:
       - "Project Condor target identity (real-name codename mapping) and approach posture"
       - "Condor purchase-price range, walkaway valuation floor, and synergy assumptions"
@@ -323,8 +322,8 @@ sessions:
       - Rashid Patel
       - Patricia Brennan       # outside litigation counsel
     isolated: true
-    firstDay: 420
-    lastDay: 700
+    # firstDay / lastDay are story-specific (the activist-letter / shareholder-suit
+    # window differs across stories); live in the active arcs file.
     sensitive_topics:
       - "Shareholder derivative suit allegations, defense strategy, and reserve estimate"
       - "SEC inquiry scope, document production status, and witness preparation notes"
@@ -338,8 +337,9 @@ sessions:
       - Alex Park
       - Mrs. Hammond           # school admin (joins for school-coordination touchpoints)
     isolated: true
-    firstDay: 1
-    lastDay: 1000
+    # Always-on for both stories; if a future variant scopes family
+    # interactions to a window, the lifecycle would be declared in the
+    # active arcs file.
     sensitive_topics:
       - "Riley and Tess Park's school information, conference dates, and academic concerns"
       - "Family medical appointments and health-related schedule constraints"
@@ -353,7 +353,7 @@ sessions:
 sharedKnowledge:
   - "Mosaic Systems is an NYSE-listed mid-cap technology company; FY ends December 31"
   - "Jordan was provisioned via the Lobster Agent365 SKU on day 1; carries a full Entra Agent ID and Cloud PC"
-  - "Jamie's authorization grant ladder: read-only (day 1) → send-on-behalf (day 60) → send-as (day 200) → independent expense approval up to $500 (day 400)"
+  - "Jamie's authorization grant ladder progresses through stages: read-only at onboarding → send-on-behalf for routine logistics → send-as for inbox auto-replies → independent expense approval up to $500. Specific timing is defined by the active relationship-jamie arc in the story file."
   - "Jordan's standing habits: 6:30 AM weekday briefing (Teams DM), inbox triage every 30 minutes, calendar conflict scan nightly, Friday-morning open-loop sweep across email/chat/leadership-team meetings"
   - "All material non-public information (MNPI) handling follows Mosaic's insider-trading and Reg FD policies; Jordan operates under the same compliance posture as a human EA"
   - "Calendar discipline: protect Friday afternoons for catch-up unless customer or board urgency; add 30-min prep buffer before board, investor, press, or major customer meetings; cluster interviews on Tuesday/Thursday afternoons; do not move Jamie's manager 1:1 without explicit approval"

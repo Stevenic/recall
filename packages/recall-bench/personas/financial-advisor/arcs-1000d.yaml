@@ -27,6 +27,26 @@
 #   compliance-review:       1 arc        — SEC exam
 #   team-meeting:            0 arcs       — receives status echoes only
 
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2024-01-01"
+
+sessions:
+  # Per-client household lifecycles. Other sessions (principal, team-meeting,
+  # investment-committee, compliance-review) are full-stream.
+  - id: client-harrison
+    firstDay: 1
+    lastDay: 1000
+  - id: client-oconnor
+    firstDay: 30
+    lastDay: 800
+  - id: client-vance
+    firstDay: 80
+    lastDay: 900
+  - id: client-linwood
+    firstDay: 280
+    lastDay: 1000
+
 arcs:
 
   # ── Projects ───────────────────────────────────────────────────────────────

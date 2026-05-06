@@ -15,6 +15,13 @@
 #   incident-response:    3 arcs (15%) — fire-drill room during outages
 #   standup:              0 arcs       — receives status echoes only
 
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2024-01-01"
+
+# No sessions block — backend-eng-saas has no isolated sessions; all sessions
+# are full-stream within the corpus.
+
 arcs:
 
   # ── Projects ───────────────────────────────────────────────────────────────

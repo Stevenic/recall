@@ -1,6 +1,5 @@
 id: research-scientist
 name: Atlas
-epoch: "2024-01-01"
 role: AI lab co-pilot for a synthetic biology PI
 domain: University biology lab (synthetic biology and gene regulation)
 institution: Pacific State University, Dept. of Molecular Biology
@@ -133,8 +132,7 @@ sessions:
       - Kenji Nakamura
       - Dr. Wei Chen
     isolated: true
-    firstDay: 300
-    lastDay: 700
+    # firstDay / lastDay are story-specific and live in the active arcs file.
     sensitive_topics:
       - "Chen Lab's proprietary LNP-4 / LNP-7 formulation chemistry"
       - "Chen Lab's internal cytotoxicity assay protocols and panel data"

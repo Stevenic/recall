@@ -45,6 +45,24 @@
 #   board-prep:           0 arcs       — receives status echoes only
 #   comp-committee:       0 arcs       — referenced only (no comp cycle in this 6-month window)
 
+# ── Story-level metadata ────────────────────────────────────────────────────
+# epoch + per-session lifecycle live with the story (not the persona). The
+# 180-day variant compresses the Condor lifecycle and shifts the legal-
+# confidential window to match the activist-letter incident at days 90-130.
+
+epoch: "2026-01-01"
+
+sessions:
+  # Sessions whose lifecycle differs from "always-on" within this corpus.
+  # Sessions not listed (principal, direct-reports, executive-team, board-prep,
+  # ea-network, comp-committee, family) are full-stream within the 180 days.
+  - id: project-condor
+    firstDay: 1
+    lastDay: 150
+  - id: legal-confidential
+    firstDay: 90
+    lastDay: 130
+
 arcs:
 
   # ── Projects ───────────────────────────────────────────────────────────────

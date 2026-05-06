@@ -30,6 +30,24 @@
 #   direct-reports:       0 arcs       — receives status echoes only
 #   board-prep:           0 arcs       — receives status echoes only
 
+# ── Story-level metadata ────────────────────────────────────────────────────
+# epoch + per-session lifecycle live with the story (not the persona) — the
+# same persona drives different stories with different real-world anchors
+# and different lifecycle windows for sensitive sessions.
+
+epoch: "2026-01-01"
+
+sessions:
+  # Sessions whose lifecycle differs from "always-on" within this corpus.
+  # Sessions not listed here (principal, direct-reports, executive-team,
+  # board-prep, ea-network, comp-committee, family) are full-stream.
+  - id: project-condor
+    firstDay: 100
+    lastDay: 400
+  - id: legal-confidential
+    firstDay: 420
+    lastDay: 700
+
 arcs:
 
   # ── Projects ───────────────────────────────────────────────────────────────
