@@ -111,7 +111,7 @@ program
     .description('Generate daily memory logs for a persona using an LLM')
     .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + arcs file)')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
-    .option('--arcs <filename>', 'Arcs file within the persona dir; convention: arcs.yaml (1000d default) or arcs-<NNN>d.yaml (variants)', 'arcs.yaml')
+    .option('--arcs <filename>', 'Arcs file within the persona dir; convention: arcs-<NNN>d.yaml labeled by intended corpus duration (default: arcs-1000d.yaml)', 'arcs-1000d.yaml')
     .option('--memories-dir <dirname>', 'Memory output dir name within the persona dir; defaults to "memories" or "memories-<suffix>" derived from --arcs')
     .option('--days <n>', 'Total days to generate; sets --start 1 --end <n>. Mutually exclusive with --start/--end.', parseIntArg)
     .option('--start <n>', 'Starting day number', parseIntArg, 1)
@@ -181,7 +181,7 @@ program
     .description('Create a new persona and story arcs from a text prompt using an LLM')
     .requiredOption('--prompt <text>', 'Description of the persona to create')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
-    .requiredOption('--persona <dir>', 'Persona directory to write persona.yaml and arcs.yaml into')
+    .requiredOption('--persona <dir>', 'Persona directory to write persona.yaml and arcs-1000d.yaml into')
     .option('--epoch <date>', 'Epoch date for the persona timeline', '2024-01-01')
     .option('--temperature <n>', 'Generation temperature', parseFloatArg, 0.7)
     .option('--max-tokens <n>', 'Max output tokens per LLM call', parseIntArg, 4000)
@@ -206,13 +206,13 @@ program
                 process.stdout.write('  Generating arcs...');
             }
             const result = await creator.createArcs(persona);
-            await writeFile(join(personaDir, 'arcs.yaml'), serializeArcsYaml(result.arcs), 'utf-8');
+            await writeFile(join(personaDir, 'arcs-1000d.yaml'), serializeArcsYaml(result.arcs), 'utf-8');
 
             if (!opts.json) {
                 console.log(' done.');
                 console.log(`  Created ${result.arcs.length} arcs for "${persona.name}" (${persona.id}).`);
                 console.log(`  Tokens — input: ${result.inputTokens}, output: ${result.outputTokens}`);
-                console.log(`  Output: ${personaDir}/arcs.yaml`);
+                console.log(`  Output: ${personaDir}/arcs-1000d.yaml`);
             } else {
                 console.log(JSON.stringify({
                     personaId: persona.id,
@@ -229,14 +229,14 @@ program
             }
             const result = await creator.create(opts.prompt);
             await writeFile(join(personaDir, 'persona.yaml'), serializePersonaYaml(result.persona), 'utf-8');
-            await writeFile(join(personaDir, 'arcs.yaml'), serializeArcsYaml(result.arcs), 'utf-8');
+            await writeFile(join(personaDir, 'arcs-1000d.yaml'), serializeArcsYaml(result.arcs), 'utf-8');
 
             if (!opts.json) {
                 console.log(' done.');
                 console.log(`  Persona: "${result.persona.name}" (${result.persona.id})`);
                 console.log(`  Arcs: ${result.arcs.length}`);
                 console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
-                console.log(`  Output: ${personaDir}/persona.yaml, ${personaDir}/arcs.yaml`);
+                console.log(`  Output: ${personaDir}/persona.yaml, ${personaDir}/arcs-1000d.yaml`);
             } else {
                 console.log(JSON.stringify({
                     personaId: result.persona.id,
@@ -255,7 +255,7 @@ program
     .description('Generate conversation history for each day from existing daily logs (Pass 2)')
     .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + memories dir)')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
-    .option('--memories-dir <dirname>', 'Memory input dir name within the persona dir (default: "memories"; pair with the suffix used at generate time, e.g., "memories-180d")', 'memories')
+    .option('--memories-dir <dirname>', 'Memory input dir name within the persona dir (default: "memories-1000d"; pair with the suffix used at generate time, e.g., "memories-180d")', 'memories-1000d')
     .option('--conversations-dir <dirname>', 'Conversation output dir name within the persona dir (default: "conversations" or derived from --memories-dir suffix)')
     .option('--days <n>', 'Total days to generate; sets --start 1 --end <n>. Mutually exclusive with --start/--end.', parseIntArg)
     .option('--start <n>', 'Starting day number', parseIntArg, 1)
@@ -280,9 +280,9 @@ program
 
         const memoriesDirName = opts.memoriesDir;
         // Mirror the suffix from --memories-dir onto --conversations-dir if not explicitly set.
-        // 'memories' -> 'conversations'; 'memories-180d' -> 'conversations-180d'.
+        // 'memories-1000d' -> 'conversations-1000d'; 'memories-180d' -> 'conversations-180d'.
         const conversationsDirName = opts.conversationsDir ??
-            (memoriesDirName === 'memories' ? 'conversations' : memoriesDirName.replace(/^memories/, 'conversations'));
+            memoriesDirName.replace(/^memories/, 'conversations');
         const memoriesDir = join(personaDir, memoriesDirName);
         const conversationsDir = join(personaDir, conversationsDirName);
         await mkdir(conversationsDir, { recursive: true });

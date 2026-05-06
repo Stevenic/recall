@@ -92,7 +92,7 @@ projects:
     description: "Teaching and curriculum development for the undergraduate molecular biology course"
 
 # Conversation contexts Atlas participates in (recall-bench v0.5 §2.6 / §2.7).
-# Group sessions are 65/35 weighted in arcs.yaml (~12 principal-primary, ~7 group-primary).
+# Group sessions are 65/35 weighted in arcs-1000d.yaml (~12 principal-primary, ~7 group-primary).
 sessions:
   - id: principal
     kind: 1to1

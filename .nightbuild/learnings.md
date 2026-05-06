@@ -12,7 +12,9 @@ Distilled lessons from past NightBuild runs on this project. Future kickoffs rea
 
 ## Project conventions
 
-- Day-generator persona schema is **v0.5** (multi-session): `persona.yaml` carries `sessions:` and `sharedKnowledge:` blocks; `arcs.yaml` annotates every arc with `primarySession` and (optional) `referencedSessions`. The 5 v1 personas + `executive-assistant` follow this schema; check `specs/recall-bench.md` §2.6/§2.7 and `specs/day-generator.md` §3.1 before changing the prompt template. *first seen 2026-05-05*
+- Day-generator persona schema is **v0.5** (multi-session): `persona.yaml` carries `sessions:` and `sharedKnowledge:` blocks; `arcs-<NNN>d.yaml` annotates every arc with `primarySession` and (optional) `referencedSessions`. The 5 v1 personas + `executive-assistant` follow this schema; check `specs/recall-bench.md` §2.6/§2.7 and `specs/day-generator.md` §3.1 before changing the prompt template. *first seen 2026-05-05*
+
+- Arcs files are labeled by intended corpus duration: `arcs-1000d.yaml` is the canonical default; variants like `arcs-180d.yaml` live alongside it in the same persona dir. Memory and Q&A directories share the suffix (`memories-1000d/`, `qa-180d/`, etc.) — `deriveSiblingDir` in `src/generator.ts` is the source of truth for this mapping. CLI default is `arcs-1000d.yaml` when `--arcs` is omitted. *first seen 2026-05-06*
 
 - The `--model claude` flag invokes the local `claude` CLI subprocess — coding-agent quirks apply per `docs/recall-bench.md` (no `--temperature` or `--max-tokens` honored). For per-call control, write a custom model adapter in `packages/recall-bench/src/defaults/` and pass its compiled JS path via `--model`. *first seen 2026-05-05*
 

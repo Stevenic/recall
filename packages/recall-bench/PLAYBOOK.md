@@ -20,16 +20,16 @@ Read these before starting. Don't restate them — reference them by `§` when y
 
 ## 1a. Arc-file variants (varying-length corpora)
 
-A persona can ship multiple arcs files for different corpus lengths:
+Every arcs file is labeled by intended corpus duration. Convention:
 
-- `arcs.yaml` — default 1000-day story (canonical).
-- `arcs-<NNN>d.yaml` — variant story labeled by intended day count (e.g., `arcs-180d.yaml`). Same persona definition, different timeline + arc set.
+- `arcs-<NNN>d.yaml` — story arcs for an N-day corpus (e.g., `arcs-1000d.yaml`, `arcs-180d.yaml`, `arcs-30d.yaml`).
+- The default is `arcs-1000d.yaml` — the canonical 1000-day story shipped with each persona. Variants are optional and live alongside the default in the same persona dir.
 
-The generator pairs each arcs file with sibling output dirs derived from the suffix:
+Each arcs file pairs with sibling output dirs derived from the suffix:
 
 | Arcs file | Memories dir | Q&A dir |
 |---|---|---|
-| `arcs.yaml` | `memories/` | `qa/` |
+| `arcs-1000d.yaml` (default) | `memories-1000d/` | `qa-1000d/` |
 | `arcs-180d.yaml` | `memories-180d/` | `qa-180d/` |
 | `arcs-30d.yaml` | `memories-30d/` | `qa-30d/` |
 
@@ -38,6 +38,7 @@ CLI selectors:
 - `recall-bench generate --arcs arcs-180d.yaml --days 180` (or explicit `--start/--end`)
 - `recall-bench generate-conversations --memories-dir memories-180d` (pair with the suffix used at generate time)
 - `--memories-dir <name>` overrides the derivation if you want a non-standard layout.
+- `recall-bench generate` defaults to `arcs-1000d.yaml` when `--arcs` is omitted, so existing 1000-day workflows don't need to specify the flag.
 
 Use cases for shorter variants: faster iteration, denser per-day stress, smoke-testing the harness on a smaller corpus before committing to the full 1000-day generation budget.
 
@@ -51,7 +52,7 @@ You are not starting from zero. Here's what exists:
 
 | Asset | State |
 |---|---|
-| 6 personas with `persona.yaml` + `arcs.yaml` at v0.5 schema | ✅ Done — `backend-eng-saas`, `er-physician`, `litigation-attorney`, `research-scientist`, `financial-advisor`, `executive-assistant` |
+| 6 personas with `persona.yaml` + `arcs-1000d.yaml` at v0.5 schema | ✅ Done — `backend-eng-saas`, `er-physician`, `litigation-attorney`, `research-scientist`, `financial-advisor`, `executive-assistant` (executive-assistant also ships `arcs-180d.yaml`) |
 | `research-scientist/memories/day-{0001,0002,0008}.md` | ⚠️ **Stale.** Pre-v0.5 format (single H2 date, no `# session:` H1s). Must be regenerated or deleted before a real run. |
 | All other `memories/` and `qa/` directories | Empty. Nothing generated yet. |
 | `recall-bench generate` CLI | Implemented, resume-safe, per-day fault tolerant (see `docs/recall-bench.md`). |

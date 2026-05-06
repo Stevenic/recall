@@ -77,7 +77,7 @@ export interface SessionDef {
 }
 
 // ---------------------------------------------------------------------------
-// Arc Definition (loaded from arcs.yaml)
+// Arc Definition (loaded from arcs-<NNN>d.yaml; default arcs-1000d.yaml)
 // ---------------------------------------------------------------------------
 
 export type ArcType = 'project' | 'incident' | 'decision' | 'learning' | 'relationship' | 'correction';

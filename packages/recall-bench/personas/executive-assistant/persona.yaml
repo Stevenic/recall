@@ -223,7 +223,7 @@ projects:
     description: "Annual exec comp planning, comp committee deliberation, equity grant decisions; sensitive personnel work isolated to comp-committee session"
 
 # Conversation contexts Jordan participates in (recall-bench v0.5 §2.6 / §2.7).
-# Group sessions are 65/35 weighted in arcs.yaml (~14 principal-primary, ~10 group-primary).
+# Group sessions are 65/35 weighted in arcs-1000d.yaml (~14 principal-primary, ~10 group-primary).
 # Of the 10 group-primary, ~7 are isolated and the remainder span the multi-claw
 # ea-network plus event/board sessions.
 #

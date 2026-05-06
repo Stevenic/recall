@@ -108,7 +108,7 @@ projects:
     description: "Implement Regulation Best Interest documentation and disclosure requirements"
 
 # Conversation contexts Sterling participates in (recall-bench v0.5 §2.6 / §2.7).
-# Group sessions are 65/35 weighted in arcs.yaml (14 principal-primary, 8 group-primary).
+# Group sessions are 65/35 weighted in arcs-1000d.yaml (14 principal-primary, 8 group-primary).
 # Financial Advisor is a BOUNDARY-STRESSED persona (spec §3.4): four isolated
 # client households create the cross-session leakage test surface.
 sessions:

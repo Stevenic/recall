@@ -112,7 +112,7 @@ projects:
     description: "Rotating pro bono tenant defense cases through legal aid partnership"
 
 # Conversation contexts Quill participates in (recall-bench v0.5 §2.6 / §2.7).
-# Group sessions are 65/35 weighted in arcs.yaml (13 principal-primary, 7 group-primary).
+# Group sessions are 65/35 weighted in arcs-1000d.yaml (13 principal-primary, 7 group-primary).
 # Litigation Attorney is a BOUNDARY-STRESSED persona (spec §3.4): four isolated
 # client matters create the cross-session leakage test surface.
 sessions:
@@ -145,7 +145,7 @@ sessions:
   # Each client matter is its own isolated session. Per spec §2.3.1, sensitive
   # content from these sessions must NOT appear in any other session unless
   # Carmen explicitly authorizes the disclosure. Lifecycles match the matter
-  # arcs in arcs.yaml.
+  # arcs in arcs-1000d.yaml.
 
   - id: client-nexgen
     kind: group

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import YAML from 'yaml';
 import type { DayMetadata, QAPair, TimeRangeKey } from './types.js';
 import { TIME_RANGES } from './types.js';
+import { deriveSiblingDir } from './generator.js';
 
 // ---------------------------------------------------------------------------
 // Persona dataset on disk
@@ -31,17 +32,28 @@ export interface DayEntry {
 // ---------------------------------------------------------------------------
 
 /**
- * Load a persona dataset from the standard directory layout:
- *   <dataDir>/<personaId>/memories/day-NNNN.md
- *   <dataDir>/<personaId>/qa/questions.yaml
+ * Load a persona dataset from the standard directory layout. The default
+ * arcs file is `arcs-1000d.yaml`; pair memory and Q&A dirs are derived
+ * from that filename's suffix (see `deriveSiblingDir`):
+ *
  *   <dataDir>/<personaId>/persona.yaml
- *   <dataDir>/<personaId>/arcs.yaml
+ *   <dataDir>/<personaId>/arcs-1000d.yaml
+ *   <dataDir>/<personaId>/memories-1000d/day-NNNN.md
+ *   <dataDir>/<personaId>/qa-1000d/questions.yaml
+ *
+ * To load a variant (e.g., the 180-day story), pass `arcsFile`:
+ *   loadPersona(dataDir, personaId, 'arcs-180d.yaml')
+ *   → reads memories-180d/, qa-180d/
  */
-export async function loadPersona(dataDir: string, personaId: string): Promise<PersonaDataset> {
+export async function loadPersona(
+    dataDir: string,
+    personaId: string,
+    arcsFile: string = 'arcs-1000d.yaml',
+): Promise<PersonaDataset> {
     const personaDir = join(dataDir, personaId);
 
     // Load arc info for day metadata
-    const arcsRaw = await readFile(join(personaDir, 'arcs.yaml'), 'utf-8');
+    const arcsRaw = await readFile(join(personaDir, arcsFile), 'utf-8');
     const arcsData = YAML.parse(arcsRaw) as ArcFile;
 
     // Load persona.yaml for epoch date
@@ -49,8 +61,12 @@ export async function loadPersona(dataDir: string, personaId: string): Promise<P
     const personaData = YAML.parse(personaRaw) as PersonaFile;
     const epoch = new Date(personaData.epoch ?? '2024-01-01');
 
+    // Derive sibling dirs from the arcs filename suffix
+    const memoriesDirName = deriveSiblingDir(arcsFile, 'memories');
+    const qaDirName = deriveSiblingDir(arcsFile, 'qa');
+
     // Load memory days
-    const memoriesDir = join(personaDir, 'memories');
+    const memoriesDir = join(personaDir, memoriesDirName);
     const files = await readdir(memoriesDir);
     const dayFiles = files
         .filter(f => /^day-\d{4}\.md$/.test(f))
@@ -78,7 +94,7 @@ export async function loadPersona(dataDir: string, personaId: string): Promise<P
     }
 
     // Load Q&A pairs
-    const qaRaw = await readFile(join(personaDir, 'qa', 'questions.yaml'), 'utf-8');
+    const qaRaw = await readFile(join(personaDir, qaDirName, 'questions.yaml'), 'utf-8');
     const qaData = YAML.parse(qaRaw) as QAFile[];
     const qaPairs: QAPair[] = qaData.map(q => ({
         id: q.id,

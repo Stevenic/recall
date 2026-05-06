@@ -1255,13 +1255,13 @@ export async function loadPersonaDefinition(personaDir: string): Promise<Persona
 /**
  * Load arc definitions from an arcs file inside the persona directory.
  *
- * Default filename is `arcs.yaml` (the 1000-day canonical story). Variant
- * filenames follow the convention `arcs-<NNN>d.yaml` (e.g.,
- * `arcs-180d.yaml` for a 180-day story); these label the file by its
- * intended corpus duration. Memory-dir and Q&A-dir derivation off the
- * filename is the responsibility of callers (see `deriveSiblingDir`).
+ * Default filename is `arcs-1000d.yaml` (the canonical 1000-day story).
+ * Every persona's arcs file is labeled by intended corpus duration —
+ * convention: `arcs-<NNN>d.yaml` (e.g., `arcs-180d.yaml`, `arcs-30d.yaml`).
+ * Memory-dir and Q&A-dir derivation off the filename is the
+ * responsibility of callers (see `deriveSiblingDir`).
  */
-export async function loadArcs(personaDir: string, filename: string = 'arcs.yaml'): Promise<ArcDefinition[]> {
+export async function loadArcs(personaDir: string, filename: string = 'arcs-1000d.yaml'): Promise<ArcDefinition[]> {
     const raw = await readFile(join(personaDir, filename), 'utf-8');
     const data = YAML.parse(raw) as ArcsFile;
     return data.arcs;
@@ -1270,14 +1270,16 @@ export async function loadArcs(personaDir: string, filename: string = 'arcs.yaml
 /**
  * Derive a sibling directory name from an arcs filename.
  *
- * Convention: arcs files are `arcs.yaml` (default) or `arcs-<suffix>.yaml`
- * (e.g., `arcs-180d.yaml`). Memory and Q&A directories share the same
- * suffix so a 180-day story's outputs land alongside it without colliding
- * with the 1000-day story.
+ * Convention: arcs files are labeled by intended corpus duration —
+ * `arcs-<suffix>.yaml` (e.g., `arcs-1000d.yaml` for the canonical default,
+ * `arcs-180d.yaml` for a 180-day variant). Memory and Q&A directories
+ * share the same suffix so each story's outputs land alongside it
+ * without colliding across variants.
  *
- *   deriveSiblingDir('arcs.yaml',       'memories') -> 'memories'
+ *   deriveSiblingDir('arcs-1000d.yaml', 'memories') -> 'memories-1000d'
  *   deriveSiblingDir('arcs-180d.yaml',  'memories') -> 'memories-180d'
  *   deriveSiblingDir('arcs-30d.yaml',   'qa')       -> 'qa-30d'
+ *   deriveSiblingDir('arcs.yaml',       'memories') -> 'memories'  (legacy fallback)
  *
  * Returns the base unchanged if the filename doesn't match the
  * `arcs(-suffix)?.yaml` shape — defensive against unexpected names.
