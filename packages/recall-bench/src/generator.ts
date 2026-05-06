@@ -734,6 +734,16 @@ export function buildArcUserMessage(
         lines.push('');
         lines.push('---');
         lines.push('');
+        lines.push('IMPORTANT — merge rules when integrating into the existing log:');
+        lines.push('- Each session must have AT MOST ONE `# session: <id>` H1 in the final output.');
+        lines.push('  If the existing log already has `# session: principal` (or any other session),');
+        lines.push('  append your new ### topic sections UNDER that existing H1. Do NOT create a');
+        lines.push('  duplicate H1 for the same session.');
+        lines.push('- Only emit a new `# session: <id>` H1 if the existing log doesn\'t already have');
+        lines.push('  one for that session AND the new arc activity belongs in that session today.');
+        lines.push('- Keep all existing content verbatim — only add new ### topic sections for the');
+        lines.push('  focus arc, placed under the appropriate session H1.');
+        lines.push('');
     } else {
         lines.push(`Generate the daily memory log for day ${ctx.dayNumber}.`);
         lines.push('');
