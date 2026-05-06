@@ -1,11 +1,49 @@
 # Litigation Attorney — Story Arcs
-# 22 arcs across 1,000 days. Designed to stress factual recall,
-# decision tracking, contradiction resolution, and cross-reference.
-# Legal cases create natural multi-phase timelines with deadlines,
-# strategy pivots, and conflicting witness accounts.
+# 20 arcs across 1,000 days. Designed to stress factual recall,
+# decision tracking, contradiction resolution, cross-reference, and
+# information-boundary. Legal cases create natural multi-phase timelines
+# with deadlines, strategy pivots, and conflicting witness accounts.
 #
 # Max concurrent arcs: 4
 # Quiet periods: ~days 365-375 (holiday recess), ~days 730-740 (bar trip)
+#
+# Session affinity (recall-bench v0.5 §2.7):
+#   primarySession: required — where the arc primarily unfolds
+#   referencedSessions: optional — sessions echoed at natural touchpoints
+#
+# Litigation Attorney is BOUNDARY-STRESSED. Per spec §2.3.1, arcs scoped
+# to an isolated client matter MUST have that client session as primarySession,
+# and sensitive content from those sessions must not appear in
+# referencedSessions unless explicitly authorized.
+#
+# Primary-session distribution (target ~65 / 35):
+#   principal:           13 arcs (65%) — Carmen's deep deliberation room
+#   client-nexgen:        1 arc        — isolated trade-secret matter
+#   client-coastal:       2 arcs       — isolated merger-dispute matter
+#   client-datastream:    2 arcs       — isolated patent-defense matter
+#   client-helix:         1 arc        — isolated Garcia-employment matter
+#   pro-bono:             1 arc        — non-isolated legal-aid coordination
+#   partner-review:       0 arcs       — receives status echoes only
+
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2024-01-01"
+
+sessions:
+  # Per-client matter lifecycles. Other sessions (principal, case-strategy,
+  # partner-review, pro-bono) are full-stream.
+  - id: client-nexgen
+    firstDay: 1
+    lastDay: 350
+  - id: client-coastal
+    firstDay: 150
+    lastDay: 500
+  - id: client-datastream
+    firstDay: 380
+    lastDay: 700
+  - id: client-helix
+    firstDay: 550
+    lastDay: 850
 
 arcs:
 
@@ -23,6 +61,11 @@ arcs:
       deposition testimony are dense factual recall targets.
     startDay: 1
     endDay: 350
+    primarySession: client-nexgen
+    referencedSessions:
+      - case-strategy        # internal team strategy briefings (no client-confidential detail)
+      - principal            # Carmen's deliberation between client meetings
+    participants: [James Park, Mira Solano, Diane Carter, Marcus Steel]
 
   - id: coastal-merger
     type: project
@@ -30,11 +73,17 @@ arcs:
     description: |
       $200M real estate merger with contested post-closing adjustment.
       Both sides dispute the working capital calculation. Carmen represents
-      the buyer. Involves forensic accounting, earn-out milestones, and
-      competing expert valuations. Numbers (valuations, adjustment amounts)
-      change across phases — tests contradiction resolution.
+      the buyer (Apex Capital). Involves forensic accounting, earn-out
+      milestones, and competing expert valuations. Numbers (valuations,
+      adjustment amounts) change across phases — tests contradiction
+      resolution.
     startDay: 150
     endDay: 500
+    primarySession: client-coastal
+    referencedSessions:
+      - case-strategy        # team coordination on expert reports and motion practice
+      - principal            # Carmen's tradeoff analysis between client meetings
+    participants: [Devi Rao, Mira Solano, Eve Tanaka]
 
   - id: patent-defense
     type: project
@@ -48,18 +97,28 @@ arcs:
       shared IP law principles.
     startDay: 380
     endDay: 700
+    primarySession: client-datastream
+    referencedSessions:
+      - case-strategy        # team strategy and Markman prep
+      - principal            # Carmen's claim-construction deliberation
+    participants: [Devi Rao, James Park, Yusuf Al-Mansoori]
 
   - id: garcia-employment
     type: project
     title: "Garcia employment discrimination defense"
     description: |
       Title VII discrimination and retaliation claim. Carmen defends the
-      employer. Case involves personnel file review, timeline of adverse
-      actions, and multiple employee witnesses with conflicting accounts
-      of workplace events. Witness credibility assessments evolve as
-      depositions reveal new information.
+      employer (Helix Manufacturing). Case involves personnel file review,
+      timeline of adverse actions, and multiple employee witnesses with
+      conflicting accounts of workplace events. Witness credibility
+      assessments evolve as depositions reveal new information.
     startDay: 550
     endDay: 850
+    primarySession: client-helix
+    referencedSessions:
+      - case-strategy        # team coordination on witness prep and motion practice
+      - principal            # Carmen's witness-credibility deliberation
+    participants: [James Park, Mira Solano, Janet Sokol, Bruce Chen]
 
   - id: pro-bono-housing
     type: project
@@ -72,6 +131,10 @@ arcs:
       distinct cases.
     startDay: 100
     endDay: 950
+    primarySession: pro-bono
+    referencedSessions:
+      - principal            # Carmen's deliberation on case acceptance and strategy
+    participants: [James Park, Asha Bhatt]
 
   # ── Incidents ──────────────────────────────────────────────────────────────
 
@@ -86,6 +149,11 @@ arcs:
       Slack channel names, date ranges, and custodian names.
     startDay: 225
     endDay: 245
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # team scramble to assemble declarations
+      - client-nexgen        # status briefings to NexGen GC during emergency response
+    participants: [James Park, Mira Solano]
 
   - id: incident-expert-disqualified
     type: incident
@@ -98,6 +166,11 @@ arcs:
       from the original report must be verified against replacement.
     startDay: 380
     endDay: 400
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # team coordination on replacement-expert selection
+      - client-coastal       # client briefing on disqualification impact and budget
+    participants: [Devi Rao, Mira Solano]
 
   - id: incident-client-data-breach
     type: incident
@@ -109,6 +182,12 @@ arcs:
       obligations (litigation defense + breach response counsel).
     startDay: 580
     endDay: 600
+    primarySession: client-datastream
+    referencedSessions:
+      - principal            # Carmen's deliberation on dual-obligation conflict
+      # NOTE: Intentionally NOT referenced in case-strategy — breach details
+      # are isolated to the client-datastream session.
+    participants: [Yusuf Al-Mansoori]
 
   # ── Decisions ──────────────────────────────────────────────────────────────
 
@@ -124,6 +203,11 @@ arcs:
       across three phases with shifting rationale.
     startDay: 15
     endDay: 100
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # internal debate at each strategy shift
+      - client-nexgen        # client authorization at each pivot
+    participants: [James Park]
 
   - id: decision-settlement-authority
     type: decision
@@ -136,6 +220,12 @@ arcs:
       case developments.
     startDay: 200
     endDay: 480
+    primarySession: client-coastal
+    referencedSessions:
+      - principal            # Carmen's deliberation between authorization moments
+      # NOTE: Intentionally NOT referenced in case-strategy — settlement
+      # numbers are client-confidential to client-coastal.
+    participants: [Eve Tanaka]
 
   - id: decision-ipr-strategy
     type: decision
@@ -148,6 +238,11 @@ arcs:
       on day 560: IPR for two patents, district court for the third.
     startDay: 400
     endDay: 570
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # team budget and capacity discussion
+      - client-datastream    # client authorization for the budget pivot
+    participants: [Devi Rao]
 
   - id: decision-trial-strategy
     type: decision
@@ -160,6 +255,11 @@ arcs:
       potential lower damages. Client accepts jury trial on day 730.
     startDay: 600
     endDay: 740
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # team's role-played damages-modeling exercises
+      - client-helix         # client briefings and final election
+    participants: [James Park]
 
   # ── Learning ───────────────────────────────────────────────────────────────
 
@@ -174,6 +274,10 @@ arcs:
       bias resistance targets. Applied in every major case.
     startDay: 40
     endDay: 200
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # TAR adoption rolled out to team
+    participants: [Mira Solano]
 
   - id: learning-patent-law
     type: learning
@@ -185,6 +289,10 @@ arcs:
       become foundational but unrevisited.
     startDay: 380
     endDay: 550
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # share-out moments to team during ramp
+    participants: []
 
   # ── Relationships ──────────────────────────────────────────────────────────
 
@@ -200,6 +308,10 @@ arcs:
       multiple cases — cross-reference material.
     startDay: 1
     endDay: 800
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # James's growth visible in team meetings
+    participants: [James Park]
 
   - id: relationship-opposing-counsel-warren
     type: relationship
@@ -212,6 +324,10 @@ arcs:
       engagements tests memory linking.
     startDay: 1
     endDay: 600
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # Warren's tactics analyzed for team prep
+    participants: [Warren Liu]
 
   - id: relationship-managing-partner
     type: relationship
@@ -223,6 +339,10 @@ arcs:
       case outcomes) documented at each review.
     startDay: 80
     endDay: 950
+    primarySession: partner-review
+    referencedSessions:
+      - principal            # Carmen's prep and post-review reflection
+    participants: [Helen Whitfield]
 
   # ── Corrections ────────────────────────────────────────────────────────────
 
@@ -236,6 +356,11 @@ arcs:
       June 30. Carmen documents the contradiction explicitly.
     startDay: 120
     endDay: 260
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # contradiction analyzed for cross-exam strategy
+      - client-nexgen        # client briefed on the impeachment opportunity
+    participants: [James Park]
     wrongDay: 120
     correctedDay: 250
     wrongBelief: "VP last accessed trade secret database on March 15"
@@ -251,6 +376,11 @@ arcs:
       central dispute point.
     startDay: 200
     endDay: 420
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # team analysis of the methodology variance
+      - client-coastal       # client briefed on the recalculated baseline
+    participants: [Devi Rao]
     wrongDay: 200
     correctedDay: 410
     wrongBelief: "Working capital baseline for post-closing adjustment: $42.3M"
@@ -267,6 +397,11 @@ arcs:
       timely.
     startDay: 560
     endDay: 690
+    primarySession: principal
+    referencedSessions:
+      - case-strategy        # tolling-doctrine research and revised motion strategy
+      - client-helix         # client briefed on the revised exposure
+    participants: [James Park]
     wrongDay: 560
     correctedDay: 680
     wrongBelief: "Garcia's second retaliation claim is time-barred (outside 180-day window)"

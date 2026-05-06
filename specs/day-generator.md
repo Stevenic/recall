@@ -17,7 +17,7 @@ This spec defines the prompt structure, input/output format, and behavioral rule
 ## 2. Pipeline Position
 
 ```
-Arc Planner (done — arcs.yaml files exist)
+Arc Planner (done — arcs-1000d.yaml files exist)
        │
        ▼
  ┌─────────────────────────────────────────┐

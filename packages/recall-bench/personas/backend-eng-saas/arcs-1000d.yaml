@@ -1,10 +1,26 @@
 # Backend Engineer — Story Arcs
 # 20 arcs across 1,000 days. Designed to stress decision tracking,
-# cross-reference, and synthesis while providing secondary coverage
-# for all other categories.
+# cross-reference, synthesis, and group-session attribution.
 #
 # Max concurrent arcs: 4 (by design; see §4.2 constraint)
 # Quiet periods: ~days 370-380 (holiday break), ~days 730-745 (sabbatical)
+#
+# Session affinity (recall-bench v0.5 §2.7):
+#   primarySession: required — where the arc primarily unfolds
+#   referencedSessions: optional — sessions echoed at natural touchpoints
+#
+# Primary-session distribution (target ~65 / 35):
+#   principal:           13 arcs (65%) — deep deliberation with River
+#   design-review:        4 arcs (20%) — team architecture / ADR debates
+#   incident-response:    3 arcs (15%) — fire-drill room during outages
+#   standup:              0 arcs       — receives status echoes only
+
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2024-01-01"
+
+# No sessions block — backend-eng-saas has no isolated sessions; all sessions
+# are full-stream within the corpus.
 
 arcs:
 
@@ -20,6 +36,11 @@ arcs:
       Cross-references the caching decision (shared Redis dependency).
     startDay: 15
     endDay: 145
+    primarySession: principal
+    referencedSessions:
+      - design-review        # ADR-007 review and design feedback
+      - standup              # rollout status at internal/beta/GA milestones
+    participants: [Alex, Morgan]
     directives:
       - day: 15
         event: "Kickoff meeting for auth migration; reviewed current Express-session implementation and identified 3 breaking changes for mobile clients on v2.3 and below"
@@ -54,6 +75,11 @@ arcs:
       storage) and later the GraphQL layer (API surface).
     startDay: 180
     endDay: 380
+    primarySession: principal
+    referencedSessions:
+      - design-review        # multi-currency schema review
+      - standup              # rollout status
+    participants: [Morgan]
 
   - id: graphql-layer
     type: project
@@ -65,6 +91,11 @@ arcs:
       is learning.
     startDay: 320
     endDay: 520
+    primarySession: principal
+    referencedSessions:
+      - design-review        # federation strategy and schema review
+      - standup              # rollout status
+    participants: [Alex, Morgan]
 
   - id: multi-tenant
     type: project
@@ -76,6 +107,11 @@ arcs:
       observability stack with event-driven migration.
     startDay: 500
     endDay: 750
+    primarySession: principal
+    referencedSessions:
+      - design-review        # tenant-isolation strategy review
+      - standup              # rollout status
+    participants: [Alex, Morgan]
 
   - id: event-driven
     type: project
@@ -84,8 +120,15 @@ arcs:
       Replace synchronous REST calls between core services with NATS-based
       event bus. Motivation: reduce cascading failures seen in incidents.
       Reuses patterns from DDD learning arc. Final major project in timeline.
+      Architecture-heavy and team-led; the design happens in design-review,
+      with status surfaced through standup.
     startDay: 700
     endDay: 950
+    primarySession: design-review
+    referencedSessions:
+      - principal            # River's deep deliberation on tradeoffs
+      - standup              # rollout milestones
+    participants: [Alex, Morgan, Helena]
 
   # ── Incidents ──────────────────────────────────────────────────────────────
 
@@ -99,6 +142,11 @@ arcs:
       auth-migration arc.
     startDay: 85
     endDay: 95
+    primarySession: incident-response
+    referencedSessions:
+      - principal            # River's on-call decisions and post-mortem prep
+      - standup              # daily status while incident is active
+    participants: [Alex, Priya]
     directives:
       - day: 85
         event: "Production alerts fired at 2:47 AM Pacific — Postgres connection pool exhausted with 450 active connections against a pool max of 100; all API requests returning 503 for 23 minutes before on-call (River) scaled pool to 200 as a temporary mitigation"
@@ -121,6 +169,11 @@ arcs:
       decision later.
     startDay: 475
     endDay: 490
+    primarySession: incident-response
+    referencedSessions:
+      - principal            # River's deliberation on detection gap
+      - standup              # status during fix and recovery
+    participants: [Morgan]
 
   - id: incident-memory-leak
     type: incident
@@ -132,6 +185,11 @@ arcs:
       with TTL. Cross-references the caching decision from earlier.
     startDay: 620
     endDay: 640
+    primarySession: principal
+    referencedSessions:
+      - incident-response    # initial triage when alarms fire
+      - standup              # status updates during investigation
+    participants: [Alex]
 
   # ── Decisions ──────────────────────────────────────────────────────────────
 
@@ -145,6 +203,11 @@ arcs:
       Decision reversed on day 161. Key decision-tracking arc.
     startDay: 140
     endDay: 200
+    primarySession: principal
+    referencedSessions:
+      - design-review        # initial Redis ADR + reversal ADR
+      - standup              # decision moment communicated to team
+    participants: [Alex, Morgan]
 
   - id: decision-monorepo
     type: decision
@@ -156,6 +219,11 @@ arcs:
       around day 510 when CI times spike but upheld.
     startDay: 350
     endDay: 410
+    primarySession: design-review
+    referencedSessions:
+      - principal            # River's deliberation between debates
+      - standup              # CI-time spike revisitation
+    participants: [Alex, Morgan, Priya]
 
   - id: decision-api-versioning
     type: decision
@@ -167,6 +235,10 @@ arcs:
       Cross-references the GraphQL project.
     startDay: 550
     endDay: 590
+    primarySession: design-review
+    referencedSessions:
+      - principal            # River's tradeoff analysis
+    participants: [Morgan, Alex, Helena]
 
   - id: decision-observability
     type: decision
@@ -178,6 +250,11 @@ arcs:
       from Datadog despite team familiarity.
     startDay: 800
     endDay: 845
+    primarySession: design-review
+    referencedSessions:
+      - principal            # River's deliberation on budget tradeoff
+      - standup              # rollout status
+    participants: [Morgan, Priya]
 
   # ── Learning ───────────────────────────────────────────────────────────────
 
@@ -193,6 +270,10 @@ arcs:
       tests recency bias resistance.
     startDay: 50
     endDay: 280
+    primarySession: principal
+    referencedSessions:
+      - design-review        # NexusConfigSync proposal and operator patterns share-out
+    participants: [Sam, Alex]
     directives:
       - day: 50
         event: "Started reading Kubernetes operator documentation after team decided to move all services to K8s; focused on operator-sdk and kubebuilder frameworks"
@@ -223,6 +304,10 @@ arcs:
       in the event-driven migration.
     startDay: 400
     endDay: 600
+    primarySession: principal
+    referencedSessions:
+      - design-review        # bounded-contexts applied to GraphQL federation
+    participants: []
 
   - id: learning-rust
     type: learning
@@ -234,6 +319,10 @@ arcs:
       to keep Go but River continues learning for personal growth.
     startDay: 650
     endDay: 950
+    primarySession: principal
+    referencedSessions:
+      - design-review        # Rust-vs-Go benchmark presentation at decision moment
+    participants: []
 
   # ── Relationships ──────────────────────────────────────────────────────────
 
@@ -247,6 +336,11 @@ arcs:
       Provides cross-reference material across many arcs.
     startDay: 30
     endDay: 850
+    primarySession: principal
+    referencedSessions:
+      - standup              # Alex visibility on team-facing work
+      - design-review        # Alex's polyrepo argument and event-driven leadership
+    participants: [Alex]
     directives:
       - day: 30
         event: "First code review with Alex — reviewed his Go service for order validation; suggested extracting auth middleware into shared package instead of duplicating across services"
@@ -278,6 +372,10 @@ arcs:
       incident proves the point.
     startDay: 100
     endDay: 700
+    primarySession: principal
+    referencedSessions:
+      - standup              # weekly priorities surfaced to team
+    participants: [Dana]
 
   # ── Corrections ────────────────────────────────────────────────────────────
 
@@ -291,6 +389,10 @@ arcs:
       influenced early caching decisions.
     startDay: 50
     endDay: 200
+    primarySession: principal
+    referencedSessions:
+      - design-review        # the wrong value cited in caching ADR
+    participants: []
     wrongDay: 50
     correctedDay: 200
     wrongBelief: "Vendor API rate-limited to 100 requests/second"
@@ -317,6 +419,11 @@ arcs:
       Leads to config-as-code initiative.
     startDay: 300
     endDay: 450
+    primarySession: incident-response
+    referencedSessions:
+      - principal            # River's analysis of the 14 differences
+      - design-review        # config-as-code proposal
+    participants: [Morgan, Alex]
     wrongDay: 300
     correctedDay: 450
     wrongBelief: "Staging environment mirrors production configuration"
@@ -333,6 +440,10 @@ arcs:
       useful security audit.
     startDay: 500
     endDay: 580
+    primarySession: principal
+    referencedSessions:
+      - design-review        # security review where flag was raised; later all-clear
+    participants: [Morgan]
     wrongDay: 500
     correctedDay: 580
     wrongBelief: "Redis connections are not encrypted (no TLS)"

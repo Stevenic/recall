@@ -1,6 +1,5 @@
 id: research-scientist
 name: Atlas
-epoch: "2024-01-01"
 role: AI lab co-pilot for a synthetic biology PI
 domain: University biology lab (synthetic biology and gene regulation)
 institution: Pacific State University, Dept. of Molecular Biology
@@ -92,7 +91,7 @@ projects:
     description: "Teaching and curriculum development for the undergraduate molecular biology course"
 
 # Conversation contexts Atlas participates in (recall-bench v0.5 §2.6 / §2.7).
-# Group sessions are 65/35 weighted in arcs.yaml (~12 principal-primary, ~7 group-primary).
+# Group sessions are 65/35 weighted in arcs-1000d.yaml (~12 principal-primary, ~7 group-primary).
 sessions:
   - id: principal
     kind: 1to1
@@ -133,8 +132,7 @@ sessions:
       - Kenji Nakamura
       - Dr. Wei Chen
     isolated: true
-    firstDay: 300
-    lastDay: 700
+    # firstDay / lastDay are story-specific and live in the active arcs file.
     sensitive_topics:
       - "Chen Lab's proprietary LNP-4 / LNP-7 formulation chemistry"
       - "Chen Lab's internal cytotoxicity assay protocols and panel data"

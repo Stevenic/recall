@@ -1,5 +1,5 @@
 # ER Physician — Story Arcs
-# 22 arcs across 1,000 days. Designed to stress factual recall,
+# 21 arcs across 1,000 days. Designed to stress factual recall,
 # temporal reasoning, and recency bias resistance. Shift-based work
 # creates natural episodic memory patterns with specific clinical details.
 #
@@ -7,6 +7,24 @@
 # Quiet periods: ~days 200-210 (vacation), ~days 560-575 (conference travel),
 #                ~days 880-890 (personal leave)
 # Note: "quiet" for an ER doc still means shifts happen — just fewer arcs active
+#
+# Session affinity (recall-bench v0.5 §2.7):
+#   primarySession: required — where the arc primarily unfolds
+#   referencedSessions: optional — sessions echoed at natural touchpoints
+#
+# Primary-session distribution (target ~65 / 35):
+#   principal:        14 arcs (67%) — deep deliberation with Jordan
+#   qi-committee:      3 arcs (14%) — protocol redesign, M&M-driven work
+#   er-huddle:         2 arcs (10%) — shift-floor mass-effect events
+#   consult-tox:       1 arc        — tox service buildout
+#   resident-rounds:   1 arc        — curriculum redesign
+
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2024-01-01"
+
+# No sessions block — er-physician has no isolated sessions; all sessions are
+# full-stream within the corpus.
 
 arcs:
 
@@ -23,6 +41,11 @@ arcs:
       established early and tested — key factual recall targets.
     startDay: 30
     endDay: 180
+    primarySession: qi-committee
+    referencedSessions:
+      - principal            # Jordan's drafting and threshold deliberation
+      - er-huddle            # rollout briefings on shift floor
+    participants: [Dr. Reyes, Marta]
 
   - id: trauma-renovation
     type: project
@@ -35,6 +58,10 @@ arcs:
       about which config was active when.
     startDay: 220
     endDay: 420
+    primarySession: principal
+    referencedSessions:
+      - er-huddle            # phase-change briefings to shift staff
+    participants: [Marta, Dr. Kwon]
 
   - id: ehr-migration
     type: project
@@ -47,6 +74,11 @@ arcs:
       recency-bias-resistance targets.
     startDay: 450
     endDay: 600
+    primarySession: principal
+    referencedSessions:
+      - er-huddle            # cutover briefings and parallel-charting status
+      - qi-committee         # post-migration med-recon issues surfaced
+    participants: [Dr. Reyes, Sam]
 
   - id: tox-service
     type: project
@@ -58,6 +90,11 @@ arcs:
       dosing protocols established early.
     startDay: 650
     endDay: 820
+    primarySession: consult-tox
+    referencedSessions:
+      - principal            # Jordan's deliberation on call schedule and MOU
+      - er-huddle            # rollout briefings on new 24/7 coverage
+    participants: [Dr. Hessler, Sam]
 
   - id: resident-curriculum
     type: project
@@ -68,6 +105,10 @@ arcs:
       designs the toxicology and resuscitation modules.
     startDay: 850
     endDay: 980
+    primarySession: resident-rounds
+    referencedSessions:
+      - principal            # Jordan's drafting of tox + resus modules
+    participants: [Dr. Maya Chen, Dr. Patel]
 
   # ── Incidents ──────────────────────────────────────────────────────────────
 
@@ -82,6 +123,11 @@ arcs:
       (temporary bay layout complicates flow).
     startDay: 310
     endDay: 320
+    primarySession: er-huddle
+    referencedSessions:
+      - principal            # Jordan's after-action reflection and documentation
+      - qi-committee         # post-event review and process improvements
+    participants: [Marta, Dr. Kwon]
 
   - id: incident-contamination
     type: incident
@@ -93,6 +139,11 @@ arcs:
       identified over investigation days.
     startDay: 700
     endDay: 712
+    primarySession: er-huddle
+    referencedSessions:
+      - consult-tox          # tox identification and antidote selection
+      - principal            # Jordan's documentation of staff-exposure followup
+    participants: [Marta, Dr. Hessler]
 
   - id: incident-med-error
     type: incident
@@ -104,6 +155,10 @@ arcs:
       arc. Triggers order set revision.
     startDay: 580
     endDay: 595
+    primarySession: qi-committee
+    referencedSessions:
+      - principal            # Jordan's RCA prep and order-set revision drafting
+    participants: [Sam, Dr. Reyes]
 
   # ── Decisions ──────────────────────────────────────────────────────────────
 
@@ -118,6 +173,10 @@ arcs:
       roc for all RSI with specific dosing.
     startDay: 80
     endDay: 400
+    primarySession: principal
+    referencedSessions:
+      - qi-committee         # M&M presentation and protocol adoption vote
+    participants: []
 
   - id: decision-boarding-policy
     type: decision
@@ -130,6 +189,11 @@ arcs:
       capacity constraints.
     startDay: 280
     endDay: 340
+    primarySession: principal
+    referencedSessions:
+      - qi-committee         # safety pushback formalized in committee
+      - er-huddle            # final policy briefed to shift staff
+    participants: [Dr. Reyes, Marta]
 
   - id: decision-triage-algorithm
     type: decision
@@ -141,6 +205,11 @@ arcs:
       final adopted values (day 170) — contradiction resolution target.
     startDay: 120
     endDay: 175
+    primarySession: qi-committee
+    referencedSessions:
+      - principal            # Jordan's drafting and pilot data analysis
+      - er-huddle            # threshold change briefed to triage nurses
+    participants: [Dr. Reyes, Marta]
 
   # ── Learning ───────────────────────────────────────────────────────────────
 
@@ -155,6 +224,10 @@ arcs:
       targets as they're not revisited after month 3.
     startDay: 10
     endDay: 250
+    primarySession: principal
+    referencedSessions:
+      - resident-rounds      # teaching POCUS to residents
+    participants: []
 
   - id: learning-disaster-med
     type: learning
@@ -165,6 +238,10 @@ arcs:
       emergency preparedness committee role.
     startDay: 340
     endDay: 520
+    primarySession: principal
+    referencedSessions:
+      - qi-committee         # preparedness committee role and recommendations
+    participants: []
 
   - id: learning-pediatric-em
     type: learning
@@ -175,6 +252,10 @@ arcs:
       documented on day 750 and not revisited — recency bias target.
     startDay: 740
     endDay: 790
+    primarySession: principal
+    referencedSessions:
+      - resident-rounds      # PALS dosing review with residents
+    participants: []
 
   # ── Relationships ──────────────────────────────────────────────────────────
 
@@ -188,6 +269,10 @@ arcs:
       nursing workflow. Cross-references multiple arcs.
     startDay: 1
     endDay: 700
+    primarySession: principal
+    referencedSessions:
+      - er-huddle            # ongoing shift-floor coordination
+    participants: [Marta]
 
   - id: relationship-trauma-surgeon
     type: relationship
@@ -199,6 +284,10 @@ arcs:
       thresholds documented in their early collaborations.
     startDay: 50
     endDay: 500
+    primarySession: principal
+    referencedSessions:
+      - er-huddle            # trauma activation call coordination
+    participants: [Dr. Kwon]
 
   - id: relationship-resident-mentee
     type: relationship
@@ -211,6 +300,10 @@ arcs:
       contexts.
     startDay: 400
     endDay: 800
+    primarySession: principal
+    referencedSessions:
+      - resident-rounds      # in-rounds teaching moments and feedback
+    participants: [Dr. Patel]
 
   # ── Corrections ────────────────────────────────────────────────────────────
 
@@ -224,6 +317,10 @@ arcs:
       "significant — avoid concurrent use or mandate telemetry."
     startDay: 60
     endDay: 350
+    primarySession: principal
+    referencedSessions:
+      - consult-tox          # tox-team flagged the updated guideline
+    participants: []
     wrongDay: 60
     correctedDay: 350
     wrongBelief: "Methadone-fluconazole interaction is minor — monitor QTc"
@@ -238,6 +335,10 @@ arcs:
       AHA guidelines on day 180. Early documentation reflects old window.
     startDay: 25
     endDay: 180
+    primarySession: principal
+    referencedSessions:
+      - er-huddle            # window-change briefed to shift staff
+    participants: []
     wrongDay: 25
     correctedDay: 180
     wrongBelief: "tPA treatment window for ischemic stroke is 3 hours from symptom onset"
@@ -253,6 +354,10 @@ arcs:
       multiple handoff notes between days 100-480.
     startDay: 100
     endDay: 480
+    primarySession: principal
+    referencedSessions:
+      - er-huddle            # criteria-change briefed to trauma activation team
+    participants: [Dr. Kwon]
     wrongDay: 100
     correctedDay: 480
     wrongBelief: "Full trauma activation threshold: GCS ≤ 13"
@@ -268,6 +373,10 @@ arcs:
       methylprednisolone for emergent cases.
     startDay: 40
     endDay: 600
+    primarySession: principal
+    referencedSessions:
+      - qi-committee         # protocol update reviewed in committee
+    participants: []
     wrongDay: 40
     correctedDay: 600
     wrongBelief: "Contrast allergy premedication requires minimum 12-hour lead time"

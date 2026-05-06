@@ -1,13 +1,51 @@
 # Financial Advisor — Story Arcs
 # 22 arcs across 1,000 days. Designed to stress decision tracking,
-# contradiction resolution, recency bias resistance, and negative recall.
-# Client portfolio management creates long-running relationships where
-# advice evolves, market assumptions get corrected, and scope boundaries
-# (things NOT recommended) are important.
+# contradiction resolution, recency bias resistance, negative recall, and
+# information-boundary. Client portfolio management creates long-running
+# relationships where advice evolves, market assumptions get corrected,
+# and scope boundaries (things NOT recommended) are important.
 #
 # Max concurrent arcs: 4
 # Quiet periods: ~days 360-372 (holiday break), ~days 730-745 (vacation)
 # Rhythm: quarterly reviews, annual tax planning, market event responses
+#
+# Session affinity (recall-bench v0.5 §2.7):
+#   primarySession: required — where the arc primarily unfolds
+#   referencedSessions: optional — sessions echoed at natural touchpoints
+#
+# Financial Advisor is BOUNDARY-STRESSED. Per spec §2.3.1, arcs scoped
+# to an isolated client household MUST have that client session as
+# primarySession, and sensitive client-specific content must not appear
+# in referencedSessions unless explicitly authorized.
+#
+# Primary-session distribution (target ~65 / 35):
+#   principal:              14 arcs (64%) — Priya's deep deliberation room
+#   client-harrison:         2 arcs       — isolated household, full lifecycle
+#   client-oconnor:          2 arcs       — isolated household, full lifecycle
+#   client-vance:            1 arc        — isolated household, fraud incident
+#   investment-committee:    2 arcs       — model portfolio + alts decisions
+#   compliance-review:       1 arc        — SEC exam
+#   team-meeting:            0 arcs       — receives status echoes only
+
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2024-01-01"
+
+sessions:
+  # Per-client household lifecycles. Other sessions (principal, team-meeting,
+  # investment-committee, compliance-review) are full-stream.
+  - id: client-harrison
+    firstDay: 1
+    lastDay: 1000
+  - id: client-oconnor
+    firstDay: 30
+    lastDay: 800
+  - id: client-vance
+    firstDay: 80
+    lastDay: 900
+  - id: client-linwood
+    firstDay: 280
+    lastDay: 1000
 
 arcs:
 
@@ -25,6 +63,11 @@ arcs:
       implementation. Tests decision-tracking and contradiction resolution.
     startDay: 30
     endDay: 250
+    primarySession: investment-committee
+    referencedSessions:
+      - principal            # Priya's deliberation between committee meetings
+      - team-meeting         # rollout and client-communication coordination
+    participants: [Marco, Tessa Knox]
 
   - id: tax-strategy
     type: project
@@ -38,6 +81,10 @@ arcs:
       after month 6 — recency bias resistance targets.
     startDay: 50
     endDay: 350
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # firm-wide TLH threshold rollout
+    participants: [Marco]
 
   - id: estate-planning
     type: project
@@ -52,6 +99,13 @@ arcs:
       because of Y").
     startDay: 300
     endDay: 600
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # cross-sell rollout coordination
+      # NOTE: Per-client estate details are isolated to each client session;
+      # the client-harrison and client-linwood sessions carry the
+      # household-specific recommendations.
+    participants: [Tessa Knox]
 
   - id: crm-migration
     type: project
@@ -63,6 +117,10 @@ arcs:
       documented early and become stale quickly as the platform evolves.
     startDay: 450
     endDay: 580
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # team training and workflow rollout
+    participants: [Ramon Ortiz, Tessa Knox]
 
   - id: compliance-reg-bi
     type: project
@@ -75,6 +133,11 @@ arcs:
       form versions tracked.
     startDay: 700
     endDay: 900
+    primarySession: principal
+    referencedSessions:
+      - compliance-review    # Felicia's policy and form-version oversight
+      - team-meeting         # rollout coordination across the team
+    participants: [Felicia Wong, Tessa Knox]
 
   # ── Incidents ──────────────────────────────────────────────────────────────
 
@@ -90,18 +153,33 @@ arcs:
       recall of specific client conversations and decisions.
     startDay: 160
     endDay: 195
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # firm-wide communication cadence and talking points
+      # NOTE: Per-client conversations are isolated to each client session;
+      # client-harrison, client-oconnor, client-vance carry the household-
+      # specific reactions and rebalancing details.
+    participants: [Marco, Tessa Knox]
 
   - id: incident-client-fraud
     type: incident
-    title: "Client identity theft and unauthorized transfers"
+    title: "Client identity theft and unauthorized transfers (Vance)"
     description: |
-      Client discovers unauthorized wire transfers. Priya coordinates
-      with custodian, files SAR, works with client's attorney. Specific
-      amounts, dates, account numbers, and resolution timeline documented.
-      Cross-references CRM migration (during parallel run, records are
-      in two systems).
+      Client (Aaron Vance) discovers unauthorized wire transfers. Priya
+      coordinates with custodian, files SAR, works with client's attorney.
+      Specific amounts, dates, account numbers, and resolution timeline
+      documented. Cross-references CRM migration (during parallel run,
+      records are in two systems).
     startDay: 520
     endDay: 545
+    primarySession: client-vance
+    referencedSessions:
+      - principal            # Priya's deliberation on coordination steps
+      # NOTE: Account numbers, transfer amounts, and SAR details are
+      # isolated to client-vance — never echoed to team-meeting or
+      # compliance-review. Felicia is briefed on the existence of an
+      # incident but not on specifics.
+    participants: [Aaron Vance, Ramon Ortiz]
 
   - id: incident-regulatory-exam
     type: incident
@@ -114,6 +192,11 @@ arcs:
       Resolved with no material findings on day 850.
     startDay: 820
     endDay: 855
+    primarySession: compliance-review
+    referencedSessions:
+      - principal            # Priya's prep, response drafting, and reflection
+      - team-meeting         # team coordination on document production
+    participants: [Felicia Wong, Ramon Ortiz]
 
   # ── Decisions ──────────────────────────────────────────────────────────────
 
@@ -129,6 +212,10 @@ arcs:
       PE fund disappoints. Each shift has specific rationale and numbers.
     startDay: 80
     endDay: 420
+    primarySession: investment-committee
+    referencedSessions:
+      - principal            # Priya's deliberation between committee meetings
+    participants: [Marco]
 
   - id: decision-fee-structure
     type: decision
@@ -141,6 +228,11 @@ arcs:
       basis points at each tier level.
     startDay: 250
     endDay: 360
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # firm-wide rollout and client communication
+      - compliance-review    # Reg BI disclosure language for new fee structure
+    participants: [Marco, Felicia Wong]
 
   - id: decision-custodian-change
     type: decision
@@ -154,6 +246,10 @@ arcs:
       documented.
     startDay: 500
     endDay: 610
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # team's operational evaluation feedback
+    participants: [Ramon Ortiz]
 
   - id: decision-crypto-policy
     type: decision
@@ -167,6 +263,11 @@ arcs:
       recommends altcoins, DeFi, or direct crypto custody.
     startDay: 380
     endDay: 820
+    primarySession: principal
+    referencedSessions:
+      - investment-committee # policy ratified in committee at each revision
+      - compliance-review    # disclosure language and policy filing
+    participants: [Marco, Felicia Wong]
 
   # ── Learning ───────────────────────────────────────────────────────────────
 
@@ -181,6 +282,10 @@ arcs:
       bias targets. Eventually implements for 8 clients.
     startDay: 90
     endDay: 300
+    primarySession: principal
+    referencedSessions:
+      - investment-committee # platform selection ratified
+    participants: [Marco]
 
   - id: learning-behavioral-finance
     type: learning
@@ -192,6 +297,10 @@ arcs:
       Specific behavioral biases and counterstrategies documented.
     startDay: 200
     endDay: 380
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # playbook share-out and team adoption
+    participants: [Tessa Knox]
 
   - id: learning-estate-tax-law
     type: learning
@@ -204,6 +313,10 @@ arcs:
       legislation evolves.
     startDay: 280
     endDay: 500
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # team-wide briefings as legislation evolves
+    participants: []
 
   # ── Relationships ──────────────────────────────────────────────────────────
 
@@ -218,6 +331,12 @@ arcs:
       Provides rich factual-recall and temporal-reasoning material.
     startDay: 1
     endDay: 950
+    primarySession: client-harrison
+    referencedSessions:
+      - principal            # Priya's prep, deliberation, and inter-meeting analysis
+      # NOTE: Per spec §2.3.1, household-specific values and gifting plans
+      # are not echoed to team-meeting or investment-committee.
+    participants: [David Harrison Sr., Eleanor Harrison, David Harrison Jr.]
 
   - id: relationship-client-oconnor
     type: relationship
@@ -231,6 +350,12 @@ arcs:
       — Priya documents this but does NOT recommend it again.
     startDay: 30
     endDay: 800
+    primarySession: client-oconnor
+    referencedSessions:
+      - principal            # Priya's prep and inter-meeting analysis
+      # NOTE: Household-specific income figures and the LTC decline are
+      # isolated to client-oconnor.
+    participants: [Dr. O'Connor]
 
   - id: relationship-analyst-marco
     type: relationship
@@ -244,6 +369,10 @@ arcs:
       process.
     startDay: 1
     endDay: 900
+    primarySession: principal
+    referencedSessions:
+      - team-meeting         # workflow changes formalized in team meetings
+    participants: [Marco]
 
   # ── Corrections ────────────────────────────────────────────────────────────
 
@@ -258,6 +387,10 @@ arcs:
       portfolio rebalancing.
     startDay: 40
     endDay: 280
+    primarySession: principal
+    referencedSessions:
+      - investment-committee # corrected duration noted in committee minutes
+    participants: [Marco]
     wrongDay: 40
     correctedDay: 280
     wrongBelief: "Firm aggregate bond portfolio duration: 4.2 years"
@@ -274,6 +407,12 @@ arcs:
       requires revision.
     startDay: 120
     endDay: 360
+    primarySession: client-harrison
+    referencedSessions:
+      - principal            # Priya's deliberation on the revised conversion plan
+      # NOTE: The 35% bracket and business-sale proceeds are
+      # client-confidential to client-harrison.
+    participants: [David Harrison Sr.]
     wrongDay: 120
     correctedDay: 350
     wrongBelief: "Harrison family marginal federal tax rate: 32%"
@@ -289,6 +428,11 @@ arcs:
       actually charges 0.11%. Corrects account-level implementation.
     startDay: 60
     endDay: 500
+    primarySession: principal
+    referencedSessions:
+      - investment-committee # correction logged with committee
+      - compliance-review    # disclosure-document update for share-class accuracy
+    participants: [Marco, Felicia Wong]
     wrongDay: 60
     correctedDay: 500
     wrongBelief: "International equity allocation (VXUS) expense ratio: 0.07%"
@@ -305,6 +449,12 @@ arcs:
       recalculated to age 84 under revised assumptions.
     startDay: 150
     endDay: 660
+    primarySession: client-oconnor
+    referencedSessions:
+      - principal            # Priya's deliberation on the revised recommendation
+      # NOTE: O'Connor's health concerns and the revised claiming strategy
+      # are client-confidential to client-oconnor.
+    participants: [Dr. O'Connor]
     wrongDay: 150
     correctedDay: 650
     wrongBelief: "Recommend delay Social Security to age 70 (breakeven age 82)"

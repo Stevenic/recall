@@ -19,6 +19,17 @@
 #   course-staff:    1 arc        — teaching coordination
 #   tenure-review:   1 arc        — chair mentorship and tenure prep
 
+# ── Story-level metadata ────────────────────────────────────────────────────
+
+epoch: "2024-01-01"
+
+sessions:
+  # collab-chen lifecycle (cross-lab IP collaboration). Other sessions
+  # (principal, lab-meeting, course-staff, tenure-review) are full-stream.
+  - id: collab-chen
+    firstDay: 300
+    lastDay: 700
+
 arcs:
 
   # ── Projects ───────────────────────────────────────────────────────────────

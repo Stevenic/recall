@@ -669,7 +669,7 @@ recall-bench/
 ├── personas/
 │   ├── backend-eng-saas/
 │   │   ├── persona.yaml          # Persona definition (incl. principal, cast, sessions, sharedKnowledge)
-│   │   ├── arcs.yaml             # Arc definitions and timeline (incl. primarySession, referencedSessions)
+│   │   ├── arcs-1000d.yaml             # Arc definitions and timeline (incl. primarySession, referencedSessions)
 │   │   ├── memories/
 │   │   │   ├── day-0001.md
 │   │   │   ├── day-0002.md

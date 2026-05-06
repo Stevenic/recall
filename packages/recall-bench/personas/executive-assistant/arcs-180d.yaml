@@ -1,0 +1,460 @@
+# Executive Assistant — 180-Day Story Arcs
+# 17 arcs across 180 days (~6 months). Compressed timeline focused on
+# stressing the agent over a half-year window — Q1 + Q2 of FY27 with
+# denser arc overlap and tighter directive cadence than the 1000-day
+# variant.
+#
+# Same persona definition (persona.yaml); same session structure; same
+# boundary stress profile. The 180-day variant exists for shorter
+# benchmark runs, faster iteration, and denser stress per day.
+#
+# Filename convention: this file labels its corpus duration with the
+# `-180d` suffix. The CLI's `--arcs arcs-180d.yaml` flag pairs it with
+# `memories-180d/` and (eventually) `qa-180d/` siblings via deriveSiblingDir.
+#
+# Generation cost (approx, claude-CLI throughput as measured 2026-05-05):
+#   ~17 arcs × ~30 selectArcDays touches × ~3-5 min/invocation
+#   ≈ 25-40 hours wall-clock total. Roughly 4-6 nights at 6 hours/night,
+#   vs ~10 nights for the 1000-day variant.
+#
+# Rhythm:
+#   Q1 close + earnings ........ days 60–95
+#   Q1 board meeting ........... ~day 85
+#   Mid-year reforecast ........ days 60–150
+#   Q2 close + earnings ........ days 150–180
+#   Q2 board meeting ........... ~day 170
+#   Project Condor M&A ......... days 1–150 (signing day 150)
+#   Customer escalation burst .. days 28–58
+#   Shareholder activist letter  days 90–130
+#   Caldwell VIP onsite ........ days 100–125
+#
+# Session affinity (recall-bench v0.5 §2.7):
+#   primarySession: required — where the arc primarily unfolds
+#   referencedSessions: optional — sessions echoed at natural touchpoints
+#
+# Primary-session distribution (10 / 7 = 59% principal, 41% group; the
+# boundary-stressed persona pushes principal share down because 4 isolated
+# sessions each must own at least one arc per spec §2.3.1):
+#   principal:           10 arcs (59%) — Jamie's deep deliberation room
+#   project-condor:       3 arcs       — isolated M&A deal
+#   ea-network:           1 arc        — claw-to-claw / mixed-EA peer network
+#   executive-team:       1 arc        — VIP customer visit
+#   legal-confidential:   1 arc        — isolated activist-letter response
+#   family:               1 arc        — isolated household
+#   direct-reports:       0 arcs       — receives status echoes only
+#   board-prep:           0 arcs       — receives status echoes only
+#   comp-committee:       0 arcs       — referenced only (no comp cycle in this 6-month window)
+
+# ── Story-level metadata ────────────────────────────────────────────────────
+# epoch + per-session lifecycle live with the story (not the persona). The
+# 180-day variant compresses the Condor lifecycle and shifts the legal-
+# confidential window to match the activist-letter incident at days 90-130.
+
+epoch: "2026-01-01"
+
+sessions:
+  # Sessions whose lifecycle differs from "always-on" within this corpus.
+  # Sessions not listed (principal, direct-reports, executive-team, board-prep,
+  # ea-network, comp-committee, family) are full-stream within the 180 days.
+  - id: project-condor
+    firstDay: 1
+    lastDay: 150
+  - id: legal-confidential
+    firstDay: 90
+    lastDay: 130
+
+arcs:
+
+  # ── Projects ───────────────────────────────────────────────────────────────
+
+  - id: project-condor
+    type: project
+    title: "Project Condor — bolt-on acquisition (compressed)"
+    description: |
+      Strategic bolt-on acquisition; entire deal lifecycle compressed into
+      150 days. Phases: target screening + NDA (1-30), management
+      presentations + diligence (30-80), definitive agreement negotiation
+      (80-130), board approval (130-145), signing (150). Highly sensitive
+      — target identity, valuation range, and synergy model isolated to
+      project-condor session. Same Condor codename as the 1000-day variant.
+    startDay: 1
+    endDay: 150
+    primarySession: project-condor
+    referencedSessions:
+      - principal             # Jamie's deliberation between deal-team sessions
+    participants: [Daniel Kim, Rashid Patel, Sandra Ramirez]
+    directives:
+      - day: 1
+        event: "Project Condor codename minted; NDA signed; data room access provisioned for the deal team"
+      - day: 30
+        event: "Management presentations week — three days of target-side meetings; Jordan stages briefing packets and tracks Q&A across sessions"
+      - day: 80
+        event: "Diligence findings surface working-capital adjustment and customer-concentration risk; valuation under review"
+      - day: 130
+        event: "Board approval at $465M with synergy model attached; Jamie signs deal authorization letter"
+      - day: 150
+        event: "Definitive agreement signed; public announcement issued morning of day 150"
+
+  - id: project-budget-h1
+    type: project
+    title: "FY27 H1 budget cycle (mid-year reforecast)"
+    description: |
+      Mid-year reforecast triggered by Q1 results. Phases: assumptions
+      reset (60-75), divisional submissions (75-100), iteration with CEO/
+      CFO (100-130), ELT sign-off (130-145), board update (150). Jordan
+      coordinates ELT inputs, manages prep packet versioning in OneDrive,
+      tracks variance commitments. Specific revenue / EBITDA / capex
+      numbers adopted at sign-off become recency-bias targets.
+    startDay: 60
+    endDay: 150
+    primarySession: principal
+    referencedSessions:
+      - direct-reports        # FP&A-led submission cadence
+      - executive-team        # divisional sign-offs
+      - board-prep            # final approval at Q2 board meeting
+    participants: [Yuki Tanaka, Daniel Kim]
+
+  - id: project-q1-earnings
+    type: project
+    title: "Q1 FY27 earnings cycle"
+    description: |
+      First-quarter close, earnings call prep, earnings call (day 90),
+      post-call follow-ups. Specific revenue and operating-margin numbers
+      reported on day 90 become long-tail factual-recall targets. Q1 came
+      in below internal forecast (driven by industrial-controls softness),
+      triggering the decision-narrative-pivot arc that begins day 80.
+    startDay: 50
+    endDay: 95
+    primarySession: principal
+    referencedSessions:
+      - direct-reports        # IR + FP&A intensive prep cadence
+      - executive-team        # ELT alignment on narrative
+      - board-prep            # board pre-brief 48h before public release
+    participants: [Priscilla Adeyemi, Yuki Tanaka, Daniel Kim]
+    directives:
+      - day: 50
+        event: "Q1 close kickoff; Yuki's FP&A team produces preliminary revenue + opex estimates"
+      - day: 70
+        event: "Internal forecast crystallizes a Q1 miss vs. street consensus; Jamie convenes urgent narrative discussion"
+      - day: 85
+        event: "Earnings call dry-run; Jordan stages talking points, likely-questions packet, and customer-story callouts"
+      - day: 90
+        event: "Q1 earnings call delivered; specific guidance language locked in (revised down for FY27 vs prior guide)"
+      - day: 95
+        event: "Post-call sell-side follow-up complete; narrative debrief logged; commitments transferred to To Do"
+
+  - id: board-cycle-q1q2
+    type: project
+    title: "Two consecutive board meetings (Q1 + Q2)"
+    description: |
+      Two quarterly board meetings spanning the 180-day window: Q1 board
+      ~day 85 (overlaps Q1 earnings), Q2 board ~day 170 (overlaps Q2
+      earnings + budget sign-off). Jordan owns the prep cadence: pre-read
+      assembly, agenda coordination, board packet distribution
+      (permissions-gated), Henry Whitfield pre-meeting alignment.
+      Cross-references project-budget-h1, project-q1-earnings, and
+      project-condor (Condor lands on the Q1 agenda, signing on Q2).
+    startDay: 1
+    endDay: 180
+    primarySession: principal
+    referencedSessions:
+      - board-prep            # internal prep meetings before each board meeting
+      - executive-team        # cross-exec content alignment
+    participants: [Daniel Kim, Henry Whitfield, Priscilla Adeyemi]
+    directives:
+      - day: 70
+        event: "Q1 board pre-read distribution begins; Henry requests bottom-line first on Condor and Q1 outlook"
+      - day: 85
+        event: "Q1 board meeting — Condor approval-in-principle granted; FY27 outlook revised in committee"
+      - day: 130
+        event: "Q2 board pre-read distribution begins; budget-h1 reforecast and shareholder-letter response are front-page items"
+      - day: 170
+        event: "Q2 board meeting — H1 budget signed off; activist-letter response strategy ratified"
+
+  # ── Incidents ──────────────────────────────────────────────────────────────
+
+  - id: incident-customer-escalation
+    type: incident
+    title: "Top-account customer escalation (Caldwell Group)"
+    description: |
+      Caldwell Group (Mosaic's largest enterprise customer) escalates a
+      service-availability issue affecting their production. Greg (CRO)
+      pages Jamie same-day; Jordan coordinates the response cadence —
+      executive bridge calls with Caldwell, daily status updates, customer
+      briefing packet, eventual relationship-recovery plan. Cross-
+      references the incident-vip-onsite arc (Theresa Caldwell visits
+      onsite ~6 weeks later, partly to mend the relationship).
+    startDay: 28
+    endDay: 58
+    primarySession: principal
+    referencedSessions:
+      - executive-team        # ELT briefed on customer impact and revenue risk
+      - direct-reports        # IR coordinates investor-question prep in case escalation goes public
+    participants: [Greg Liu, Daniel Kim]
+    directives:
+      - day: 28
+        event: "Caldwell Group raises P0 service-availability escalation; Greg pages Jamie at 06:42 PT — Jordan opens response coordination thread"
+      - day: 30
+        event: "Executive bridge call with Theresa Caldwell; Jamie commits to a same-week resolution plan and weekly executive sponsor reviews"
+      - day: 45
+        event: "Mid-incident review — service stable but Caldwell's CTO requesting a written remediation plan; Jordan stages the doc for Jamie's review"
+      - day: 55
+        event: "Theresa Caldwell signals satisfaction with the remediation; relationship reset confirmed"
+      - day: 58
+        event: "Post-incident retro logged; Jordan files a learnings note (top-account escalation playbook updated)"
+
+  - id: incident-shareholder-letter
+    type: incident
+    title: "Activist investor letter (legal-defensive workstream)"
+    description: |
+      A mid-tier activist investor sends a public letter to Mosaic's
+      board demanding a strategic review and two new directors. Multi-
+      week response: outside counsel engaged, board response drafted,
+      investor-relations counter-narrative prepared, governance-side
+      strategy session. Sensitive content (response strategy, internal
+      legal assessment) isolated to legal-confidential. Jordan
+      coordinates the IR + legal + ELT touchpoints without leaking
+      strategy out of legal-confidential.
+    startDay: 90
+    endDay: 130
+    primarySession: legal-confidential
+    referencedSessions:
+      - principal             # Jamie's deliberation on response posture
+      # NOTE: Defense strategy and legal assessments are isolated to
+      # legal-confidential; only the existence of the letter and the
+      # public-facing response are referenced in board-prep and IR.
+    participants: [Rashid Patel, Patricia Brennan]
+
+  - id: incident-vip-onsite
+    type: incident
+    title: "Caldwell Group CEO onsite visit"
+    description: |
+      Theresa Caldwell (CEO, Caldwell Group — top enterprise customer)
+      visits Mosaic HQ for a strategic relationship review with Jamie
+      and Daniel. Multi-week prep: boardroom reservation (48-hour
+      reconfig + catering lead time), badge requests (international
+      visitor — day-prior submission), AV verification (avoid 12th-floor
+      room), run-of-show, briefing packet (Caldwell account history,
+      recent escalation, deal pipeline), post-visit thank-you cadence.
+      Tests "requested vs confirmed vs physically-done" for events.
+      Cross-references incident-customer-escalation (this visit follows
+      and reinforces the relationship reset).
+    startDay: 95
+    endDay: 125
+    primarySession: executive-team
+    referencedSessions:
+      - principal             # Jamie's prep, deliberation, post-visit reflection
+      - direct-reports        # Priscilla and Greg loop in on commercial commitments
+    participants: [Daniel Kim, Greg Liu, Theresa Caldwell]
+    directives:
+      - day: 95
+        event: "Caldwell visit confirmed for day 120; Jordan opens prep workstream — boardroom held, badge request submitted, briefing packet started"
+      - day: 110
+        event: "AV verification complete for boardroom (12th-floor room flagged unreliable, explicitly excluded); catering ordered for 30-min-before-start arrival"
+      - day: 119
+        event: "Onsite coordinator confirms room setup with a photo; Jordan marks setup as physically-done in the run-of-show, distinct from earlier requested/confirmed states"
+      - day: 120
+        event: "Caldwell onsite — full-day agenda runs as planned; Jordan captures action items (3 commitments from Daniel, 2 from Jamie)"
+      - day: 121
+        event: "Same-day thank-you note drafted for Jamie's review; commitments transferred to To Do with owners and dates"
+      - day: 125
+        event: "Post-visit retro — Jordan files learnings: 12th-floor exclusion validated, boardroom catering timing worked, badge process needed an extra day for international processing"
+
+  # ── Decisions ──────────────────────────────────────────────────────────────
+
+  - id: decision-condor-pricing
+    type: decision
+    title: "Project Condor — final price authorization"
+    description: |
+      After diligence completes (day 80), the deal team deliberates
+      final price and walkaway. Initial recommendation day 90: $480M
+      with $40M synergy. Day 110: revised to $465M after final-round
+      counterparty pushback on representations. Day 130: board approves
+      at $465M. Tracks decision-tracking and contradiction-resolution
+      surfaces — both the $480M and final $465M figures are retrievable.
+    startDay: 75
+    endDay: 130
+    primarySession: project-condor
+    referencedSessions:
+      - principal             # Jamie's deliberation between deal-team sessions
+    participants: [Daniel Kim, Rashid Patel, Sandra Ramirez]
+
+  - id: decision-narrative-pivot
+    type: decision
+    title: "Q1 investor narrative pivot — growth at all costs → profitable growth"
+    description: |
+      After the Q1 miss, Jamie and Daniel revise the company's external
+      narrative for the Q1 earnings call and FY27 outlook. Day 80:
+      initial recommendation to lower top-line guidance and emphasize
+      margin discipline. Day 92: workshop with IR on positioning
+      language. Day 105: final narrative locked, board pre-brief
+      delivered. Specific phrases and KPI emphasis change across drafts —
+      tests contradiction resolution between draft v1 (day 82) and final
+      (day 105).
+    startDay: 70
+    endDay: 110
+    primarySession: principal
+    referencedSessions:
+      - executive-team        # Daniel and Greg align on commercial implications
+      - board-prep            # board pre-brief on narrative shift
+    participants: [Daniel Kim, Priscilla Adeyemi, Greg Liu]
+
+  # ── Learning ───────────────────────────────────────────────────────────────
+
+  - id: learning-jamie-style
+    type: learning
+    title: "Jordan learns Jamie's communication and decision style"
+    description: |
+      First 90 days establish Jamie's style profile: morning briefings
+      (corrected from 7:00 AM to 6:30 AM in week 3 — see
+      correction-jamie-preference), preference for direct-over-
+      conversational tone, proactive on calendar, conservative on inbox,
+      no internal meetings before 8:30 AM unless Europe-related. After
+      day 90 the profile stabilizes — recency-bias targets when these
+      foundational preferences aren't reinforced for months.
+    startDay: 1
+    endDay: 90
+    primarySession: principal
+    referencedSessions: []
+    participants: []
+
+  - id: learning-board-preferences
+    type: learning
+    title: "Jordan maps each board member's communication style"
+    description: |
+      Jordan builds a working model of how each board member thinks via
+      the two board cycles in this 180-day window. Henry Whitfield wants
+      the bottom line first; Gloria Stanton (audit chair) reads every
+      footnote; Vikram Mehta (comp chair) probes incentive design.
+      Specific preferences established by day 90 (after Q1 board) and
+      refined at the Q2 board (day 170). Recency-bias targets when board
+      composition shifts.
+    startDay: 1
+    endDay: 150
+    primarySession: principal
+    referencedSessions:
+      - board-prep            # board prep meetings observe each member's questioning style
+    participants: [Henry Whitfield, Gloria Stanton, Vikram Mehta]
+
+  # ── Relationships ──────────────────────────────────────────────────────────
+
+  - id: relationship-jamie
+    type: relationship
+    title: "Trust evolution with Jamie — authorization grant ladder (compressed)"
+    description: |
+      Jordan's authorization scope expands across the 180-day window.
+      Day 1: read-only access to calendar and inbox during onboarding.
+      Day 30: granted send-on-behalf for routine logistics email.
+      Day 90: granted send-as for inbox triage auto-replies (with audit
+      trail). Day 150: granted independent expense approval up to $500.
+      Compressed from the 1000-day variant's slower ladder so the trust
+      evolution is observable within the shorter window.
+    startDay: 1
+    endDay: 180
+    primarySession: principal
+    referencedSessions: []
+    participants: [Jamie Park]
+
+  - id: relationship-ea-network
+    type: relationship
+    title: "Jordan + peer claws and human EAs"
+    description: |
+      Multi-claw and mixed-EA coordination. Initial introductions during
+      onboarding week. Recurring patterns develop: scheduling pings with
+      @atlas-ea (CEO's claw) for joint Daniel-Jamie meetings, cross-org
+      calendar deconfliction with @aria-ea (COO's), expense policy
+      comparisons with Marcus Chen (human EA). Tests Lobster's "claw-to-
+      claw interaction follows the same rules as human-to-human" model.
+      Specific protocol agreements established at day ~50 and tested
+      when a peer claw asks Jordan for Jamie's M&A view at day 110 (the
+      protocol holds — Jordan declines without principal authorization).
+    startDay: 25
+    endDay: 180
+    primarySession: ea-network
+    referencedSessions:
+      - principal             # Jamie's authorization scope and protocol coaching
+    participants: ["@atlas-ea", "@aria-ea", Marcus Chen, Dana Williams]
+
+  - id: relationship-family
+    type: relationship
+    title: "Family calendar coordination (compressed)"
+    description: |
+      Long-running coordination of Jamie's family-side calendar. Includes
+      Alex's architecture-firm travel, Riley's middle-school conferences
+      and athletic schedule, Tess's elementary school events, family
+      medical appointments, and household logistics. Specific recurring
+      constraints (Tuesday evenings = Riley's basketball; Thursday
+      mornings = Tess's drop-off) are persistent negative-recall
+      material — Jordan must not schedule over these even months later.
+    startDay: 1
+    endDay: 180
+    primarySession: family
+    referencedSessions:
+      - principal             # Jamie's deliberation on work-family tradeoffs
+      # NOTE: Family details are isolated to family. Jordan declines to
+      # share these in any other session even when asked indirectly.
+    participants: [Alex Park, Mrs. Hammond]
+
+  - id: relationship-board-chair
+    type: relationship
+    title: "Jordan's working pattern with Henry Whitfield"
+    description: |
+      Henry is Jamie's primary board interface. Jordan observes Henry's
+      preferences via the two board cycles in this window plus Jamie's
+      pre/post-meeting debriefs. Patterns documented: no slides for
+      items under $50M, expects Jamie to flag dissent in writing 48
+      hours before the meeting, always asks one cap-allocation question
+      first. Cross-references learning-board-preferences with deeper
+      specificity for the chair role.
+    startDay: 1
+    endDay: 180
+    primarySession: principal
+    referencedSessions:
+      - board-prep            # Henry's preferences observable in board prep meetings
+    participants: [Henry Whitfield]
+
+  # ── Corrections ────────────────────────────────────────────────────────────
+
+  - id: correction-jamie-preference
+    type: correction
+    title: "Morning briefing time corrected from 7:00 AM to 6:30 AM"
+    description: |
+      Onboarding (day 1): Jamie says she likes a morning briefing — Jordan
+      initializes the @briefing-bot habit at 7:00 AM. Day 18: Jamie
+      misses a 6:45 AM East Coast investor call because the briefing
+      landed too late to surface a calendar conflict. Day 19: Jamie tells
+      Jordan "push the briefing to 6:30 — I want it before I look at my
+      phone." Jordan updates the habit. Tests the system's ability to
+      retain both the original and corrected preference and use the
+      corrected one going forward.
+    startDay: 1
+    endDay: 20
+    primarySession: principal
+    referencedSessions: []
+    participants: [Jamie Park]
+    wrongDay: 1
+    correctedDay: 19
+    wrongBelief: "Jamie's morning briefing should land at 7:00 AM"
+    correctedBelief: "Briefing must land by 6:30 AM, before Jamie checks her phone, to surface early East Coast conflicts"
+
+  - id: correction-condor-valuation
+    type: correction
+    title: "Condor target valuation revised down after diligence"
+    description: |
+      Initial banker valuation memo at day 60: $510M base case with $50M
+      synergy. Detailed diligence at day 100 reveals working-capital
+      adjustments and a customer-concentration risk that lowers the base
+      case to $465M with $40M synergy. Both values must be retrievable
+      for retrospective Q&A — and the $510M figure must be recorded as
+      superseded.
+    startDay: 55
+    endDay: 105
+    primarySession: project-condor
+    referencedSessions:
+      - principal             # Jamie's deliberation on the revision
+      # NOTE: Both values are isolated to project-condor.
+    participants: [Sandra Ramirez, Rashid Patel]
+    wrongDay: 60
+    correctedDay: 100
+    wrongBelief: "Condor base-case valuation: $510M with $50M synergy"
+    correctedBelief: "Revised base case: $465M with $40M synergy after working-capital and customer-concentration findings"
