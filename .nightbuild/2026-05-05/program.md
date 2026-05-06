@@ -2,9 +2,11 @@
 
 ## Mission
 
-Generate a usable v0.5-format memory corpus for the `executive-assistant` persona at `packages/recall-bench/personas/executive-assistant/memories/`, in chronological day order, with each completed chunk committed to git so progress survives interruption and is resumable across multiple nights. Tonight's success = generator is at v0.5 + research-scientist smoke validates the format + EA generation is in progress with at least one committed chunk; the run is structurally resumable by tomorrow's NightBuild.
+**Night 1 of a 10-night epic.** Generate the v0.5 multi-session memory corpus for the `executive-assistant` persona, in chronological day order, with each completed chunk committed to git. Across-night plan and progress: `.nightbuild/ea-corpus-epic.md`.
 
-The full 1,000-day EA corpus is unlikely to complete in a single 6-hour run. Tomorrow night's NightBuild will pick up at the next un-generated day and continue.
+Tonight's success criterion = (1) Phase A v0.5 day-generator landed, (2) duplicate-H1 bug fix validated end-to-end via a small live smoke, (3) EA generation in progress with at least one committed chunk of new days, (4) state cleanly resumable by tomorrow's NightBuild kickoff.
+
+The full 1,000-day EA corpus is **explicitly multi-night** — this is a 10-night epic. Each night ends with a brief progress entry appended to `.nightbuild/ea-corpus-epic.md`.
 
 ## Scope deviations
 
@@ -49,60 +51,51 @@ Sub-steps:
 
 **Done bar:** All four matched lines appear in the prompt-build smoke output (`# Sessions`, `# Shared knowledge`, `# How to partition`, and the `# session:` template marker). `tsc --noEmit` passes. Existing tests still pass: `cd packages/recall-bench && npm test`.
 
-### Phase B — `research-scientist smoke (30 days)`
+### Phase B — `validate duplicate-H1 fix (small live smoke)`
 
-Validates Phase A end-to-end against a real generation run on the simplest v0.5 persona before risking EA's larger surface.
+A 3-day research-scientist smoke. Purpose is not exhaustive validation — it's specifically to confirm commit `6e42b72`'s prompt-level merge rules eliminate the duplicate `# session: principal` H1s observed in the prior smoke.
+
+Why 3 days and not 30: at ~3 min per `claude` CLI invocation × multi-arc-merge per day, even a 5-day smoke costs ~30 min. We have measured throughput data already; the only open question is whether the merge fix works.
 
 Sub-steps:
 
-1. **Delete stale memory days.** `rm packages/recall-bench/personas/research-scientist/memories/day-*.md` (the 3 existing days are pre-v0.5 and would break the consistency canary).
-2. **Run smoke.**
-   ```bash
-   cd C:/source/recall && npx recall-bench generate --persona ./packages/recall-bench/personas/research-scientist --model claude --start 1 --end 30
-   ```
-   Stream stdout to `<run_dir>/raw/phase-b-smoke.log`.
-3. **Sample-day inspection** — pick days 1, 8, 15, 22, 30. For each, verify:
-   - Frontmatter has `type: daily` plus day/date/persona/active-sessions
-   - At least one `# session: <id>` H1 emitted
-   - No empty session H1s
-   - No `## YYYY-MM-DD` legacy headers
-4. **Boundary canary.** `grep -B1 -A30 "Chen Lab's proprietary LNP" packages/recall-bench/personas/research-scientist/memories/day-*.md` should return either zero matches OR matches only under `# session: collab-chen` (the lifecycle for that session is days 300–700, so within days 1–30 it should be zero matches — this is the cleanest possible smoke).
+1. **Run smoke.** `cd C:/source/recall && npx recall-bench generate --persona ./packages/recall-bench/personas/research-scientist --model claude --start 1 --end 3`. Stream stdout to `<run_dir>/raw/phase-b-validate.log`.
+2. **Inspect.** For each emitted day-NNNN.md file, count `^# session: principal$` H1s. Each must equal exactly 1. Same for any other declared session.
+3. **If duplicates found:** investigate the prompt; iterate fix; re-smoke. Up to 3 attempts per § Tick recipe step 7.
 
-**Done bar:** 30 day-NNNN.md files exist under `research-scientist/memories/`; all 5 sampled days pass the inspection checklist; boundary canary clean; no `[generator] arc=... skipped:` lines in stderr.
+**Done bar:** Every emitted day file in days 1–3 has at most one H1 per session. No duplicate `# session: <id>` H1s anywhere in the inspection set.
 
-### Phase C — `EA full generation (chunked, resume-safe)`
+### Phase C — `EA generation (Night 1 chunk)`
 
-The main work. Iterative — each tick generates one chunk (~50 days), verifies, commits, schedules next. The chunk size is tuned so each tick stays under 20 minutes of wall-clock work (PLAYBOOK §6 / NIGHTBUILD §Tick recipe step 4).
+Iterative — each tick runs ~25 minutes of generation (one `recall-bench generate` invocation against a calendar-day range). The number of calendar days emitted per tick varies based on how many arcs touch that range, but each tick aims for ~6–10 unique calendar days landed.
 
 Sub-step recipe (one per tick):
 
-1. Determine the next day to generate: `ls packages/recall-bench/personas/executive-assistant/memories/day-*.md | sort | tail -1` → the highest existing day. Next start = highest + 1, or 1 if no days exist.
-2. Compute end day: `min(start + 49, 1000)`.
-3. Run:
-   ```bash
-   cd C:/source/recall && npx recall-bench generate --persona ./packages/recall-bench/personas/executive-assistant --model claude --start <start> --end <end>
-   ```
-   Stream to `<run_dir>/raw/phase-c-chunk-<NNNN>.log`.
-4. Verify: `ls packages/recall-bench/personas/executive-assistant/memories/day-*.md | wc -l` matches expected count. Scan stderr for skipped days; if >2 in this chunk, log BLOCKED and yield.
-5. Commit per § Tick recipe step 8.
+1. **Determine resume point.** `ls packages/recall-bench/personas/executive-assistant/memories/day-*.md 2>/dev/null | sort | tail -1` → highest existing day. Next start = `highest + 1`, or `1` if no days exist.
+2. **Pick chunk end.** Conservative chunk: `start + 24` (25 calendar-day window). Multi-arc days will trigger merges within that window — 25 days × ~5 invocations/day ≈ 125 invocations. At 3 min each that's ~6 hours, too long for one tick. So use a smaller window: `start + 9` (10-day chunk → ~50 invocations → ~25 minutes/tick). Iterate.
+3. **Run** `npx recall-bench generate --persona ./packages/recall-bench/personas/executive-assistant --model claude --start <start> --end <end>` in foreground (single tick) OR background (long-tick with monitor wakeup). For ~25-min ticks, foreground is fine.
+4. **Verify.** Count files; confirm no skipped-day stderr lines.
+5. **Commit** per § Tick recipe step 8 with message `phase-c: ea days <start>-<end>`.
 
-**Done bar (per chunk tick):** chunk's day-NNNN.md files exist; `git log -1` shows a commit covering the chunk; `consecutive_blocked` is reset to 0.
+**Done bar (per chunk tick):** chunk's day-NNNN.md files exist; commit landed; `consecutive_blocked` reset.
 
-**Done bar (phase complete — only achievable on a future night):** `ls packages/recall-bench/personas/executive-assistant/memories/day-*.md | wc -l` returns 1000.
+**Done bar (Night 1 phase done):** at least one Phase C chunk committed; resume command for tomorrow recorded in `.nightbuild/ea-corpus-epic.md`.
 
-### Phase D — `morning-readiness gate`
+**Done bar (epic complete — Night 10 or earlier):** EA day count ≥ 1000.
 
-Runs as the final tick before exit. Proves the run produced a useful, resumable corpus state.
+### Phase D — `Night 1 progress checkpoint`
+
+Runs when the wall-clock budget is ~80% consumed OR when an EA chunk lands at a clean stopping point. Lightweight, not a full morning gate (the epic spans 10 nights).
 
 Sub-steps:
 
-1. Count EA memory files: `ls packages/recall-bench/personas/executive-assistant/memories/day-*.md | wc -l`. Record `<N>`.
-2. Sample-day inspection on 3 random EA days from the produced corpus (same checklist as Phase B step 3).
-3. Boundary canary across the EA corpus: `grep -B1 "Project Condor target identity" packages/recall-bench/personas/executive-assistant/memories/day-*.md | grep "^# session:"` — every match must show `# session: project-condor`. Any other session H1 in front of those lines is a leak.
-4. Confirm git state is clean: `git status --porcelain` returns empty.
-5. Write `<run_dir>/handoff.md` per NIGHTBUILD § End-of-overnight protocol step 1, including the resume command for tomorrow night.
+1. Count EA memory files: `ls packages/recall-bench/personas/executive-assistant/memories/day-*.md 2>/dev/null | wc -l`. Record as `night_1_total`.
+2. Boundary canary spot-check: `grep -l "Project Condor target identity" packages/recall-bench/personas/executive-assistant/memories/day-*.md 2>/dev/null` — if matches, confirm via grep that they appear under `# session: project-condor` only. (No matches yet is fine — Project Condor's lifecycle starts day 100, so early chunks won't have leak surface.)
+3. Confirm git state clean.
+4. Append a Night 1 progress entry to `.nightbuild/ea-corpus-epic.md` with: total EA days emitted, resume start day for tomorrow, anything notable from this night.
+5. Write minimal `<run_dir>/handoff.md` (one paragraph; the epic file carries the longer narrative).
 
-**Done bar:** at least 30 EA day files exist (Phase A + B prerequisite plus at least one Phase C chunk landed); all 3 sampled days pass inspection; boundary canary clean; git clean; handoff.md written.
+**Done bar:** progress entry appended to `.nightbuild/ea-corpus-epic.md`; git clean; handoff.md written; next wakeup not scheduled (run ends, user re-kicks tomorrow).
 
 ## Authority overrides
 
