@@ -1,8 +1,8 @@
 {
   "schema_version": 4,
-  "phase": "phase-b-validate-bug-fix",
-  "iteration": 4,
-  "last_completed_step": "phase-b-merge-rules-fix",
+  "phase": "phase-c-ea-generation",
+  "iteration": 5,
+  "last_completed_step": "phase-b-validate-bug-fix",
   "consecutive_blocked": 0,
   "boot_error": null,
   "started_at": "2026-05-06T01:29:18Z",
@@ -40,7 +40,7 @@
     "phase-c-ea-generation",
     "phase-d-morning-readiness"
   ],
-  "phases_done": ["phase-a-day-generator-v05"],
+  "phases_done": ["phase-a-day-generator-v05", "phase-b-validate-bug-fix"],
   "deliverables": {
     "phase-a-substeps-1-2": {
       "commit": "8dc7c7168f2d676acb2a86f102a0473d74f183bc",

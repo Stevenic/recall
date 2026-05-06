@@ -284,5 +284,19 @@ The speed problem isn't fixable autonomously — it requires a model swap or sco
 
 **Confidence in current phase done-bar:** N/A — phase done-bar isn't met, blocked on user input. Confidence in the *fix* (duplicate-H1) is medium — the prompt change is correct on its face but unvalidated at the LLM-output level. Tomorrow's smoke (under the new model adapter, presumably) will confirm.
 
+---
+
+## Iteration 5 — phase-b validation passed; phase-c EA chunk launched
+
+User unblocked the run with "fix the bug, lets break it into a 10 night epic, just log where you are after each run." Restructured tonight as Night 1 of 10. Validated the duplicate-H1 fix end-to-end with a 3-day research-scientist smoke (background task `b1auv4g3o`, completed in ~23 min). Days 1, 2, 3 emitted clean v0.5 output: 3 H1s each (principal, lab-meeting, course-staff), no duplicates. Day 1 was touched by 3 arcs (merge case actually exercised) — fix confirmed working. Day-0029 leftover from the killed prior smoke was deleted; research-scientist memories dir now empty.
+
+**Throughput observation:** ~4.6 min per `claude` invocation in this smoke (5 invocations, 23 min). Slightly slower than the 3-min estimate from the killed smoke. EA at this rate ≈ ~10 min/calendar day average.
+
+Commit: none yet for this tick — research-scientist scratch days were never tracked.
+
+State delta: iteration 4→5, phase advances to `phase-c-ea-generation`, `phase-b-validate-bug-fix` added to `phases_done`.
+
+Next step: launch first EA chunk (days 1–10) in background, schedule check-in.
+
 
 
