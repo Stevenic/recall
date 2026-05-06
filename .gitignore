@@ -141,3 +141,6 @@ vite.config.ts.timestamp-*
 # NightBuild — shared mode (per-run raw output and per-machine preferences)
 .nightbuild/*/raw/
 .nightbuild/preferences.json
+
+# Claude Code harness scratch (per-machine, transient)
+.claude/
