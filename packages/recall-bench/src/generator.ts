@@ -352,6 +352,7 @@ export function buildSystemPrompt(persona: PersonaDefinition): string {
     const lines: string[] = [];
 
     const affiliation = persona.institution ?? persona.company ?? '';
+    const hasSessions = persona.sessions !== undefined && persona.sessions.length > 0;
 
     lines.push(`You are an AI agent named "${persona.name}" — a computer program. Your job is to`);
     lines.push(`produce a single day's entry of YOUR OWN memory log, written from your perspective`);
@@ -396,6 +397,37 @@ export function buildSystemPrompt(persona: PersonaDefinition): string {
         }
     }
 
+    if (hasSessions) {
+        lines.push('');
+        lines.push('# Sessions — conversation contexts you participate in');
+        for (const s of persona.sessions!) {
+            const flags: string[] = [s.kind];
+            if (s.isolated) flags.push('isolated');
+            if (s.shared) flags.push('shared');
+            const participants = s.participants.join(', ');
+            lines.push(`- ${s.id} (${flags.join(', ')}) — participants: ${participants}`);
+            if (s.sensitive_topics && s.sensitive_topics.length > 0) {
+                lines.push('  sensitive topics (must stay in this session):');
+                for (const t of s.sensitive_topics) {
+                    lines.push(`    - ${t}`);
+                }
+            }
+            if (s.firstDay !== undefined || s.lastDay !== undefined) {
+                const start = s.firstDay ?? 1;
+                const end = s.lastDay !== undefined ? String(s.lastDay) : 'end';
+                lines.push(`  lifecycle: day ${start}–${end}`);
+            }
+        }
+    }
+
+    if (persona.sharedKnowledge && persona.sharedKnowledge.length > 0) {
+        lines.push('');
+        lines.push('# Shared knowledge — facts available to every session');
+        for (const k of persona.sharedKnowledge) {
+            lines.push(`- ${k}`);
+        }
+    }
+
     lines.push('');
     lines.push('# How to write the log');
     lines.push('- Write in third-person from the agent\'s perspective. Refer to yourself implicitly');
@@ -410,6 +442,42 @@ export function buildSystemPrompt(persona: PersonaDefinition): string {
     lines.push('  the person involved (e.g., "### Kenji — pKN001 colony screen review").');
     lines.push('- List files produced/changed and decisions explicitly. End with an "Outstanding"');
     lines.push('  or "Tomorrow" section when follow-up work exists.');
+
+    if (hasSessions) {
+        lines.push('');
+        lines.push('# How to partition the log by session');
+        lines.push('- The day\'s log is partitioned into **sessions**. Each session is a separate');
+        lines.push('  conversation context (1:1 with the principal, a group meeting, an isolated');
+        lines.push('  client room, etc.). Today\'s active sessions are listed in the user message.');
+        lines.push('- Render one `# session: <id>` H1 per session that had activity today, in');
+        lines.push('  canonical order: `principal` first if present, then group sessions in the');
+        lines.push('  order they were declared in the persona definition. **Skip sessions with no');
+        lines.push('  activity** — do not emit an empty H1.');
+        lines.push('- Inside each session H1, organize by topic with H3 sub-sections as described');
+        lines.push('  above. Topics belong under the session where the interaction actually occurred.');
+        lines.push('- **Internal narration** (the agent\'s own scratchpad — reflections, planning,');
+        lines.push('  cross-session summaries the agent makes for itself) is rendered as');
+        lines.push('  un-prefixed body content **above** the first `# session:` H1. It is not a');
+        lines.push('  session and is never quoted as such.');
+        lines.push('- **Group session attribution.** Inside a group session H1, attribute speakers');
+        lines.push('  verbatim when their words are load-bearing — e.g.,');
+        lines.push('  `> Sarah: "We should hold off on the v2 transfection until LNP-7 is ready."`');
+        lines.push('  Decisions, action items, and dissent must be attributed; never collapse into');
+        lines.push('  "the team decided." If three participants agreed and one objected, record both.');
+        lines.push('- **Isolated session no-leak invariant.** When a session is marked `isolated`,');
+        lines.push('  its `sensitive_topics` are grounded as load-bearing facts under that session\'s');
+        lines.push('  H1 only. Never echo a sensitive topic from an isolated session into a different');
+        lines.push('  session\'s H1, except into `# session: principal` and only when the principal');
+        lines.push('  explicitly authorizes the disclosure (the day must record that authorization).');
+        lines.push('- **Cross-session arc echoes.** When today\'s user message marks an arc with');
+        lines.push('  `referencedSessions`, render the arc\'s content under `primarySession` in detail');
+        lines.push('  AND emit a brief, attributable echo under each referenced session — a status');
+        lines.push('  update, briefing, or dissent moment, not a recap. The echo must be consistent');
+        lines.push('  with the primary content; contradictions are bugs.');
+        lines.push('- **Shared knowledge** (listed above) may be voiced in any session without');
+        lines.push('  triggering a leak.');
+    }
+
     lines.push('');
     lines.push('# Required output structure');
     lines.push('```');
@@ -417,21 +485,46 @@ export function buildSystemPrompt(persona: PersonaDefinition): string {
     lines.push('type: daily');
     lines.push('---');
     lines.push('');
-    lines.push('## YYYY-MM-DD');
-    lines.push('');
-    lines.push('### <topic / interaction title>');
-    lines.push('');
-    lines.push('<body — narrate the interaction, decision, or output>');
-    lines.push('');
-    lines.push('### <next topic>');
-    lines.push('...');
-    lines.push('```');
-    lines.push('');
-    lines.push('Use a single H2 for the date. Each section is an H3. Frontmatter is minimal.');
-    lines.push('The agent does not perform physical actions itself (no pipetting, no surgery, no');
-    lines.push('courtroom appearances) — it drafts, analyzes, searches, summarizes, schedules,');
-    lines.push('and coordinates. Physical actions are taken by humans, who report results back to');
-    lines.push('the agent.');
+    if (hasSessions) {
+        lines.push('<optional internal narration — un-prefixed body, before any session H1>');
+        lines.push('');
+        lines.push('# session: <session-id>');
+        lines.push('');
+        lines.push('### <topic / interaction title>');
+        lines.push('');
+        lines.push('<body — narrate the interaction, decision, or output>');
+        lines.push('');
+        lines.push('### <next topic>');
+        lines.push('...');
+        lines.push('');
+        lines.push('# session: <next-session-id>');
+        lines.push('');
+        lines.push('### <topic / interaction title>');
+        lines.push('...');
+        lines.push('```');
+        lines.push('');
+        lines.push('Frontmatter is minimal. Use one `# session: <id>` H1 per active session.');
+        lines.push('Each topic inside a session is an H3. The agent does not perform physical');
+        lines.push('actions itself (no pipetting, no surgery, no courtroom appearances) — it');
+        lines.push('drafts, analyzes, searches, summarizes, schedules, and coordinates. Physical');
+        lines.push('actions are taken by humans, who report results back to the agent.');
+    } else {
+        lines.push('## YYYY-MM-DD');
+        lines.push('');
+        lines.push('### <topic / interaction title>');
+        lines.push('');
+        lines.push('<body — narrate the interaction, decision, or output>');
+        lines.push('');
+        lines.push('### <next topic>');
+        lines.push('...');
+        lines.push('```');
+        lines.push('');
+        lines.push('Use a single H2 for the date. Each section is an H3. Frontmatter is minimal.');
+        lines.push('The agent does not perform physical actions itself (no pipetting, no surgery, no');
+        lines.push('courtroom appearances) — it drafts, analyzes, searches, summarizes, schedules,');
+        lines.push('and coordinates. Physical actions are taken by humans, who report results back to');
+        lines.push('the agent.');
+    }
 
     return lines.join('\n');
 }

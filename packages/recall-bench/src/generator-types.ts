@@ -34,6 +34,8 @@ export interface PersonaDefinition {
     projects?: ProjectRef[];
     principal?: PrincipalRef;
     cast?: CastMember[];
+    sessions?: SessionDef[];
+    sharedKnowledge?: string[];
 }
 
 export interface ProjectRef {
@@ -54,6 +56,26 @@ export interface CastMember {
     kind?: 'human' | 'agent';
 }
 
+/**
+ * A conversation context the agent participates in. Sessions partition every
+ * daily memory log; a day's content is rendered under one `# session: <id>`
+ * H1 per session that had activity. See specs/recall-bench.md §2.6 / §2.7
+ * and specs/day-generator.md §3.1.1.
+ *
+ * Reserved slug: `principal` is the principal-agent 1:1 session (kind = 1to1).
+ * All other slugs are persona-defined.
+ */
+export interface SessionDef {
+    id: string;
+    kind: '1to1' | 'group';
+    participants: string[];
+    isolated?: boolean;
+    shared?: boolean;
+    firstDay?: number;
+    lastDay?: number;
+    sensitive_topics?: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Arc Definition (loaded from arcs.yaml)
 // ---------------------------------------------------------------------------
@@ -71,6 +93,20 @@ export interface ArcDefinition {
 
     /** Key events that MUST appear on specific days. */
     directives?: ArcDirective[];
+
+    /**
+     * Session affinity — see specs/recall-bench.md §2.3.1 and §2.7.
+     * `primarySession` names the session where the arc primarily unfolds;
+     * the day-generator emits the arc's deep content under that session's H1.
+     * `referencedSessions[]` lists sessions that get attributable echoes
+     * at natural touchpoints (sprint boundaries, decision moments).
+     * For arcs whose `primarySession` is itself isolated, sensitive content
+     * must NOT appear in `referencedSessions` unless explicitly authorized.
+     */
+    primarySession?: string;
+    referencedSessions?: string[];
+    /** Cast members involved (informational only). */
+    participants?: string[];
 
     // Correction arc fields
     wrongDay?: number;
@@ -96,6 +132,21 @@ export interface ActiveArc {
     phase: ArcPhase;
     dayInArc: number;
     arcLength: number;
+    /**
+     * Session affinity surfaced from the arc definition (see ArcDefinition).
+     * The day-generator uses these to route content under the correct
+     * `# session: <id>` H1 and to emit echoes only at natural touchpoints.
+     */
+    primarySession?: string;
+    referencedSessions?: string[];
+    /**
+     * Set true only on touchpoint days — sprint boundaries, decision
+     * moments, arc start, arc end, explicit `directives[].day` entries.
+     * On these days the generator emits brief attributable echoes under
+     * each `referencedSessions` H1; otherwise echoes are suppressed.
+     * See specs/recall-bench.md §3.3.
+     */
+    echoToday?: boolean;
 }
 
 export type DensityHint = 'quiet' | 'normal' | 'busy' | 'dense';
