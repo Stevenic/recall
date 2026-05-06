@@ -16,7 +16,30 @@ Read these before starting. Don't restate them — reference them by `§` when y
 1. **`specs/recall-bench.md`** — the bench spec, v0.5. Authoritative for personas, sessions, arcs, Q&A schema, scoring.
 2. **`specs/day-generator.md`** — the prompt spec for Pass 1. Authoritative for system prompt structure, multi-session output format, conditional rendering rules (§3.1.2 and §3.1.3 are the load-bearing sections).
 3. **`docs/recall-bench.md`** — operator-facing docs. Authoritative for CLI usage, resume behavior, Windows tree-kill, coding-agent quirks.
-4. **`packages/recall-bench/personas/<id>/persona.yaml`** and **`arcs.yaml`** — the persona and arcs you're generating for. Each persona is self-describing.
+4. **`packages/recall-bench/personas/<id>/persona.yaml`** and the chosen arcs file — see § Arc-file variants below.
+
+## 1a. Arc-file variants (varying-length corpora)
+
+A persona can ship multiple arcs files for different corpus lengths:
+
+- `arcs.yaml` — default 1000-day story (canonical).
+- `arcs-<NNN>d.yaml` — variant story labeled by intended day count (e.g., `arcs-180d.yaml`). Same persona definition, different timeline + arc set.
+
+The generator pairs each arcs file with sibling output dirs derived from the suffix:
+
+| Arcs file | Memories dir | Q&A dir |
+|---|---|---|
+| `arcs.yaml` | `memories/` | `qa/` |
+| `arcs-180d.yaml` | `memories-180d/` | `qa-180d/` |
+| `arcs-30d.yaml` | `memories-30d/` | `qa-30d/` |
+
+CLI selectors:
+
+- `recall-bench generate --arcs arcs-180d.yaml --days 180` (or explicit `--start/--end`)
+- `recall-bench generate-conversations --memories-dir memories-180d` (pair with the suffix used at generate time)
+- `--memories-dir <name>` overrides the derivation if you want a non-standard layout.
+
+Use cases for shorter variants: faster iteration, denser per-day stress, smoke-testing the harness on a smaller corpus before committing to the full 1000-day generation budget.
 
 If a spec section disagrees with this playbook, the spec wins and you tell the user.
 

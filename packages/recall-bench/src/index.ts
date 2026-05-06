@@ -31,7 +31,7 @@ export { loadPersona, filterQAByRange, listPersonas } from './dataset.js';
 export type { PersonaDataset, DayEntry } from './dataset.js';
 
 // Generator
-export { DayGenerator, loadPersonaDefinition, loadArcs } from './generator.js';
+export { DayGenerator, loadPersonaDefinition, loadArcs, deriveSiblingDir } from './generator.js';
 export {
     computePhase,
     computeDensity,

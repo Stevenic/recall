@@ -11,7 +11,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { BenchmarkHarness } from './harness.js';
 import { formatTextReport, formatJsonReport, toHeatmapGrid } from './report.js';
 import { listPersonas } from './dataset.js';
-import { DayGenerator, loadPersonaDefinition, loadArcs } from './generator.js';
+import { DayGenerator, loadPersonaDefinition, loadArcs, deriveSiblingDir } from './generator.js';
 import { PersonaCreator, serializePersonaYaml, serializeArcsYaml } from './persona-creator.js';
 import { ConversationGenerator, serializeConversation, serializeConversationJson } from './conversation-generator.js';
 import { CliGeneratorModel, isCliAgentName, CLI_AGENT_NAMES } from './cli-generator-model.js';
@@ -109,8 +109,11 @@ program
 program
     .command('generate')
     .description('Generate daily memory logs for a persona using an LLM')
-    .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + arcs.yaml)')
+    .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + arcs file)')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
+    .option('--arcs <filename>', 'Arcs file within the persona dir; convention: arcs.yaml (1000d default) or arcs-<NNN>d.yaml (variants)', 'arcs.yaml')
+    .option('--memories-dir <dirname>', 'Memory output dir name within the persona dir; defaults to "memories" or "memories-<suffix>" derived from --arcs')
+    .option('--days <n>', 'Total days to generate; sets --start 1 --end <n>. Mutually exclusive with --start/--end.', parseIntArg)
     .option('--start <n>', 'Starting day number', parseIntArg, 1)
     .option('--end <n>', 'Ending day number', parseIntArg, 1000)
     .option('--temperature <n>', 'Generation temperature', parseFloatArg, 0.7)
@@ -121,16 +124,25 @@ program
     .action(async (opts) => {
         const personaDir = resolve(opts.persona);
         const persona = await loadPersonaDefinition(personaDir);
-        const arcs = await loadArcs(personaDir);
+        const arcs = await loadArcs(personaDir, opts.arcs);
         const model = await resolveModel(opts.model, opts.timeout);
 
-        const memoriesDir = join(personaDir, 'memories');
+        // Resolve --days shorthand. If supplied, it overrides --start/--end.
+        let startDay = opts.start;
+        let endDay = opts.end;
+        if (opts.days !== undefined) {
+            startDay = 1;
+            endDay = opts.days;
+        }
+
+        const memoriesDirName = opts.memoriesDir ?? deriveSiblingDir(opts.arcs, 'memories');
+        const memoriesDir = join(personaDir, memoriesDirName);
         await mkdir(memoriesDir, { recursive: true });
 
         const writtenDays = new Set<number>();
         const generator = new DayGenerator(persona, arcs, model, {
-            startDay: opts.start,
-            endDay: opts.end,
+            startDay,
+            endDay,
             temperature: opts.temperature,
             maxTokens: opts.maxTokens,
             historyWindow: opts.historyWindow,
@@ -141,7 +153,7 @@ program
                 writtenDays.add(dayNumber);
                 if (!opts.json) {
                     const tag = `[${kind}]`.padEnd(6);
-                    const dayLabel = `day ${String(dayNumber).padStart(4, ' ')}/${opts.end}`;
+                    const dayLabel = `day ${String(dayNumber).padStart(4, ' ')}/${endDay}`;
                     console.log(`  ${tag} ${dayLabel}  ${filename}  (${writtenDays.size} unique)`);
                 }
             },
@@ -241,8 +253,11 @@ program
 program
     .command('generate-conversations')
     .description('Generate conversation history for each day from existing daily logs (Pass 2)')
-    .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml, memories/)')
+    .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + memories dir)')
     .requiredOption('--model <name|path>', `Agent name (${CLI_AGENT_NAMES.join(', ')}) or path to model module`)
+    .option('--memories-dir <dirname>', 'Memory input dir name within the persona dir (default: "memories"; pair with the suffix used at generate time, e.g., "memories-180d")', 'memories')
+    .option('--conversations-dir <dirname>', 'Conversation output dir name within the persona dir (default: "conversations" or derived from --memories-dir suffix)')
+    .option('--days <n>', 'Total days to generate; sets --start 1 --end <n>. Mutually exclusive with --start/--end.', parseIntArg)
     .option('--start <n>', 'Starting day number', parseIntArg, 1)
     .option('--end <n>', 'Ending day number', parseIntArg, 1000)
     .option('--temperature <n>', 'Generation temperature', parseFloatArg, 0.7)
@@ -255,23 +270,36 @@ program
         const persona = await loadPersonaDefinition(personaDir);
         const model = await resolveModel(opts.model, opts.timeout);
 
-        const memoriesDir = join(personaDir, 'memories');
-        const conversationsDir = join(personaDir, 'conversations');
+        // Resolve --days shorthand. If supplied, it overrides --start/--end.
+        let startDay = opts.start;
+        let endDay = opts.end;
+        if (opts.days !== undefined) {
+            startDay = 1;
+            endDay = opts.days;
+        }
+
+        const memoriesDirName = opts.memoriesDir;
+        // Mirror the suffix from --memories-dir onto --conversations-dir if not explicitly set.
+        // 'memories' -> 'conversations'; 'memories-180d' -> 'conversations-180d'.
+        const conversationsDirName = opts.conversationsDir ??
+            (memoriesDirName === 'memories' ? 'conversations' : memoriesDirName.replace(/^memories/, 'conversations'));
+        const memoriesDir = join(personaDir, memoriesDirName);
+        const conversationsDir = join(personaDir, conversationsDirName);
         await mkdir(conversationsDir, { recursive: true });
 
         const format = opts.format as 'markdown' | 'json';
         let convCount = 0;
 
         const generator = new ConversationGenerator(persona, model, {
-            startDay: opts.start,
-            endDay: opts.end,
+            startDay,
+            endDay,
             temperature: opts.temperature,
             maxTokens: opts.maxTokens,
             onConversation: async (dayNumber, _content) => {
                 // We re-serialize here to control the format
                 convCount++;
                 if (!opts.json) {
-                    process.stdout.write(`\r  Generated conversation ${convCount} (day ${dayNumber}/${opts.end})`);
+                    process.stdout.write(`\r  Generated conversation ${convCount} (day ${dayNumber}/${endDay})`);
                 }
             },
         });

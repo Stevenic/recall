@@ -77,3 +77,23 @@ User updated the EA persona to reflect the EA Persona Source Document (April 202
 **Net effect on Night 1 progress:** day count rolls back from 2 → 0. Phase A and bug fix work persist. Night 2 effectively starts from scratch on EA generation, with a richer persona aligned to the source doc.
 
 ---
+
+## Tooling: arc-file variants for varying-length corpora
+
+User asked for a 180-day story arc set for Jordan plus tooling support for varying-length corpora. Implemented:
+
+- **`arcs-180d.yaml`** added to `personas/executive-assistant/` — 17 arcs over 180 days, denser stress than the 1000-day variant. Same persona, same sessions, same boundary surface; compressed timeline for Q1+Q2 of FY27.
+- **`loadArcs(personaDir, filename?)`** now accepts a filename; defaults to `arcs.yaml`.
+- **`deriveSiblingDir(arcsFile, base)`** helper: maps `arcs-180d.yaml` → `memories-180d` / `qa-180d`. Filename suffix labels the variant.
+- **CLI** `generate` gains `--arcs <filename>`, `--memories-dir <dirname>`, `--days <n>` (shorthand for `--start 1 --end <n>`).
+- **CLI** `generate-conversations` gains `--memories-dir`, `--conversations-dir`, `--days` for matching the variant chosen at generate time.
+
+122/122 unit tests still pass; tsc clean.
+
+Deferred (follow-ups, not blocking the epic):
+- `dataset.loadPersona` and the harness `run` command are still arcs.yaml-hardcoded. Will need similar variant support before the harness can evaluate against `arcs-180d.yaml`-generated corpora. Not urgent — Q&A pairs don't exist yet.
+- Optional `corpus_days` field at the head of each arcs file for self-description. Skipped — filename suffix is sufficient signal.
+
+**Implication for the 10-night epic:** the existing plan generates the 1000-day corpus. The 180-day variant is a parallel option — could be substituted in (or run alongside) if the user prefers shorter coverage in less time. At ~10 min/calendar day average throughput, 180 days projects to ~30 hours wall-clock = 5-6 nights vs ~10 nights for the 1000-day. No decision required tonight; this expands the optionality.
+
+---
