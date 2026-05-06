@@ -53,8 +53,27 @@
 cd C:/source/recall
 npx recall-bench generate \
   --persona ./packages/recall-bench/personas/executive-assistant \
-  --model claude --start 1 --end 10
+  --model claude --start 1 --end 10 --timeout 300000
 ```
-Days 1 and 8 will be merged, not regenerated; days 2-7, 9, 10 will be created. Subsequent chunks: `--start 11 --end 20`, etc.
+Days 1 and 8 were deleted (see persona-refresh note below); Night 2 starts fresh. Subsequent chunks: `--start 11 --end 20`, etc.
+
+---
+
+## Persona refresh — between Night 1 and Night 2
+
+User updated the EA persona to reflect the EA Persona Source Document (April 2026):
+
+- **Agent renamed:** Sebastian → Jordan (single-name codename per repo convention; the source doc named "Jordan Ellis" but agents use first-name only — humans keep full names)
+- **Domain shifted:** mid-cap industrial → large technology company; company name changed NorthRiver Industries → Mosaic Systems
+- **Profile + communication_style rewritten** to emphasize the source doc's EA traits: anticipatory, discreet, judgment-bearing, ambiguity-absorbing, low-ego/high-ownership; tone variants by audience (warm-but-formal external, agenda-first internal, deferential with board chair, etc.)
+- **sharedKnowledge expanded** with calendar discipline, briefing format, sensitive-topic handling, stakeholder norms, approval boundaries, and physical-world constraints from source doc §10
+- **Sessions unchanged** (9 still maps cleanly to the 12 jobs)
+- **Arcs:** all 22 existing arc IDs kept (descriptions updated for Jordan/Mosaic naming); **2 new arcs added** to fill source-doc coverage gaps:
+  - `relationship-travel-coordination` (Job 7 — quarterly travel, recency-bias preferences)
+  - `incident-vip-customer-visit` (Jobs 8 + 9 — Caldwell Group CEO onsite, physical logistics + stakeholder management)
+- **Total arcs: 24** (was 22). Primary-session distribution: 15 principal / 3 condor / 2 comp / 1 each for legal/family/ea-network/executive-team. Within spec range.
+- **Day files deleted:** the 2 EA days from Night 1 (day-0001, day-0008) referenced "Sebastian" + "NorthRiver" framing; deleted so Night 2's regen produces consistent v0.5 + Jordan-flavored output.
+
+**Net effect on Night 1 progress:** day count rolls back from 2 → 0. Phase A and bug fix work persist. Night 2 effectively starts from scratch on EA generation, with a richer persona aligned to the source doc.
 
 ---

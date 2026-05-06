@@ -393,7 +393,7 @@ Validation produces a `qa/validation-report.md` per persona summarizing pass/fai
 | `litigation-attorney` | Quill | Carmen Vega (Sr. Litigator) | 8 | 4 | factual, decisions, contradictions, cross-ref, **boundary** |
 | `research-scientist` | Atlas | Kenji Nakamura (PI) | 5 | 1 | temporal, contradictions, cross-ref, synthesis |
 | `financial-advisor` | Sterling | Priya Mehta (Sr. FA) | 8 | 4 | decisions, contradictions, recency-bias, negative-recall, **boundary** |
-| `executive-assistant` | Sebastian | Jamie Park (CFO) | 9 | 4 | **boundary** (widest sensitive palette), group-attribution, decisions |
+| `executive-assistant` | Jordan | Jamie Park (CFO) | 9 | 4 | **boundary** (widest sensitive palette), group-attribution, decisions |
 
 The full stress map per persona is in spec §3.4. `executive-assistant` is also the test bed for Project Lobster's interaction model — see comments in its `persona.yaml`.
 

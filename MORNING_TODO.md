@@ -26,11 +26,23 @@ Nothing blocking, but two issues worth your awareness on Night 2:
 1. **Timeouts cost 10 min each and made no progress.** `--timeout` defaults to 600000ms. On Night 2, consider passing `--timeout 300000` to fail faster. Skipped days can be retried.
 2. **Session-selection drift.** The LLM picked 4 sessions for days 1 and 8 instead of the 5-6 expected per the active-sessions list in the user message. Not structurally broken; merging missing arcs into those days on Night 2's rerun should clean it up. If it persists, the `buildUserMessage` active-sessions instruction needs to be made stricter.
 
+## Persona refreshed between Night 1 and Night 2
+
+After Night 1 closed, you supplied the EA Persona Source Document (April 2026) and asked me to update the persona. Changes:
+- Agent renamed: Sebastian → **Jordan** (first-name-only convention)
+- Domain: industrial → **large technology company** (Mosaic Systems)
+- Profile + communication style rewritten to match the source doc's EA traits (anticipatory, discreet, judgment-bearing, ambiguity-absorbing)
+- `sharedKnowledge` expanded with §10 calendar/stakeholder/sensitive/physical rules
+- **24 arcs** now (was 22) — added `relationship-travel-coordination` (Job 7) and `incident-vip-customer-visit` (Jobs 8+9, Caldwell Group CEO onsite)
+- **Night 1's 2 EA days deleted** — they used the old Sebastian/NorthRiver framing. Night 2 starts EA generation from scratch.
+
+Full diff of the refresh is in the same commit as this update; details in `.nightbuild/ea-corpus-epic.md`.
+
 ## Resume instructions (Night 2 — tonight)
 
 Update `TONIGHT.md` with:
 ```
-Night 2/10 of EA corpus epic. Resume EA generation:
+Night 2/10 of EA corpus epic. Persona was refreshed (Jordan, Mosaic Systems, EA-source-doc framing); EA day files reset.
   Step 1: npx recall-bench generate --persona ./packages/recall-bench/personas/executive-assistant --model claude --start 1 --end 10 --timeout 300000
   Step 2: continue with --start 11 --end 20 (and onward) until budget cap.
 Append Night 2 entry to .nightbuild/ea-corpus-epic.md at end of run.
