@@ -1,0 +1,37 @@
+{
+  "schema_version": 4,
+  "phase": "phase-a-day-generator-v05",
+  "iteration": 0,
+  "last_completed_step": "boot",
+  "consecutive_blocked": 0,
+  "boot_error": null,
+  "started_at": "2026-05-06T01:29:18Z",
+  "run_dir": ".nightbuild/2026-05-05",
+  "nightbuild_md_sha": "a52aada31528b8c6023d74b8057970bbc7104bcc",
+  "tick_in_progress": false,
+  "head_at_tick_start": null,
+  "tokens_total": 0,
+  "usd_estimate": 0.0,
+  "morning_ready": false,
+  "morning_ready_at": null,
+  "stretch_completed": [],
+  "inputs": {
+    "parent_branch": "main",
+    "persona_id": "executive-assistant",
+    "smoke_persona_id": "research-scientist",
+    "chunk_size_days": 50,
+    "budget_max_usd": null,
+    "usd_per_mtok": null
+  },
+  "secrets": {},
+  "todo": [
+    "boot",
+    "phase-a-day-generator-v05",
+    "phase-b-smoke-research-scientist",
+    "phase-c-ea-generation",
+    "phase-d-morning-readiness"
+  ],
+  "phases_done": [],
+  "deliverables": {},
+  "history": []
+}
