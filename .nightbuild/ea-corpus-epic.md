@@ -31,9 +31,30 @@
 
 **Goal for Night 1:** validate the merge-rules prompt fix at LLM-output level, then emit as many EA days as the remaining budget allows. No specific day-count target; whatever lands, lands.
 
-**Rolling totals (updated end-of-night):**
-- Total EA days emitted: 0 / 1000 (0%)
-- Cumulative invocations: ~8 (the killed smoke)
-- Cumulative wall-clock: ~30 min compute + ~30 min orchestration
+**Done:**
+- ✅ Phase A — day-generator at v0.5 schema (commits `8dc7c71`, `9653ee0`)
+- ✅ Bug fix landed and validated (`6e42b72`) — duplicate session H1s in arc-merge prompt; confirmed via 3-day research-scientist smoke and again on EA day 1 (touched by 4+ arcs, emitted exactly one H1 per session)
+- ⚠️ Phase C chunk 1-10 — partial: 2 days emitted (1, 8) before chunk hit two 10-min timeouts and was killed (commit `b4ccf16`)
+
+**Closed at:** 2026-05-06T06:08Z (~4h39m elapsed; budget cap was 6h, ended ~80 min early after Phase C stalled)
+
+**Rolling totals:**
+- Total EA days emitted: 2 / 1000 (0.2%)
+- Day files: 1, 8 (both v0.5 multi-session format, no duplicate H1s)
+- Cumulative invocations: ~14 successful + 2 timeouts (research-scientist smoke + EA chunk + earlier killed smoke)
+- Cumulative wall-clock: ~3h compute + ~30 min orchestration
+
+**Issues to watch on Night 2:**
+1. **Per-call timeouts.** `--timeout` defaults to 600000ms (10 min). Two timeouts on EA chunk 1-10 (relationship-family day 8, relationship-board-chair day 1). Consider reducing to 300000ms — claude CLI hangs are non-recoverable, so faster failure is cheaper. Skipped days can be retried on subsequent runs.
+2. **Session-selection drift.** EA days 1 and 8 emitted only 4 sessions each (principal, direct-reports, ea-network, family) instead of the active-sessions list (which would also include board-prep and executive-team echoes from arc start touchpoints). The LLM took narrative liberties — picked sessions based on what felt right rather than strictly following the user message. Not a structural failure; tomorrow's `--start 1 --end 10` rerun will merge missing arcs into days 1 and 8 (and add days 2-7, 9, 10). If drift persists, tighten `buildUserMessage` to make the active-sessions list a hard constraint.
+
+**Resume command for Night 2:**
+```bash
+cd C:/source/recall
+npx recall-bench generate \
+  --persona ./packages/recall-bench/personas/executive-assistant \
+  --model claude --start 1 --end 10
+```
+Days 1 and 8 will be merged, not regenerated; days 2-7, 9, 10 will be created. Subsequent chunks: `--start 11 --end 20`, etc.
 
 ---

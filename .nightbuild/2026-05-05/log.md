@@ -298,5 +298,11 @@ State delta: iteration 4→5, phase advances to `phase-c-ea-generation`, `phase-
 
 Next step: launch first EA chunk (days 1–10) in background, schedule check-in.
 
+---
+
+## Iteration 6 — EA chunk 1-10 still running
+
+05:08Z (3h39m in, 2h21m of budget remaining). 2/10 unique days landed (1, 8). ~6 invocations done in ~26 min, ≈4.3 min/invocation. Chunk still has more arcs to process — multiple `[arc] day 1/10 day-0001.md (2 unique)` entries show day 1 being re-touched by additional arcs without new uniques being added. No errors. Rescheduling for 1800s to revisit.
+
 
 
