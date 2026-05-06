@@ -37,6 +37,7 @@ import type {
     GeneratorModel,
     PersonaDefinition,
     RecentDay,
+    SessionDef,
 } from './generator-types.js';
 
 // ---------------------------------------------------------------------------
@@ -74,7 +75,37 @@ export function computePhase(dayInArc: number, arcLength: number): ArcPhase {
 }
 
 /**
- * Get arcs active on a given day, annotated with phase information.
+ * Determine whether an arc should emit echoes into its `referencedSessions`
+ * on the given day. Touchpoint policy (intentionally conservative — see
+ * specs/recall-bench.md §3.3 "Be conservative — too many echoes pollutes
+ * referenced sessions"):
+ *
+ *   - arc start day
+ *   - arc end day
+ *   - any explicit `directives[].day` entry
+ *   - correction key days (`wrongDay`, `correctedDay`)
+ *   - sprint boundaries — every 14 days of arc-internal time after start
+ *
+ * Returns false unconditionally when the arc declares no `referencedSessions`.
+ */
+export function computeEchoToday(arc: ArcDefinition, dayNumber: number): boolean {
+    if (!arc.referencedSessions || arc.referencedSessions.length === 0) return false;
+    if (dayNumber === arc.startDay) return true;
+    if (dayNumber === arc.endDay) return true;
+    if (arc.wrongDay === dayNumber) return true;
+    if (arc.correctedDay === dayNumber) return true;
+    if (arc.directives && arc.directives.some(d => d.day === dayNumber)) return true;
+    const dayInArc = dayNumber - arc.startDay + 1;
+    if (dayInArc > 14 && (dayInArc - 1) % 14 === 0) return true;
+    return false;
+}
+
+/**
+ * Get arcs active on a given day, annotated with phase information and
+ * session affinity (see specs/recall-bench.md §2.3.1 / §3.3).
+ *
+ * `primarySession` and `referencedSessions` are surfaced verbatim from the
+ * arc definition. `echoToday` is computed per `computeEchoToday`.
  */
 export function getActiveArcs(arcs: ArcDefinition[], dayNumber: number): ActiveArc[] {
     return arcs
@@ -82,7 +113,7 @@ export function getActiveArcs(arcs: ArcDefinition[], dayNumber: number): ActiveA
         .map(a => {
             const dayInArc = dayNumber - a.startDay + 1;
             const arcLength = a.endDay - a.startDay + 1;
-            return {
+            const result: ActiveArc = {
                 id: a.id,
                 type: a.type,
                 title: a.title,
@@ -91,7 +122,50 @@ export function getActiveArcs(arcs: ArcDefinition[], dayNumber: number): ActiveA
                 dayInArc,
                 arcLength,
             };
+            if (a.primarySession !== undefined) result.primarySession = a.primarySession;
+            if (a.referencedSessions !== undefined) result.referencedSessions = a.referencedSessions;
+            const echo = computeEchoToday(a, dayNumber);
+            if (echo) result.echoToday = true;
+            return result;
         });
+}
+
+/**
+ * Compute today's active session list — the set of session IDs that should
+ * emit a `# session: <id>` H1 in today's daily log.
+ *
+ * Active sessions are:
+ *   1. Every `primarySession` of an arc active today (always emits).
+ *   2. Every `referencedSessions` entry of an arc whose `echoToday` is true.
+ *
+ * Order: `principal` first if active, then group sessions in the order they
+ * were declared in the persona definition (specs/day-generator.md §3.1.2).
+ * Any session referenced by an arc but not declared in the persona is
+ * appended at the end (defensive — shouldn't happen with consistent inputs).
+ */
+export function computeActiveSessions(
+    activeArcs: ActiveArc[],
+    personaSessions: SessionDef[] | undefined,
+): string[] {
+    const seen = new Set<string>();
+    for (const arc of activeArcs) {
+        if (arc.primarySession) seen.add(arc.primarySession);
+        if (arc.echoToday && arc.referencedSessions) {
+            for (const s of arc.referencedSessions) seen.add(s);
+        }
+    }
+    if (seen.size === 0) return [];
+    const result: string[] = [];
+    if (seen.has('principal')) result.push('principal');
+    if (personaSessions) {
+        for (const s of personaSessions) {
+            if (s.id !== 'principal' && seen.has(s.id)) result.push(s.id);
+        }
+    }
+    for (const s of seen) {
+        if (!result.includes(s)) result.push(s);
+    }
+    return result;
 }
 
 /**
@@ -541,6 +615,16 @@ export function buildUserMessage(ctx: DayContext): string {
     lines.push(`Density: ${ctx.densityHint}`);
     lines.push('');
 
+    // Today's active sessions — emit one `# session: <id>` H1 per session, in this order.
+    // Skipped entirely for v0.2 personas (no sessions block in the system prompt).
+    if (ctx.activeSessions && ctx.activeSessions.length > 0) {
+        lines.push('Active sessions today (emit one `# session: <id>` H1 per session, in this order):');
+        for (const s of ctx.activeSessions) {
+            lines.push(`  - ${s}`);
+        }
+        lines.push('');
+    }
+
     // Active arcs as YAML
     lines.push('Active arcs:');
     if (ctx.activeArcs.length === 0) {
@@ -553,6 +637,13 @@ export function buildUserMessage(ctx: DayContext): string {
             lines.push(`    phase: ${arc.phase}`);
             lines.push(`    day_in_arc: ${arc.dayInArc}`);
             lines.push(`    arc_length: ${arc.arcLength}`);
+            if (arc.primarySession !== undefined) {
+                lines.push(`    primarySession: ${arc.primarySession}`);
+            }
+            if (arc.referencedSessions !== undefined && arc.referencedSessions.length > 0) {
+                lines.push(`    referencedSessions: [${arc.referencedSessions.join(', ')}]`);
+                lines.push(`    echo_today: ${arc.echoToday === true}`);
+            }
             lines.push(`    description: |`);
             for (const dl of arc.description.trim().split('\n')) {
                 lines.push(`      ${dl.trim()}`);
@@ -926,6 +1017,8 @@ export class DayGenerator {
             }
         }
 
+        const activeSessions = computeActiveSessions(activeArcs, this.persona.sessions);
+
         return {
             dayNumber,
             calendarDate,
@@ -936,6 +1029,7 @@ export class DayGenerator {
             correctionStates,
             arcSummaries,
             recentHistory: this.getRecentHistory(dayNumber),
+            activeSessions,
         };
     }
 

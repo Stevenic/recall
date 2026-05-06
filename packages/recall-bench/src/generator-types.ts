@@ -182,6 +182,14 @@ export interface DayContext {
     correctionStates: CorrectionState[];
     arcSummaries: ArcSummary[];
     recentHistory: RecentDay[];
+    /**
+     * Session IDs that should emit `# session: <id>` H1s in today's log.
+     * Computed from active arcs' `primarySession` plus any
+     * `referencedSessions` of arcs whose `echoToday` is true. Ordered with
+     * `principal` first, then group sessions in persona declaration order.
+     * Optional for backwards compatibility with v0.2 personas (no sessions).
+     */
+    activeSessions?: string[];
 }
 
 export interface RecentDay {
