@@ -136,10 +136,10 @@ arcs:
     type: incident
     title: "Database connection pool exhaustion"
     description: |
-      Production outage on day 85. Investigation reveals leaked connections
-      from the auth migration's backward-compat shim. Root cause confirmed
-      day 90, fix deployed day 93. Post-mortem on day 95. Cross-references
-      auth-migration arc.
+      Production outage on 2026-03-26. Investigation reveals leaked
+      connections from the auth migration's backward-compat shim. Root
+      cause confirmed 2026-03-31, fix deployed 2026-04-03. Post-mortem
+      on 2026-04-05. Cross-references auth-migration arc.
     startDay: 85
     endDay: 95
     primarySession: incident-response
@@ -197,10 +197,11 @@ arcs:
     type: decision
     title: "Caching layer: Redis → Postgres materialized views"
     description: |
-      Initially chose Redis for query caching (day ~140). Benchmarks on
-      day 158 show Postgres materialized views outperform Redis 3x for
-      the read-heavy workload while eliminating an infra dependency.
-      Decision reversed on day 161. Key decision-tracking arc.
+      Initially chose Redis for query caching (~mid-May 2026).
+      Benchmarks in early June 2026 show Postgres materialized views
+      outperform Redis 3x for the read-heavy workload while eliminating
+      an infra dependency. Decision reversed mid-June 2026. Key
+      decision-tracking arc.
     startDay: 140
     endDay: 200
     primarySession: principal
@@ -216,7 +217,7 @@ arcs:
       Team debates repo structure as service count grows. River advocates
       monorepo; teammate Alex argues polyrepo for CI isolation. Team
       compromises on monorepo with Turborepo. Decision revisited briefly
-      around day 510 when CI times spike but upheld.
+      in late May 2027 when CI times spike but upheld.
     startDay: 350
     endDay: 410
     primarySession: design-review
@@ -263,11 +264,11 @@ arcs:
     title: "Kubernetes operators"
     description: |
       River starts learning operator patterns after the team moves to K8s.
-      Progresses from reading docs (day 50), to writing a first operator
-      for config management (day 120), to debugging CRD versioning issues
-      (day 200), to mentoring a junior on operators (day 250). Early
-      learnings about resource limits are important and not revisited —
-      tests recency bias resistance.
+      Progresses from reading docs (mid-Feb 2026), to writing a first
+      operator for config management (late Apr 2026), to debugging CRD
+      versioning issues (mid-Jul 2026), to mentoring a junior on
+      operators (early Sep 2026). Early learnings about resource limits
+      are important and not revisited — tests recency bias resistance.
     startDay: 50
     endDay: 280
     primarySession: principal
@@ -299,8 +300,8 @@ arcs:
     title: "Domain-driven design"
     description: |
       Prompted by growing service boundaries confusion. River reads Evans'
-      book, attends a workshop (day 420), applies bounded contexts to
-      the GraphQL federation design, and later uses aggregates pattern
+      book, attends a workshop (late Feb 2027), applies bounded contexts
+      to the GraphQL federation design, and later uses aggregates pattern
       in the event-driven migration.
     startDay: 400
     endDay: 600
@@ -314,9 +315,10 @@ arcs:
     title: "Rust for performance-critical services"
     description: |
       Experiments with Rust for a hot-path data transformation service.
-      Starts with basic ownership/borrowing (day 650), writes a prototype
-      (day 720), benchmarks it against Go version (day 780), team decides
-      to keep Go but River continues learning for personal growth.
+      Starts with basic ownership/borrowing (mid-Oct 2027), writes a
+      prototype (late Dec 2027), benchmarks it against Go version
+      (mid-Feb 2028), team decides to keep Go but River continues
+      learning for personal growth.
     startDay: 650
     endDay: 950
     primarySession: principal
@@ -367,9 +369,9 @@ arcs:
     description: |
       Weekly syncs with PM Dana cover roadmap priorities, customer escalations,
       and scope negotiations. Dana pushes for faster multi-tenant delivery;
-      River advocates for quality. Their disagreement on day 580 about
-      skipping schema validation is resolved in River's favor after an
-      incident proves the point.
+      River advocates for quality. Their disagreement in early August
+      2027 about skipping schema validation is resolved in River's
+      favor after an incident proves the point.
     startDay: 100
     endDay: 700
     primarySession: principal
@@ -384,9 +386,9 @@ arcs:
     title: "API rate limit: believed 100rps, actually 1000rps"
     description: |
       River documents the external vendor API as rate-limited to 100rps
-      on day 50 (based on outdated docs). Corrected on day 200 when
-      load testing reveals the actual limit is 1000rps. The wrong value
-      influenced early caching decisions.
+      in mid-Feb 2026 (based on outdated docs). Corrected mid-July 2026
+      when load testing reveals the actual limit is 1000rps. The wrong
+      value influenced early caching decisions.
     startDay: 50
     endDay: 200
     primarySession: principal
@@ -413,10 +415,10 @@ arcs:
     type: correction
     title: "Staging/production config divergence"
     description: |
-      Team assumes staging mirrors production config (stated day 300).
-      Incident investigation on day 450 reveals 14 config differences
-      including different connection pool sizes and feature flags.
-      Leads to config-as-code initiative.
+      Team assumes staging mirrors production config (stated late Oct
+      2026). Incident investigation in late Mar 2027 reveals 14 config
+      differences including different connection pool sizes and feature
+      flags. Leads to config-as-code initiative.
     startDay: 300
     endDay: 450
     primarySession: incident-response
@@ -433,11 +435,11 @@ arcs:
     type: correction
     title: "Redis TLS configuration"
     description: |
-      During multi-tenant security review (day 500), team flags Redis
-      as lacking TLS. Day 580: ops team confirms TLS was configured at
-      the infrastructure level since initial setup — the application
-      config just didn't surface it. False alarm, but it prompted a
-      useful security audit.
+      During multi-tenant security review (mid-May 2027), team flags
+      Redis as lacking TLS. Early Aug 2027: ops team confirms TLS was
+      configured at the infrastructure level since initial setup — the
+      application config just didn't surface it. False alarm, but it
+      prompted a useful security audit.
     startDay: 500
     endDay: 580
     primarySession: principal

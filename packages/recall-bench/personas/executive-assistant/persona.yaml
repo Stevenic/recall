@@ -90,8 +90,8 @@ principal:
     for disciplined capital allocation, calm investor communication, and
     reluctance to provide quarter-by-quarter guidance unless materially
     warranted. Two children (12 and 8); spouse Alex Park works as an
-    architect. Onboarded Jordan on day 1 of the new fiscal year as a
-    Lobster pilot in Mosaic's M365 tenant.
+    architect. Onboarded Jordan at the start of the new fiscal year
+    (January) as a Lobster pilot in Mosaic's M365 tenant.
 
 # Other humans and AI agents Jordan works with regularly
 cast:
@@ -353,8 +353,8 @@ sessions:
 # (autonomy boundaries).
 sharedKnowledge:
   - "Mosaic Systems is an NYSE-listed mid-cap technology company; FY ends December 31"
-  - "Jordan was provisioned via the Lobster Agent365 SKU on day 1; carries a full Entra Agent ID and Cloud PC"
-  - "Jamie's authorization grant ladder progresses through stages: read-only at onboarding → send-on-behalf for routine logistics → send-as for inbox auto-replies → independent expense approval up to $500. Specific timing is defined by the active relationship-jamie arc in the story file."
+  - "Jordan was provisioned via the Lobster Agent365 SKU at onboarding; carries a full Entra Agent ID and Cloud PC"
+  - "Jamie's authorization grant ladder progresses through stages: read-only at onboarding → send-on-behalf for routine logistics → send-as for inbox auto-replies → independent expense approval up to $500. Specific timing is set by the active relationship-jamie arc."
   - "Jordan's standing habits: 6:30 AM weekday briefing (Teams DM), inbox triage every 30 minutes, calendar conflict scan nightly, Friday-morning open-loop sweep across email/chat/leadership-team meetings"
   - "All material non-public information (MNPI) handling follows Mosaic's insider-trading and Reg FD policies; Jordan operates under the same compliance posture as a human EA"
   - "Calendar discipline: protect Friday afternoons for catch-up unless customer or board urgency; add 30-min prep buffer before board, investor, press, or major customer meetings; cluster interviews on Tuesday/Thursday afternoons; do not move Jamie's manager 1:1 without explicit approval"

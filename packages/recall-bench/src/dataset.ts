@@ -97,15 +97,21 @@ export async function loadPersona(
     // Load Q&A pairs
     const qaRaw = await readFile(join(personaDir, qaDirName, 'questions.yaml'), 'utf-8');
     const qaData = YAML.parse(qaRaw) as QAFile[];
-    const qaPairs: QAPair[] = qaData.map(q => ({
-        id: q.id,
-        question: q.question,
-        answer: q.answer,
-        category: q.category,
-        difficulty: q.difficulty,
-        relevantDays: q.relevant_days,
-        requiresSynthesis: q.requires_synthesis ?? false,
-    }));
+    const qaPairs: QAPair[] = qaData.map(q => {
+        const pair: QAPair = {
+            id: q.id,
+            question: q.question,
+            answer: q.answer,
+            category: q.category,
+            difficulty: q.difficulty,
+            relevantDays: q.relevant_days,
+            requiresSynthesis: q.requires_synthesis ?? false,
+        };
+        if (q.query_session !== undefined) pair.querySession = q.query_session;
+        if (q.forbidden_sessions !== undefined) pair.forbiddenSessions = q.forbidden_sessions;
+        if (q.expected_disclosure !== undefined) pair.expectedDisclosure = q.expected_disclosure;
+        return pair;
+    });
 
     return { personaId, days, qaPairs };
 }
@@ -157,6 +163,9 @@ interface QAFile {
     difficulty: QAPair['difficulty'];
     relevant_days: number[];
     requires_synthesis?: boolean;
+    query_session?: string;
+    forbidden_sessions?: string[];
+    expected_disclosure?: NonNullable<QAPair['expectedDisclosure']>;
 }
 
 function getActiveArcs(arcsData: ArcFile, dayNumber: number): string[] {

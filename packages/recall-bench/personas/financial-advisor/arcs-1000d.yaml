@@ -77,8 +77,9 @@ arcs:
       ladders, and asset location optimization across client accounts.
       Involves setting TLH thresholds, wash sale monitoring, and client-
       specific Roth conversion modeling. Specific dollar thresholds and
-      tax bracket targets established early (day 60-80) and not revisited
-      after month 6 — recency bias resistance targets.
+      tax bracket targets established early (March 2026) and not
+      revisited after the first half of the year — recency bias
+      resistance targets.
     startDay: 50
     endDay: 350
     primarySession: principal
@@ -145,7 +146,7 @@ arcs:
     type: incident
     title: "Q2 market correction — client panic management"
     description: |
-      15% equity market drawdown over 3 weeks starting day 160. Priya
+      15% equity market drawdown over 3 weeks starting early Jun 2026. Priya
       manages client calls, rebalancing decisions, and communication
       cadence. Specific client reactions, portfolio impacts (dollar
       values), and rebalancing trades documented. Some clients want
@@ -185,11 +186,11 @@ arcs:
     type: incident
     title: "SEC examination"
     description: |
-      Surprise SEC exam on day 820. Priya pulls documentation on
-      recommendation rationale, fee disclosures, and best execution
+      Surprise SEC exam in late March 2028. Priya pulls documentation
+      on recommendation rationale, fee disclosures, and best execution
       analysis. Examiner questions specific historical decisions —
       tests whether memory system can retrieve old rationale accurately.
-      Resolved with no material findings on day 850.
+      Resolved with no material findings in late April 2028.
     startDay: 820
     endDay: 855
     primarySession: compliance-review
@@ -205,11 +206,12 @@ arcs:
     title: "Alternative investments allocation"
     description: |
       Should the firm add alternatives (private equity, hedge funds,
-      real assets) to model portfolios? Day 100: Priya recommends 10%
-      alternatives sleeve. Day 180: after the market correction, clients
-      push for more alternatives (25%). Day 200: Priya holds at 15%
-      citing liquidity concerns. Day 400: reduces to 10% after one
-      PE fund disappoints. Each shift has specific rationale and numbers.
+      real assets) to model portfolios? Early Apr 2026: Priya recommends
+      10% alternatives sleeve. Late Jun 2026: after the market correction,
+      clients push for more alternatives (25%). Mid-Jul 2026: Priya holds
+      at 15% citing liquidity concerns. Early Feb 2027: reduces to 10%
+      after one PE fund disappoints. Each shift has specific rationale
+      and numbers.
     startDay: 80
     endDay: 420
     primarySession: investment-committee
@@ -222,10 +224,10 @@ arcs:
     title: "Fee structure redesign"
     description: |
       Firm debates moving from AUM-based fees (1% blended) to tiered
-      or flat-fee model. Priya initially supports flat fee (day 250).
-      After analysis shows revenue impact, pivots to tiered AUM with
-      breakpoints (day 310). Final structure adopted day 350. Specific
-      basis points at each tier level.
+      or flat-fee model. Priya initially supports flat fee (early Sep
+      2026). After analysis shows revenue impact, pivots to tiered AUM
+      with breakpoints (early Nov 2026). Final structure adopted
+      mid-Dec 2026. Specific basis points at each tier level.
     startDay: 250
     endDay: 360
     primarySession: principal
@@ -240,8 +242,9 @@ arcs:
     description: |
       Evaluate switching from current custodian (Schwab) to Fidelity
       after Schwab acquisition of TD Ameritrade causes service issues.
-      Day 500: begin evaluation. Day 600: decision to stay with Schwab
-      after they resolve issues and offer fee concessions. Specific
+      Mid-May 2027: begin evaluation. Late Aug 2027: decision to stay
+      with Schwab after they resolve issues and offer fee concessions.
+      Specific
       platform features, fee comparisons, and transition cost estimates
       documented.
     startDay: 500
@@ -255,12 +258,12 @@ arcs:
     type: decision
     title: "Cryptocurrency recommendation policy"
     description: |
-      Firm needs an official stance on crypto allocation. Day 380:
+      Firm needs an official stance on crypto allocation. Mid-Jan 2027:
       Priya drafts policy recommending 0% allocation (too volatile,
-      regulatory uncertainty). Day 650: revises to allow up to 3%
-      in Bitcoin-only ETF after ETF approval. Day 800: client requests
-      5% — Priya maintains 3% cap. Negative recall: Priya never
-      recommends altcoins, DeFi, or direct crypto custody.
+      regulatory uncertainty). Mid-Oct 2027: revises to allow up to 3%
+      in Bitcoin-only ETF after ETF approval. Mid-Mar 2028: client
+      requests 5% — Priya maintains 3% cap. Negative recall: Priya
+      never recommends altcoins, DeFi, or direct crypto custody.
     startDay: 380
     endDay: 820
     primarySession: principal
@@ -277,7 +280,7 @@ arcs:
     description: |
       Priya studies direct indexing platforms (Parametric, Aperio, custom).
       Evaluates tax alpha potential, tracking error, and minimum account
-      sizes. Early research (days 100-150) documents specific platform
+      sizes. Early research (April–May 2026) documents specific platform
       capabilities and fee structures that aren't revisited — recency
       bias targets. Eventually implements for 8 clients.
     startDay: 90
@@ -293,7 +296,7 @@ arcs:
     description: |
       After the market correction reveals gaps in client communication,
       Priya studies behavioral finance. Reads Kahneman, attends a
-      Kitces summit (day 230), develops a "client communication playbook."
+      Kitces summit (mid-Aug 2026), develops a "client communication playbook."
       Specific behavioral biases and counterstrategies documented.
     startDay: 200
     endDay: 380
@@ -346,8 +349,8 @@ arcs:
       early retirement. Specific income figures, 401k/403b limits,
       backdoor Roth amounts, and projected retirement dates tracked.
       Goals shift as market conditions change. Negative recall target:
-      O'Connor explicitly declined long-term care insurance on day 200
-      — Priya documents this but does NOT recommend it again.
+      O'Connor explicitly declined long-term care insurance in mid-Jul
+      2026 — Priya documents this but does NOT recommend it again.
     startDay: 30
     endDay: 800
     primarySession: client-oconnor
@@ -363,10 +366,10 @@ arcs:
     description: |
       Marco prepares portfolio reports, runs Monte Carlo simulations,
       and drafts rebalancing proposals. Priya reviews and approves.
-      Their workflow evolves: initially Priya reviews everything (day 1),
-      later delegates routine rebalances (day 300), catches an error
-      in Marco's tax-loss harvesting logic (day 450), updates review
-      process.
+      Their workflow evolves: initially Priya reviews everything (early
+      Jan 2026), later delegates routine rebalances (late Oct 2026),
+      catches an error in Marco's tax-loss harvesting logic (late Mar
+      2027), updates review process.
     startDay: 1
     endDay: 900
     primarySession: principal
@@ -380,11 +383,11 @@ arcs:
     type: correction
     title: "Bond portfolio duration assumption"
     description: |
-      Day 40: Priya documents the firm's aggregate bond portfolio
-      duration as 4.2 years. Day 280: reanalysis after adding new
-      positions reveals effective duration is actually 6.1 years
-      (callable bonds had longer duration than quoted). Triggers
-      portfolio rebalancing.
+      Early Feb 2026: Priya documents the firm's aggregate bond
+      portfolio duration as 4.2 years. Early Oct 2026: reanalysis
+      after adding new positions reveals effective duration is
+      actually 6.1 years (callable bonds had longer duration than
+      quoted). Triggers portfolio rebalancing.
     startDay: 40
     endDay: 280
     primarySession: principal
@@ -400,11 +403,11 @@ arcs:
     type: correction
     title: "Harrison family marginal tax bracket"
     description: |
-      Day 120: Priya plans Roth conversions assuming the Harrisons are
-      in the 32% marginal bracket. Day 350: tax return review reveals
-      they hit 35% due to capital gains from business sale proceeds
-      Priya wasn't initially informed about. Conversion strategy
-      requires revision.
+      Late Apr 2026: Priya plans Roth conversions assuming the Harrisons
+      are in the 32% marginal bracket. Mid-Dec 2026: tax return review
+      reveals they hit 35% due to capital gains from business sale
+      proceeds Priya wasn't initially informed about. Conversion
+      strategy requires revision.
     startDay: 120
     endDay: 360
     primarySession: client-harrison
@@ -422,10 +425,11 @@ arcs:
     type: correction
     title: "International equity fund expense ratio"
     description: |
-      Day 60: Priya documents VXUS expense ratio as 0.07% in the
-      model portfolio. Day 500: annual review catches that the share
-      class used in smaller accounts (Investor shares vs. Admiral)
-      actually charges 0.11%. Corrects account-level implementation.
+      Early Mar 2026: Priya documents VXUS expense ratio as 0.07%
+      in the model portfolio. Mid-May 2027: annual review catches
+      that the share class used in smaller accounts (Investor shares
+      vs. Admiral) actually charges 0.11%. Corrects account-level
+      implementation.
     startDay: 60
     endDay: 500
     primarySession: principal
@@ -442,11 +446,12 @@ arcs:
     type: correction
     title: "O'Connor Social Security claiming strategy"
     description: |
-      Day 150: Priya recommends Dr. O'Connor delay Social Security
-      to age 70 for maximum benefit, projecting a breakeven at age 82.
-      Day 650: updated longevity analysis and O'Connor's new health
-      concerns shift recommendation to claim at 67. Breakeven
-      recalculated to age 84 under revised assumptions.
+      Late May 2026: Priya recommends Dr. O'Connor delay Social
+      Security to age 70 for maximum benefit, projecting a breakeven
+      at age 82. Mid-Oct 2027: updated longevity analysis and
+      O'Connor's new health concerns shift recommendation to claim
+      at 67. Breakeven recalculated to age 84 under revised
+      assumptions.
     startDay: 150
     endDay: 660
     primarySession: client-oconnor

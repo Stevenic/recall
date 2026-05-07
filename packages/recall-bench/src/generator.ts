@@ -523,11 +523,10 @@ export function buildSessionSystemPrompt(
                 lines.push(`    - ${t}`);
             }
         }
-        if (focusSession.firstDay !== undefined || focusSession.lastDay !== undefined) {
-            const start = focusSession.firstDay ?? 1;
-            const end = focusSession.lastDay !== undefined ? String(focusSession.lastDay) : 'end';
-            lines.push(`- lifecycle: day ${start}–${end}`);
-        }
+        // Session lifecycle (firstDay/lastDay) is enforced structurally before this
+        // prompt is built — the harness only spawns this call when the session is
+        // active. We deliberately do NOT surface the day range to the agent: it would
+        // bleed corpus-bookkeeping language into generated memories.
     } else {
         lines.push(`- id: ${focusSessionId}`);
         lines.push('- (no detailed shape declared in persona — write content scoped to this session)');
@@ -562,6 +561,13 @@ export function buildSessionSystemPrompt(
     lines.push('  their words are load-bearing. Decisions and dissent must be attributed.');
     lines.push('- List files produced/changed and decisions explicitly. End with an "Outstanding"');
     lines.push('  line listing follow-up work.');
+    lines.push('- Time references must use natural calendar phrasing as a real working agent would:');
+    lines.push('  specific dates ("2026-03-15", "March 15", "next Tuesday"), quarters ("Q1 2026",');
+    lines.push('  "end of Q2"), or relative human time ("two weeks from onboarding", "by end of');
+    lines.push('  March"). Do NOT use arc-day numbers ("day 1", "day 90", "day 150"), do NOT call');
+    lines.push('  out the corpus length ("180-day arc", "150-day window", "the arc"), and do NOT');
+    lines.push('  describe anything as "compressed". You are an operating agent in real time, not a');
+    lines.push('  simulation; you have no idea how long you will be running.');
     if (focusSession?.isolated) {
         lines.push('- This session is ISOLATED. Be concrete about sensitive topics — names, numbers,');
         lines.push('  dates, positions. The boundary keeps this content out of other sessions, so');
@@ -609,9 +615,8 @@ export function buildSessionUserMessage(
 ): string {
     const lines: string[] = [];
 
-    lines.push(`Generate the "${focusSessionId}" session entry of the daily memory log for day ${dayNumber}.`);
+    lines.push(`Generate the "${focusSessionId}" session entry of the daily memory log for ${calendarDate} (${dayOfWeek}).`);
     lines.push('');
-    lines.push(`Date: ${calendarDate} (${dayOfWeek})`);
     lines.push(`Density: ${densityHint}`);
     lines.push('');
 
@@ -633,8 +638,6 @@ export function buildSessionUserMessage(
             lines.push(`    type: ${arc.type}`);
             lines.push(`    title: "${arc.title}"`);
             lines.push(`    phase: ${arc.phase}`);
-            lines.push(`    day_in_arc: ${arc.dayInArc}`);
-            lines.push(`    arc_length: ${arc.arcLength}`);
             lines.push(`    description: |`);
             for (const dl of arc.description.trim().split('\n')) {
                 lines.push(`      ${dl.trim()}`);
@@ -718,7 +721,7 @@ export function buildSessionUserMessage(
         lines.push(`Recent days for THIS session (for continuity — do NOT repeat content from these):`);
         lines.push('');
         for (const r of sessionRecentHistory) {
-            lines.push(`### Day ${r.dayNumber} (${r.calendarDate}, ${r.dayOfWeek}) — ${focusSessionId}`);
+            lines.push(`### ${r.calendarDate} (${r.dayOfWeek}) — ${focusSessionId}`);
             lines.push(r.content);
             lines.push('');
         }

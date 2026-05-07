@@ -242,9 +242,9 @@ describe('Report generation', () => {
         const result = await harness.run();
         const grid = toHeatmapGrid(result.heatmap, result.ranges);
 
-        expect(grid.categories).toHaveLength(8);
+        expect(grid.categories).toHaveLength(10);
         expect(grid.ranges).toEqual(['30d']);
-        expect(grid.scores).toHaveLength(8);
+        expect(grid.scores).toHaveLength(10);
         // factual-recall should have a score
         expect(grid.scores[0][0]).toBe(6); // 3+2+1
         // Other categories should be null (no questions)

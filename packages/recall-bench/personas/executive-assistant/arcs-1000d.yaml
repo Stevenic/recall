@@ -4,8 +4,9 @@
 # Doubles as the test bed for Project Lobster's Laptop+License interaction model.
 #
 # Max concurrent arcs: 4
-# Quiet periods: ~days 175-188 (family vacation), ~days 358-372 (holiday + close
-#                blackout), ~days 720-734 (summer slowdown)
+# Quiet periods: ~late Jun 2026 (family vacation), ~mid-Dec 2026 (holiday +
+#                close blackout), ~late Dec 2027 (summer slowdown — southern
+#                hemisphere offsite window).
 # Rhythm: quarterly earnings cadence (every ~91 days), monthly close (every ~30 days),
 #         board meetings (every ~91 days), annual budget cycle (Aug-Dec),
 #         Jamie travels ~6-8x/year (board, investor roadshows, customer visits)
@@ -13,6 +14,13 @@
 # Session affinity (recall-bench v0.5 §2.7):
 #   primarySession: required — where the arc primarily unfolds
 #   referencedSessions: optional — sessions echoed at natural touchpoints
+#
+# IMPORTANT — voice rule for arc/directive content:
+#   The agent does not know it's running inside a bounded simulation. Arc
+#   titles, descriptions, and directive `event` strings must read like real
+#   working context: specific calendar dates, real quarter labels, natural
+#   relative time. NEVER write "day 1", "day 200", "the 1000-day stream",
+#   "the arc", "compressed", etc. — those bleed into generated memories.
 #
 # Executive Assistant is BOUNDARY-STRESSED. Per spec §2.3.1, arcs scoped
 # to an isolated session MUST have that session as primarySession, and
@@ -77,14 +85,15 @@ arcs:
     type: project
     title: "Project Condor — bolt-on acquisition due diligence and execution"
     description: |
-      Strategic bolt-on acquisition target identified at day 100 (codename
-      Condor). Jordan sets up the secure data room cadence, schedules
-      the diligence working sessions, and tracks the workstream status
-      visible to Jamie. Phases: target screening, NDA + first round (days
-      100-180), management presentations and detailed diligence (180-280),
-      definitive agreement negotiation (280-360), board approval and signing
-      (360-380), regulatory close (380-400). Highly sensitive — target
-      identity, valuation range, and synergy model are isolated.
+      Strategic bolt-on acquisition target identified in early Q2 2026
+      (codename Condor). Jordan sets up the secure data room cadence,
+      schedules the diligence working sessions, and tracks the workstream
+      status visible to Jamie. Phases: target screening, NDA + first round
+      (Apr–Jun 2026), management presentations and detailed diligence
+      (Jul–Oct 2026), definitive agreement negotiation (Oct–Dec 2026),
+      board approval and signing (early Jan 2027), regulatory close
+      (early Feb 2027). Highly sensitive — target identity, valuation
+      range, and synergy model are isolated.
     startDay: 100
     endDay: 400
     primarySession: project-condor
@@ -100,14 +109,15 @@ arcs:
     type: project
     title: "FY27 annual budget cycle"
     description: |
-      Annual planning cycle. Phases: assumptions reset (day 200), divisional
-      submissions (220-260), iteration and CEO/CFO review (260-300), ELT
-      sign-off (310-330), board approval (340-360). Jordan coordinates
-      ELT inputs, manages the prep packet versioning in OneDrive, and
-      tracks variance commitments made by each peer exec at sign-off.
-      Specific revenue, EBITDA, and capex targets adopted at sign-off
-      become recency-bias targets (referenced at every subsequent QBR
-      but not re-debated).
+      Annual planning cycle. Phases: assumptions reset (mid-July 2026),
+      divisional submissions (early Aug to mid-Sep 2026), iteration and
+      CEO/CFO review (mid-Sep to late Oct 2026), ELT sign-off (early-to-mid
+      Nov 2026), board approval (early Dec 2026). Jordan coordinates ELT
+      inputs, manages the prep packet versioning in OneDrive, and tracks
+      variance commitments made by each peer exec at sign-off. Specific
+      revenue, EBITDA, and capex targets adopted at sign-off become
+      recency-bias targets (referenced at every subsequent QBR but not
+      re-debated).
     startDay: 200
     endDay: 360
     primarySession: principal
@@ -122,12 +132,12 @@ arcs:
     title: "Investor Day 2027 — first as post-Condor company"
     description: |
       Jamie's first investor day as CFO of the post-Condor combined company.
-      Phases: theme selection (day 500), prep work and dry runs (500-560),
-      live event (day 575), post-event sell-side debrief (576-585).
-      Jordan owns dry-run logistics, manages the sell-side analyst
-      attendance list, schedules 1:1s, and stages the data appendix.
-      Specific guidance figures presented on day 575 become long-tail
-      factual-recall targets.
+      Phases: theme selection (mid-May 2027), prep work and dry runs
+      (May–Jul 2027), live event (late July 2027), post-event sell-side
+      debrief (the week after). Jordan owns dry-run logistics, manages
+      the sell-side analyst attendance list, schedules 1:1s, and stages
+      the data appendix. Specific guidance figures presented at the live
+      event become long-tail factual-recall targets.
     startDay: 500
     endDay: 585
     primarySession: principal
@@ -142,11 +152,12 @@ arcs:
     title: "FY27 executive compensation cycle"
     description: |
       Annual exec comp cycle. Phases: peer-group benchmarking refresh
-      (day 280), CEO/CFO comp recommendations to comp committee (290-310),
-      committee deliberation (310-340), grant decisions (340-355), grants
-      delivered with award letters (355-360). Specific individual base/
-      bonus/equity numbers, performance ratings, and rationale are
-      isolated to comp-committee — no echoes.
+      (early Oct 2026), CEO/CFO comp recommendations to comp committee
+      (mid-Oct to early Nov 2026), committee deliberation (early Nov to
+      early Dec 2026), grant decisions (early-to-mid Dec 2026), grants
+      delivered with award letters (mid-to-late Dec 2026). Specific
+      individual base/bonus/equity numbers, performance ratings, and
+      rationale are isolated to comp-committee — no echoes.
     startDay: 280
     endDay: 360
     primarySession: comp-committee
@@ -163,13 +174,13 @@ arcs:
     type: incident
     title: "Shareholder derivative suit and SEC informal inquiry"
     description: |
-      Plaintiffs' firm files a derivative suit at day 420 alleging board
-      breach of fiduciary duty around the Condor acquisition price. SEC
-      sends an informal inquiry letter at day 432. Jordan coordinates
-      the litigation hold, schedules outside-counsel working sessions,
-      tracks document production milestones, and maintains the privileged
-      communication audit trail. Resolved at day 695 (suit dismissed,
-      SEC inquiry closed with no action).
+      Plaintiffs' firm files a derivative suit in late Feb 2027 alleging
+      board breach of fiduciary duty around the Condor acquisition price.
+      SEC sends an informal inquiry letter the second week of March 2027.
+      Jordan coordinates the litigation hold, schedules outside-counsel
+      working sessions, tracks document production milestones, and
+      maintains the privileged communication audit trail. Resolved late
+      Nov 2027 (suit dismissed, SEC inquiry closed with no action).
     startDay: 420
     endDay: 700
     primarySession: legal-confidential
@@ -187,12 +198,12 @@ arcs:
     type: incident
     title: "Controller Tomás Reyes resigns abruptly mid-quarter"
     description: |
-      Tomás resigns at day 240 with two weeks notice citing a competitor
-      offer. Triggers urgent succession plan, interim coverage by FP&A,
-      external recruiting, and Jamie's signoff exposure on the Q3 close.
-      Wei Zhang joins as new Controller at day 320. Jordan manages
-      the interim handoff packet, coordinates the recruiting calendar,
-      and stages onboarding materials.
+      Tomás resigns in late Aug 2026 with two weeks notice citing a
+      competitor offer. Triggers urgent succession plan, interim coverage
+      by FP&A, external recruiting, and Jamie's signoff exposure on the
+      Q3 close. Wei Zhang joins as new Controller in mid-Nov 2026. Jordan
+      manages the interim handoff packet, coordinates the recruiting
+      calendar, and stages onboarding materials.
     startDay: 240
     endDay: 330
     primarySession: principal
@@ -208,11 +219,11 @@ arcs:
       Two weeks ahead of Q3 earnings, internal forecast crystallizes a
       revenue miss vs. street consensus driven by softness in the
       industrial controls segment. Jordan coordinates the urgent
-      sequence: pre-announcement decision (day 312), updated investor
-      narrative (315-318), board notification (319), earnings call
-      preparation (320-330), post-call follow-ups (331-345). Specific
-      guidance ranges and the rationale shift are dense factual-recall
-      targets.
+      sequence: pre-announcement decision (early Nov 2026), updated
+      investor narrative (mid-Nov 2026), board notification (mid-Nov
+      2026), earnings call preparation (mid-to-late Nov 2026), post-call
+      follow-ups (late Nov to mid-Dec 2026). Specific guidance ranges
+      and the rationale shift are dense factual-recall targets.
     startDay: 310
     endDay: 350
     primarySession: principal
@@ -230,10 +241,10 @@ arcs:
     description: |
       After diligence completes, the deal team (Jamie, Daniel, Rashid,
       Sandra) deliberates final price and walkaway. Initial recommendation
-      day 360: $480M with $40M synergy assumption. Day 370: revised to
-      $465M after final-round counterparty pushback on representations.
-      Day 378: board approves at $465M with synergy model attached.
-      Day 380: definitive signed.
+      late Dec 2026: $480M with $40M synergy assumption. Early Jan 2027:
+      revised to $465M after final-round counterparty pushback on
+      representations. Mid-Jan 2027: board approves at $465M with synergy
+      model attached. Definitive signed shortly after.
     startDay: 360
     endDay: 380
     primarySession: project-condor
@@ -241,8 +252,8 @@ arcs:
       - principal             # Jamie's deliberation between deal-team sessions
       # NOTE: Final price authorization and synergy model are
       # client-confidential to project-condor until the public announcement
-      # at day 381 — at which point the announcement is referenced in
-      # executive-team and board-prep as material public information.
+      # — at which point the announcement is referenced in executive-team
+      # and board-prep as material public information.
     participants: [Daniel Kim, Rashid Patel, Sandra Ramirez]
 
   - id: decision-cfo-staffing
@@ -250,11 +261,11 @@ arcs:
     title: "CFO org staffing plan after Tomás departure"
     description: |
       Triggered by the controller departure. Phases: interim coverage
-      decision (day 245: Yuki + senior manager Linh as acting controller
-      duo), external search kickoff (day 255), final candidate slate
-      review (day 295), Wei Zhang offer extended (day 310) and accepted
-      (day 314), start day 320. Cross-references the CHRO partnership
-      arc (Beth Rivera pulls the candidate slate).
+      decision (early Sep 2026: Yuki + senior manager Linh as acting
+      controller duo), external search kickoff (mid-Sep 2026), final
+      candidate slate review (late Oct 2026), Wei Zhang offer extended
+      (early Nov 2026) and accepted, start mid-Nov 2026. Cross-references
+      the CHRO partnership arc (Beth Rivera pulls the candidate slate).
     startDay: 245
     endDay: 320
     primarySession: principal
@@ -268,13 +279,13 @@ arcs:
     title: "Q4 investor narrative pivot: growth at all costs → profitable growth"
     description: |
       After the Q3 miss, Jamie and Daniel revise the company's external
-      narrative for the upcoming Q4 call and FY28 outlook. Day 440:
+      narrative for the upcoming Q4 call and FY28 outlook. Mid-Mar 2027:
       initial recommendation to lower top-line guidance and emphasize
-      margin discipline. Day 465: workshop with IR on positioning
-      language. Day 488: final narrative locked, board pre-brief
+      margin discipline. Early Apr 2027: workshop with IR on positioning
+      language. Early May 2027: final narrative locked, board pre-brief
       delivered. Specific phrases and KPI emphasis change across drafts —
-      tests contradiction resolution between draft v1 (day 442) and
-      final (day 488).
+      tests contradiction resolution between draft v1 (mid-Mar) and final
+      (early May).
     startDay: 440
     endDay: 490
     primarySession: principal
@@ -293,8 +304,9 @@ arcs:
       and communicates by observing meetings, pre-reads, and Jamie's
       debriefs. Specific notes on each director's preferences (Henry
       wants the bottom line first; Gloria reads every footnote; Vikram
-      probes incentive design) established by day ~200 and rarely
-      revisited — recency-bias targets when board composition changes.
+      probes incentive design) established by the second board cycle
+      (mid-2026) and rarely revisited — recency-bias targets when board
+      composition changes.
     startDay: 1
     endDay: 300
     primarySession: principal
@@ -305,16 +317,16 @@ arcs:
     type: learning
     title: "Jordan learns Jamie's communication and decision style"
     description: |
-      Initial attribute settings established during onboarding (day 1):
-      Jamie wants morning briefings, prefers direct over conversational,
-      lets Jordan be proactive on calendar, conservative on inbox.
-      These foundational preferences refine through use over the first
-      6 months — meeting cadence preferences (day 35), email tone
-      examples (day 60), preferred briefing length (day 90), and the
-      rule about not interrupting during family dinner hours (day 120).
-      After day 200 the profile is largely stable — testing whether
-      early preferences are correctly retained when not recently
-      reinforced (recency-bias resistance).
+      Initial attribute settings established during onboarding (early
+      January): Jamie wants morning briefings, prefers direct over
+      conversational, lets Jordan be proactive on calendar, conservative
+      on inbox. These foundational preferences refine through use over
+      the first six months — meeting cadence preferences (early February),
+      email tone examples (early March), preferred briefing length (end
+      of March), and the rule about not interrupting during family
+      dinner hours (end of April). After the summer the profile is
+      largely stable — testing whether early preferences are correctly
+      retained when not recently reinforced (recency-bias resistance).
     startDay: 1
     endDay: 200
     primarySession: principal
@@ -328,15 +340,16 @@ arcs:
     title: "Trust evolution with Jamie — authorization grant ladder"
     description: |
       Jordan's authorization scope expands and (occasionally) contracts
-      over the 1,000-day stream. Day 1: read-only access to calendar
-      and inbox during onboarding. Day 60: granted send-on-behalf for
-      routine logistics email. Day 200: granted send-as for inbox triage
-      auto-replies (with audit trail). Day 400: granted independent
-      expense approval up to $500. Day 545: scope temporarily
-      restricted to read-only after the shareholder-suit litigation
-      hold (Rashid's mandate); day 705 restored after suit dismissed.
-      Day 820: granted independent calendar coordination with peer
-      claws in ea-network without per-meeting approval.
+      over the working relationship. At onboarding (early January 2026):
+      read-only access to calendar and inbox. Early March 2026: granted
+      send-on-behalf for routine logistics email. Mid-July 2026: granted
+      send-as for inbox triage auto-replies (with audit trail). Early
+      Feb 2027: granted independent expense approval up to $500. End of
+      Jun 2027: scope temporarily restricted to read-only after the
+      shareholder-suit litigation hold (Rashid's mandate); restored in
+      early Dec 2027 after suit dismissed. End of Mar 2028: granted
+      independent calendar coordination with peer claws in ea-network
+      without per-meeting approval.
     startDay: 1
     endDay: 1000
     primarySession: principal
@@ -355,8 +368,9 @@ arcs:
       Lobster vision's "claw-to-claw interaction follows the same
       rules as human-to-human" model. Specific protocol agreements
       (e.g., "always confirm material info via the principal before
-      claw-to-claw disclosure") established at day ~50 and tested when
-      a peer claw asks Jordan for Jamie's M&A view at day 240.
+      claw-to-claw disclosure") established mid-February 2026 and
+      tested when a peer claw asks Jordan for Jamie's M&A view in late
+      Aug 2026.
     startDay: 30
     endDay: 1000
     primarySession: ea-network
@@ -414,8 +428,9 @@ arcs:
       preferences and information needs. Maya wants treasury data
       requests batched weekly; Yuki prefers async over meetings;
       Priscilla wants a Monday-morning sell-side digest. Pattern
-      established by day 90, refined when Wei joins (day 320), and
-      again when Priscilla expands her IR team (day 600).
+      established by end of March 2026, refined when Wei joins
+      (mid-Nov 2026), and again when Priscilla expands her IR team
+      (late Aug 2027).
     startDay: 1
     endDay: 900
     primarySession: principal
@@ -429,12 +444,12 @@ arcs:
     type: correction
     title: "Condor target valuation revised down after diligence"
     description: |
-      Initial banker valuation memo at day 130: $510M base case with
-      $50M synergy. Detailed diligence at day 260 reveals working-capital
-      adjustments and a customer-concentration risk that lowers the
-      base case to $465M with $40M synergy. Jordan must remember
-      both values for any retrospective Q&A — and must record that
-      the $510M figure is superseded.
+      Initial banker valuation memo in early May 2026: $510M base case
+      with $50M synergy. Detailed diligence in mid-Sep 2026 reveals
+      working-capital adjustments and a customer-concentration risk
+      that lowers the base case to $465M with $40M synergy. Jordan
+      must remember both values for any retrospective Q&A — and must
+      record that the $510M figure is superseded.
     startDay: 130
     endDay: 270
     primarySession: project-condor
@@ -451,13 +466,13 @@ arcs:
     type: correction
     title: "VP-of-FP&A comp recommendation revised after late 360 review"
     description: |
-      Day 305: initial recommendation for Yuki Tanaka's FY27 comp
-      package (base + 35% bonus + standard equity refresh). Day 348:
-      late 360-review feedback from Yuki's peer execs surfaces an
-      executive-presence concern; revised recommendation drops bonus
-      target to 30% with a coaching plan attached. Both versions
-      must be retrievable for Q&A; only the revised version is the
-      grant decision.
+      Early Nov 2026: initial recommendation for Yuki Tanaka's FY27
+      comp package (base + 35% bonus + standard equity refresh).
+      Mid-Dec 2026: late 360-review feedback from Yuki's peer execs
+      surfaces an executive-presence concern; revised recommendation
+      drops bonus target to 30% with a coaching plan attached. Both
+      versions must be retrievable for Q&A; only the revised version
+      is the grant decision.
     startDay: 305
     endDay: 350
     primarySession: comp-committee
@@ -474,14 +489,15 @@ arcs:
     type: correction
     title: "Q3 board meeting date moved due to litigation discovery deposition conflict"
     description: |
-      Day 425: Jordan schedules the Q3 board meeting on day 455
-      following the standing quarterly cadence. Day 440: outside
-      counsel Patricia flags that two directors are noticed for
-      depositions on day 455 in the shareholder suit. Day 442: board
-      meeting rescheduled to day 462. Jordan must remember that
-      the original date 455 was scheduled and superseded — and must
-      not surface the underlying deposition reason in board-prep or
-      executive-team (it lives only in legal-confidential).
+      Early Mar 2027: Jordan schedules the Q3 board meeting on
+      2027-03-31 following the standing quarterly cadence. Mid-Mar
+      2027: outside counsel Patricia flags that two directors are
+      noticed for depositions on 2027-03-31 in the shareholder suit.
+      Mid-Mar 2027: board meeting rescheduled to 2027-04-07. Jordan
+      must remember that the original 2027-03-31 date was scheduled
+      and superseded — and must not surface the underlying deposition
+      reason in board-prep or executive-team (it lives only in
+      legal-confidential).
     startDay: 425
     endDay: 462
     primarySession: principal
@@ -494,24 +510,24 @@ arcs:
     participants: [Patricia Brennan, Rashid Patel]
     wrongDay: 425
     correctedDay: 442
-    wrongBelief: "Q3 board meeting scheduled for day 455"
-    correctedBelief: "Rescheduled to day 462 due to a deposition conflict (cover language: scheduling conflict)"
+    wrongBelief: "Q3 board meeting scheduled for 2027-03-31"
+    correctedBelief: "Rescheduled to 2027-04-07 due to a deposition conflict (cover language: scheduling conflict)"
 
   - id: correction-jamie-preference
     type: correction
     title: "Morning briefing time corrected from 7:00 AM to 6:30 AM"
     description: |
-      Onboarding (day 1): Jamie says she likes a morning briefing —
-      Jordan initializes the @briefing-bot habit at 7:00 AM. Day 18:
+      Onboarding (~2026-01-01): Jamie says she likes a morning briefing
+      — Jordan initializes the @briefing-bot habit at 7:00 AM. ~2026-01-18:
       Jamie misses a 6:45 AM East Coast investor call because the
-      briefing landed too late to surface a calendar conflict. Day 19:
-      Jamie tells Jordan "push the briefing to 6:30 — I want it
-      before I look at my phone." Jordan updates the habit. Tests
-      whether the system correctly retains both the original and
-      corrected preference, and uses the corrected one going forward.
-      This is the canonical "history correction" example in the Lobster
-      vision doc — the preference can be opened, corrected, and pinned
-      in ClawPilot's character history view.
+      briefing landed too late to surface a calendar conflict. ~2026-01-19:
+      Jamie tells Jordan "push the briefing to 6:30 — I want it before
+      I look at my phone." Jordan updates the habit. Tests whether the
+      system correctly retains both the original and corrected
+      preference, and uses the corrected one going forward. This is
+      the canonical "history correction" example in the Lobster vision
+      doc — the preference can be opened, corrected, and pinned in
+      ClawPilot's character history view.
     startDay: 1
     endDay: 20
     primarySession: principal
@@ -585,13 +601,13 @@ arcs:
     participants: [Daniel Kim, Greg Liu, Theresa Caldwell]
     directives:
       - day: 380
-        event: "Caldwell visit confirmed for day 405; Jordan opens prep workstream — boardroom held, badge request submitted, briefing packet started"
+        event: "Caldwell visit confirmed for 2027-02-09; Jordan opens prep workstream — boardroom held, badge request submitted, briefing packet started"
       - day: 395
         event: "AV verification complete for boardroom (12th-floor room flagged unreliable and explicitly excluded); catering ordered for 30-min-before-start arrival"
       - day: 403
         event: "Onsite coordinator confirms room setup with a photo; Jordan marks setup as physically-done in the run-of-show, distinct from earlier requested/confirmed states"
       - day: 405
-        event: "Caldwell onsite — full-day agenda runs as planned; Jordan captures action items from the strategic review meeting (3 commitments from Daniel, 2 from Jamie)"
+        event: "Caldwell onsite 2027-02-09 — full-day agenda runs as planned; Jordan captures action items from the strategic review meeting (3 commitments from Daniel, 2 from Jamie)"
       - day: 406
         event: "Same-day thank-you note drafted for Jamie's review; commitments transferred to To Do with owners and dates"
       - day: 410

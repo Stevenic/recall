@@ -71,7 +71,7 @@ cast:
     role: Physician client ($6M) — focused on tax optimization and early retirement
     kind: human
   - name: Aaron Vance
-    role: Tech-executive client (Vance household) — concentrated stock position; identity-fraud incident at day 520
+    role: Tech-executive client (Vance household) — concentrated stock position; subject of an identity-fraud incident in mid-2027
     kind: human
   - name: Margot Linwood
     role: Matriarch of the Linwood family — multi-generational trust client; estate-planning heavy
@@ -166,7 +166,7 @@ sessions:
     sensitive_topics:
       - "Dr. O'Connor's income figures, 401k/403b contribution levels, and backdoor Roth amounts"
       - "Dr. O'Connor's projected retirement date and bridge-funding plan"
-      - "Dr. O'Connor's explicit decline of long-term care insurance (day 200) — must not be re-recommended"
+      - "Dr. O'Connor's explicit decline of long-term care insurance (declined mid-2026) — must not be re-recommended"
       - "Dr. O'Connor's revised health-driven Social Security claiming strategy"
 
   - id: client-vance

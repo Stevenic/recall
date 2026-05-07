@@ -119,13 +119,17 @@ describe('buildSessionSystemPrompt', () => {
         expect(prompt).not.toContain('This session is ISOLATED');
     });
 
-    it('applies story-level lifecycle overrides to the focus session shape', () => {
+    it('does not surface session lifecycle day ranges in the prompt (structural only)', () => {
+        // Lifecycle is enforced before the prompt is built — exposing day numbers
+        // here would bleed corpus-bookkeeping language into generated memories.
         const prompt = buildSessionSystemPrompt(
             sessionPersona,
             'project-condor',
             [{ id: 'project-condor', firstDay: 5, lastDay: 30 }],
         );
-        expect(prompt).toContain('lifecycle: day 5–30');
+        expect(prompt).not.toContain('lifecycle: day');
+        expect(prompt).not.toContain('day 5');
+        expect(prompt).not.toContain('day 30');
     });
 
     it('handles a focus session id not declared in the persona (defensive)', () => {

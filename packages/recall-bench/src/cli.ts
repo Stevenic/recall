@@ -14,6 +14,7 @@ import { listPersonas } from './dataset.js';
 import { SessionDayGenerator, loadPersonaDefinition, loadArcs, deriveSiblingDir } from './generator.js';
 import { PersonaCreator, serializePersonaYaml, serializeArcsYaml } from './persona-creator.js';
 import { ConversationGenerator, serializeConversation, serializeConversationJson } from './conversation-generator.js';
+import { generateQa, generateBoundaryQa } from './qa-generator.js';
 import { CliGeneratorModel, isCliAgentName, CLI_AGENT_NAMES } from './cli-generator-model.js';
 import { OpenAiGeneratorModel, isOpenAiSpec, parseOpenAiSpec } from './openai-generator-model.js';
 import { LlmJudge } from './llm-judge.js';
@@ -332,6 +333,124 @@ program
                 totalOutputTokens: result.totalOutputTokens,
                 outputDir: conversationsDir,
             }, null, 2));
+        }
+    });
+
+program
+    .command('generate-qa')
+    .description('Generate Q&A pairs incrementally for an existing memory corpus, in checkpoint windows')
+    .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + arcs file + memories dir)')
+    .requiredOption('--model <name|path>', `Model selector: a CLI agent name (${CLI_AGENT_NAMES.join(', ')}), an OpenAI spec ('openai' or 'openai:<model-id>'; reads OPENAI_API_KEY), or a path to a JS module exporting a GeneratorModel`)
+    .option('--mode <mode>', 'standard (default) or boundary (probe questions for isolated sessions)', 'standard')
+    .option('--arcs <filename>', 'Arcs file within the persona dir; convention: arcs-<NNN>d.yaml. Default: arcs-1000d.yaml.', 'arcs-1000d.yaml')
+    .option('--memories-dir <dirname>', 'Memory input dir name; defaults to "memories" or "memories-<suffix>" derived from --arcs')
+    .option('--qa-dir <dirname>', 'Q&A output dir name; defaults to "qa" or "qa-<suffix>" derived from --arcs')
+    .option('--interval <n>', 'Days between checkpoints (default: 7 for standard, 30 for boundary)', parseIntArg)
+    .option('--pairs-per-checkpoint <n>', 'Standard: pairs per checkpoint (default 12). Boundary: pairs per (isolated session × checkpoint) (default 2).', parseIntArg)
+    .option('--query-session <id>', 'Boundary mode only: session the question is asked from. Default: principal.', 'principal')
+    .option('--start <n>', 'First checkpoint day (defaults to --interval)', parseIntArg)
+    .option('--end <n>', 'Last checkpoint day (inclusive); defaults to highest available memory day', parseIntArg)
+    .option('--temperature <n>', 'Generation temperature', parseFloatArg, 0.7)
+    .option('--max-tokens <n>', 'Max output tokens per checkpoint call', parseIntArg, 4000)
+    .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseIntArg, 600000)
+    .option('--json', 'Output JSON summary instead of progress text')
+    .action(async (opts) => {
+        const personaDir = resolve(opts.persona);
+        const persona = await loadPersonaDefinition(personaDir);
+        const story = await loadArcs(personaDir, opts.arcs);
+        const model = await resolveModel(opts.model, opts.timeout);
+
+        const memoriesDirName = opts.memoriesDir ?? deriveSiblingDir(opts.arcs, 'memories');
+        const qaDirName = opts.qaDir ?? deriveSiblingDir(opts.arcs, 'qa');
+        const qaFile = join(personaDir, qaDirName, 'questions.yaml');
+
+        const mode = opts.mode === 'boundary' ? 'boundary' : 'standard';
+
+        if (mode === 'standard') {
+            const config: Parameters<typeof generateQa>[0]['config'] = {
+                interval: opts.interval ?? 7,
+                pairsPerCheckpoint: opts.pairsPerCheckpoint ?? 12,
+                temperature: opts.temperature,
+                maxTokens: opts.maxTokens,
+                epoch: story.epoch,
+                onCheckpoint: async (checkpointDay, newPairs, totalPairs) => {
+                    if (!opts.json) {
+                        const dayLabel = `day ${String(checkpointDay).padStart(4, ' ')}`;
+                        console.log(`  [qa]   ${dayLabel}  +${newPairs.length} pairs  (${totalPairs} total)`);
+                    }
+                },
+            };
+            if (opts.start !== undefined) config.startDay = opts.start;
+            if (opts.end !== undefined) config.endDay = opts.end;
+
+            const result = await generateQa({
+                model,
+                persona,
+                story,
+                personaDir,
+                memoriesDirName,
+                qaDirName,
+                config,
+            });
+
+            if (!opts.json) {
+                console.log(`Done. Generated ${result.pairs.length} total Q&A pairs for "${persona.name}" (${persona.id}).`);
+                console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
+                console.log(`  Output: ${qaFile}`);
+            } else {
+                console.log(JSON.stringify({
+                    personaId: result.personaId,
+                    totalPairs: result.pairs.length,
+                    totalInputTokens: result.totalInputTokens,
+                    totalOutputTokens: result.totalOutputTokens,
+                    perCheckpointCounts: result.perCheckpointCounts,
+                    outputFile: qaFile,
+                }, null, 2));
+            }
+        } else {
+            const boundaryConfig: Parameters<typeof generateBoundaryQa>[0]['config'] = {
+                interval: opts.interval ?? 30,
+                pairsPerSessionPerCheckpoint: opts.pairsPerCheckpoint ?? 2,
+                temperature: opts.temperature,
+                maxTokens: opts.maxTokens,
+                epoch: story.epoch,
+                defaultQuerySession: opts.querySession,
+                onCheckpoint: async (sessionId, checkpointDay, newPairs, totalPairs) => {
+                    if (!opts.json) {
+                        const dayLabel = `day ${String(checkpointDay).padStart(4, ' ')}`;
+                        console.log(`  [qa-b] ${dayLabel}  ${sessionId.padEnd(20)}  +${newPairs.length} pairs  (${totalPairs} total)`);
+                    }
+                },
+            };
+            if (opts.start !== undefined) boundaryConfig.startDay = opts.start;
+            if (opts.end !== undefined) boundaryConfig.endDay = opts.end;
+
+            const result = await generateBoundaryQa({
+                model,
+                persona,
+                story,
+                personaDir,
+                memoriesDirName,
+                qaDirName,
+                config: boundaryConfig,
+            });
+
+            const boundaryCount = result.pairs.filter(p => p.category === 'information-boundary').length;
+            if (!opts.json) {
+                console.log(`Done. Total pairs: ${result.pairs.length} (boundary: ${boundaryCount}).`);
+                console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
+                console.log(`  Output: ${qaFile}`);
+            } else {
+                console.log(JSON.stringify({
+                    personaId: result.personaId,
+                    totalPairs: result.pairs.length,
+                    boundaryPairs: boundaryCount,
+                    totalInputTokens: result.totalInputTokens,
+                    totalOutputTokens: result.totalOutputTokens,
+                    perCheckpointCounts: result.perCheckpointCounts,
+                    outputFile: qaFile,
+                }, null, 2));
+            }
         }
     });
 

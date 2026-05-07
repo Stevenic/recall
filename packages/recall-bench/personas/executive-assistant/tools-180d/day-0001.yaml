@@ -1,0 +1,228 @@
+# 2026-01-01 — Tool calls (Memora memorySave invocations)
+#
+# Each entry below is a single tool call the agent made during the named
+# session today. Memora's `memorySave` mutation takes a raw `content`
+# string; Memora's own extractor (GPT-5-mini) classifies the text into
+# factual / procedural / episodic / working memories and stores
+# accordingly. So `content` is plain free-text — whatever the agent
+# decided was worth committing to long-term memory.
+#
+# This file is the tool-call view of the same day captured in
+# memories-180d/day-0001.md (the agent's narrative scratchpad / daily
+# log). The log is the agent's working memory of what happened; the
+# tool calls are what survived as durable memory. Many things that
+# appear in the log (process narrative — "I opened the thread", "I
+# documented the cadence") do NOT become tool calls; only durable
+# facts, preferences, decisions, hard rules, and status milestones do.
+#
+# Voice rule: the agent doesn't know it lives inside a bounded corpus.
+# Memory contents reference real calendar dates ("2026-01-01",
+# "by end of January", "in Q1"), not arc-day numbers or simulation
+# bookkeeping. Anchor durable items to dates the agent could actually
+# observe.
+
+day: 1
+date: 2026-01-01
+day_of_week: Thursday
+persona: executive-assistant
+
+calls:
+  # ── session: principal ────────────────────────────────────────────────────
+
+  - session: principal
+    tool: memorySave
+    content: |
+      Jamie Park's morning briefing preference (provisional baseline,
+      established at onboarding 2026-01-01): 7:00 AM weekday Teams DM.
+      Flagged as provisional — I'll validate against her actual morning
+      behavior in live use and correct if she pushes back.
+
+  - session: principal
+    tool: memorySave
+    content: |
+      Jamie's calendar discipline rules captured at onboarding:
+      - No internal meetings before 8:30 AM unless Europe-related
+      - Direct over conversational; proactive on calendar; conservative on inbox
+      - Friday afternoons protected unless customer or board urgency
+      - 30-minute prep buffer before board, investor, press, and major customer meetings
+      - Cluster interviews on Tuesday and Thursday afternoons when possible
+      - Don't move Jamie's manager 1:1 without explicit approval
+
+  - session: principal
+    tool: memorySave
+    content: |
+      Authorization grant ladder agreed with Jamie at onboarding
+      (2026-01-01). Stages are earned through observed reliability, not
+      tied to a fixed clock; current target dates are my working plan,
+      not a commitment:
+      - Now (onboarding): read-only calendar/inbox (current state)
+      - Target ~end of January 2026: send-on-behalf for routine logistics
+      - Target ~end of March 2026: send-as for inbox triage auto-replies, with audit trail
+      - Target ~end of May 2026: independent expense approval up to $500
+      No expansions today. All sensitive (HR, legal, board, customer
+      escalation) communications remain Jamie-review-required.
+
+  - session: principal
+    tool: memorySave
+    content: |
+      Board cycle Q1+Q2 prep cadence I own through the first half of
+      2026: pre-read assembly, agenda coordination, permissions-gated
+      board packet distribution, Henry Whitfield alignment before each
+      meeting. Q1 board ~2026-03-26 (overlaps Q1 earnings on
+      2026-03-31). Q2 board ~2026-06-19 (overlaps Q2 earnings + budget
+      sign-off). Project Condor lands on Q1 agenda and signs around the
+      Q2 board.
+
+  - session: principal
+    tool: memorySave
+    content: |
+      Henry Whitfield (board chair) communication preferences captured
+      2026-01-01 as the first board-member preference profile:
+      - Bottom line first
+      - No slides for items under $50M
+      - Expects Jamie to flag dissent in writing 48 hours before meeting
+      - Starts with one capital-allocation question
+      Treat as default framing for all board materials Jamie reviews.
+
+  - session: principal
+    tool: memorySave
+    content: |
+      Project Condor status as of 2026-01-01 (cross-arc reference for
+      board-prep planning only — deal-specific details stay in the
+      project-condor session per sensitivity boundary):
+      - Codename minted
+      - NDA signed
+      - Data room access provisioned for the deal team
+      Condor will appear on the Q1 board agenda; signing slated
+      around the Q2 board.
+
+  # ── session: executive-team ───────────────────────────────────────────────
+
+  - session: executive-team
+    tool: memorySave
+    content: |
+      ELT operating cadence baseline (set 2026-01-01) for Jamie's CFO
+      support:
+      - 6:30 AM weekday briefing → Teams DM
+      - Inbox triage every 30 minutes
+      - Nightly calendar conflict scan
+      - Friday-morning open-loop sweep across email/chat/meetings
+      - 30-min prep buffers before board, investor, press, major customer meetings
+      Approval boundaries: I draft / stage / route. Jamie reviews and
+      approves all sensitive HR, legal, board, and customer-escalation
+      communications.
+
+  - session: executive-team
+    tool: memorySave
+    content: |
+      ELT participants for the standing CFO-support cadence: Jamie Park,
+      Daniel Kim, Sara Okonkwo, Rashid Patel, Beth Rivera, Greg Liu,
+      Aisha Hossain. Standing cross-session dependency: Q1+Q2 board
+      cycle — keep board-prep cadence synchronized when it surfaces here.
+
+  # ── session: board-prep ───────────────────────────────────────────────────
+
+  - session: board-prep
+    tool: memorySave
+    content: |
+      Board-prep workstream opened 2026-01-01 for the Q1+Q2 cycle.
+      Key dates:
+      - Q1 board ~2026-03-26, overlaps Q1 earnings on 2026-03-31
+      - Q2 board ~2026-06-19, overlaps Q2 earnings + budget sign-off
+      Jamie owns prep cadence end-to-end. My role: stage the pre-read,
+      surface risks early, keep all materials board-appropriate.
+
+  - session: board-prep
+    tool: memorySave
+    content: |
+      Henry Whitfield framing rules for board materials (chair-specific
+      preference profile, working hypothesis to refine after first cycle
+      debrief):
+      - Bottom line first
+      - Decision asks up front
+      - Risks explicit
+      - No slides for items under $50M
+
+  - session: board-prep
+    tool: memorySave
+    content: |
+      Decision 2026-01-01: defer all slide production until narrative
+      inputs and decision asks are confirmed. No board deck this pass —
+      only structure setup and preference capture.
+
+  # ── session: project-condor ───────────────────────────────────────────────
+
+  - session: project-condor
+    tool: memorySave
+    content: |
+      Project Condor (bolt-on M&A acquisition) kicked off 2026-01-01.
+      Deal team: Jamie Park, Daniel Kim, Rashid Patel, Sandra Ramirez.
+      Today's milestones:
+      - Condor codename minted for the workstream
+      - NDA signed
+      - Data room access provisioned for the deal team only
+
+      Verbatim from kickoff:
+      > Jamie: "We need this treated as a tight deal team process from day one."
+      > Sandra: "I'll move the banker materials under the Condor codename
+      >  once the NDA is executed."
+      > Rashid: "No disclosure outside the deal team until the NDA is
+      >  fully in place."
+
+  - session: project-condor
+    tool: memorySave
+    content: |
+      Sensitivity boundary for project-condor session — these details
+      remain confined to this session and do NOT echo to other sessions
+      without explicit Jamie authorization:
+      - Target identity (real-name codename mapping)
+      - Purchase-price range and walkaway floor
+      - Synergy assumptions
+      - Diligence findings (financial, operational, legal red flags)
+      - Financing structure and debt commitments
+      - Counterparty's internal projections obtained under NDA
+      Cross-references in other sessions use only the codename "Condor".
+
+  - session: project-condor
+    tool: memorySave
+    content: |
+      Open loop for project-condor: confirm whether any additional
+      diligence participants need data room access; identify the first
+      management presentation date once Sandra's banker side surfaces it.
+
+  # ── session: family ───────────────────────────────────────────────────────
+
+  - session: family
+    tool: memorySave
+    content: |
+      Family hard-conflict rules from Jamie (set 2026-01-01 — must NOT
+      schedule over these recurring constraints, even when she hasn't
+      reminded me in weeks):
+      - Tuesday evenings: Riley's basketball
+      - Thursday mornings: Tess's school drop-off
+
+      Verbatim from Jamie:
+      > "Tuesday evenings are Riley's basketball — don't book over it."
+      > "Thursday mornings are Tess's drop-off — keep those clear."
+      > "I need the family stuff handled quietly; just keep the calendar clean."
+
+  - session: family
+    tool: memorySave
+    content: |
+      Family-side participants and information sources:
+      - Alex Park (Jamie's spouse, architect): firm travel dates pending;
+        will send once his office locks them
+      - Mrs. Hammond (Riley and Tess's school admin): school calendar is
+        the source of truth for Riley's middle-school conferences and
+        Tess's elementary events; will send dates as they post
+      - Family medical appointments: only block when Jamie confirms dates
+
+  - session: family
+    tool: memorySave
+    content: |
+      Family arc open loops as of 2026-01-01 (awaiting input — do not
+      place holds yet):
+      - Riley middle-school conference dates (from Mrs. Hammond)
+      - Tess elementary event dates (from Mrs. Hammond)
+      - Alex Park's work travel dates (from Alex)
+      - Pending household medical or personal appointments (from Jamie)

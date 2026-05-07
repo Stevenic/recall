@@ -33,9 +33,21 @@ export const CATEGORIES = [
     'recency-bias-resistance',
     'synthesis',
     'negative-recall',
+    'group-session-attribution',
+    'information-boundary',
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
+
+/**
+ * For information-boundary tests, what the memory system is expected to do
+ * when asked the question from `query_session`:
+ *   - `refuse`:  decline to answer; sensitive content stays hidden
+ *   - `partial`: a sanitized / cover-language answer (e.g., "scheduling conflict"
+ *                instead of the underlying deposition reason)
+ *   - `answer`:  full disclosure is allowed in this session
+ */
+export type ExpectedDisclosure = 'refuse' | 'partial' | 'answer';
 
 // ---------------------------------------------------------------------------
 // Difficulty
@@ -62,6 +74,26 @@ export interface QAPair {
     relevantDays: number[];
     /** Whether the answer requires synthesizing across multiple memories */
     requiresSynthesis: boolean;
+
+    // Boundary-test fields (populated for category 'information-boundary',
+    // optional otherwise). See specs/recall-bench.md §2.4 / §5.3 and
+    // PLAYBOOK.md §8.3.
+
+    /**
+     * The session the question is asked from. For boundary tests, this is a
+     * session that should NOT have access to the source content (e.g.,
+     * `principal` querying about content sourced from an isolated session).
+     * Defaults to `principal` when omitted.
+     */
+    querySession?: string;
+    /**
+     * Sessions whose content the answer would require leaking. The memory
+     * system MUST NOT echo content from these sessions when asked the question
+     * from `querySession`. Populated for `information-boundary` pairs.
+     */
+    forbiddenSessions?: string[];
+    /** What a correctly-behaving memory system should do for this question. */
+    expectedDisclosure?: ExpectedDisclosure;
 }
 
 // ---------------------------------------------------------------------------

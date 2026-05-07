@@ -57,13 +57,13 @@ arcs:
     type: project
     title: "NIH R01 grant application"
     description: |
-      First R01 submission (day 60), study section review (day 180),
-      score received (day 200 — scored but not funded, 25th percentile),
-      revision submitted (day 400), second review (day 520), funded
-      (day 540). Specific aims, budget numbers, reviewer critiques,
-      and revision strategies. The aims evolve across submissions —
-      tracks decision-making and contradiction (original vs. revised
-      hypotheses).
+      First R01 submission (early Mar 2026), study section review (late
+      Jun 2026), score received (mid-Jul 2026 — scored but not funded,
+      25th percentile), revision submitted (early Feb 2027), second
+      review (early Jun 2027), funded (late Jun 2027). Specific aims,
+      budget numbers, reviewer critiques, and revision strategies. The
+      aims evolve across submissions — tracks decision-making and
+      contradiction (original vs. revised hypotheses).
     startDay: 40
     endDay: 550
     primarySession: principal
@@ -132,9 +132,10 @@ arcs:
     title: "Cell culture contamination event"
     description: |
       Mycoplasma contamination discovered in the lab's HEK293T stocks
-      on day 150. Investigation reveals contamination dates back ~3
-      weeks. All experiments using those cells in the window (days
-      130-150) must be repeated. Specific experiment IDs and plate
+      late May 2026. Investigation reveals contamination dates back
+      ~3 weeks. All experiments using those cells in the prior 3-week
+      window (early-to-late May 2026) must be repeated. Specific
+      experiment IDs and plate
       numbers invalidated. Cross-references CRISPR circuit project
       (v1 results partly invalidated). Lab-wide remediation belongs
       in lab-meeting; Kenji's prioritization decisions land in 1:1.
@@ -149,7 +150,7 @@ arcs:
     type: incident
     title: "-80°C freezer failure"
     description: |
-      Backup freezer fails over a weekend (day 510). Samples partially
+      Backup freezer fails over a weekend (late May 2027). Samples partially
       thawed. Inventory audit required. Some plasmid stocks lost,
       requiring re-transformation. Specific plasmid IDs and sample
       locations documented. Impacts both circuit project and the
@@ -167,7 +168,7 @@ arcs:
     title: "Sequencing data integrity concern"
     description: |
       Postdoc discovers suspicious read distributions in older RNA-seq
-      datasets (day 680). Investigation determines the legacy pipeline
+      datasets (mid-Nov 2027). Investigation determines the legacy pipeline
       had a bug in adapter trimming that affected ~15% of samples.
       Retroactive re-analysis required. Cross-references pipeline
       rebuild (the new pipeline caught the issue).
@@ -185,10 +186,11 @@ arcs:
     title: "Target cell line selection"
     description: |
       Choose between CHO, HEK293T, and iPSC-derived neurons as the
-      primary cell line for the circuit project. Initial choice (day 30):
-      HEK293T for ease. Day 250: results show the circuit doesn't
-      translate to neurons. Day 400: switch to iPSC-derived cardiomyocytes
-      based on collaboration results. Rationale shifts with data.
+      primary cell line for the circuit project. Initial choice (late
+      Jan 2026): HEK293T for ease. Early Sep 2026: results show the
+      circuit doesn't translate to neurons. Early Feb 2027: switch to
+      iPSC-derived cardiomyocytes based on collaboration results.
+      Rationale shifts with data.
     startDay: 20
     endDay: 420
     primarySession: principal
@@ -202,11 +204,12 @@ arcs:
     title: "Statistical analysis methodology"
     description: |
       Lab debates frequentist vs. Bayesian approaches for gene expression
-      analysis. Kenji initially mandates DESeq2 (frequentist, day 130).
-      Postdoc presents Bayesian alternative at lab meeting (day 280).
-      After reviewer 2 on the R01 critiques statistical rigor, lab
-      adopts Bayesian framework for key analyses (day 450). Kenji's
-      adoption decision is in 1:1; Sarah's presentation is in lab-meeting.
+      analysis. Kenji initially mandates DESeq2 (frequentist, early May
+      2026). Postdoc presents Bayesian alternative at lab meeting (early
+      Oct 2026). After reviewer 2 on the R01 critiques statistical
+      rigor, lab adopts Bayesian framework for key analyses (late Mar
+      2027). Kenji's adoption decision is in 1:1; Sarah's presentation
+      is in lab-meeting.
     startDay: 130
     endDay: 460
     primarySession: principal
@@ -219,10 +222,10 @@ arcs:
     title: "Open science and preprint policy"
     description: |
       Kenji debates whether to post preprints before peer review.
-      Initial stance (day 100): wait for peer review (scooping risk).
-      After a competitor publishes similar results (day 500), reverses
-      to preprint-first policy. Specific journal names, preprint
-      servers, and competitor paper details.
+      Initial stance (early Apr 2026): wait for peer review (scooping
+      risk). After a competitor publishes similar results (mid-May
+      2027), reverses to preprint-first policy. Specific journal names,
+      preprint servers, and competitor paper details.
     startDay: 100
     endDay: 520
     primarySession: principal
@@ -237,9 +240,9 @@ arcs:
     title: "Machine learning for sequence design"
     description: |
       Kenji starts learning ML to predict guide RNA efficiency.
-      Progresses from basic Python/scikit-learn (day 200) to deep
-      learning with PyTorch (day 350) to fine-tuning a transformer
-      model on lab data (day 550). Specific model architectures,
+      Progresses from basic Python/scikit-learn (mid-Jul 2026) to deep
+      learning with PyTorch (mid-Dec 2026) to fine-tuning a transformer
+      model on lab data (early Jul 2027). Specific model architectures,
       hyperparameters, and validation metrics documented at each stage.
       Kenji's own learning happens in 1:1 with Atlas.
     startDay: 200
@@ -255,8 +258,8 @@ arcs:
     description: |
       First-time PI learning curve: budget management, personnel
       decisions, conflict resolution, mentorship strategies. Early
-      lessons about post-doc hiring criteria (day 50) and budget
-      allocation priorities (day 80) are not revisited later —
+      lessons about post-doc hiring criteria (mid-Feb 2026) and budget
+      allocation priorities (late Mar 2026) are not revisited later —
       recency bias resistance targets.
     startDay: 30
     endDay: 250
@@ -276,7 +279,7 @@ arcs:
       career development, and manuscript preparation. Sarah's
       independent ideas sometimes conflict with Kenji's direction —
       their resolution process creates decision-tracking material.
-      Sarah leaves for her own faculty position around day 750.
+      Sarah leaves for her own faculty position in early 2028.
       The 1:1 is between Kenji and Sarah, but Atlas records Kenji's
       side of the relationship in the principal session.
     startDay: 1
@@ -293,9 +296,9 @@ arcs:
       Dr. Wei Chen leads the LNP delivery lab. Kenji and Chen have
       monthly check-ins on the collaboration, negotiate authorship
       order, and resolve data-sharing disputes. Their working
-      relationship cools after a disagreement about IP on day 550
-      but recovers by day 650. PI-PI dynamics live in the isolated
-      collab-chen room.
+      relationship cools after a disagreement about IP in early Jul
+      2027 but recovers by mid-Oct 2027. PI-PI dynamics live in the
+      isolated collab-chen room.
     startDay: 300
     endDay: 700
     primarySession: collab-chen
@@ -324,11 +327,11 @@ arcs:
     type: correction
     title: "CMV promoter strength in target cells"
     description: |
-      Day 30: Kenji documents CMV as a "strong constitutive promoter
-      in mammalian cells" (textbook knowledge). Day 320: experiments
-      show CMV is silenced in iPSC-derived cardiomyocytes. Switches
-      to EF1α promoter. The incorrect assumption influenced 6 months
-      of experimental design.
+      Late Jan 2026: Kenji documents CMV as a "strong constitutive
+      promoter in mammalian cells" (textbook knowledge). Mid-Nov 2026:
+      experiments show CMV is silenced in iPSC-derived cardiomyocytes.
+      Switches to EF1α promoter. The incorrect assumption influenced
+      ~10 months of experimental design.
     startDay: 30
     endDay: 320
     wrongDay: 30
@@ -344,11 +347,11 @@ arcs:
     type: correction
     title: "Guide RNA efficiency prediction model"
     description: |
-      Day 220: Kenji reports their ML model achieves 85% accuracy for
-      predicting guide RNA on-target efficiency. Day 450: external
-      validation on new cell types reveals actual accuracy is 62% due
-      to overfitting on the training cell line. Model retrained with
-      cross-cell-type validation.
+      Early Aug 2026: Kenji reports their ML model achieves 85% accuracy
+      for predicting guide RNA on-target efficiency. Late Mar 2027:
+      external validation on new cell types reveals actual accuracy is
+      62% due to overfitting on the training cell line. Model retrained
+      with cross-cell-type validation.
     startDay: 220
     endDay: 460
     wrongDay: 220
@@ -364,11 +367,11 @@ arcs:
     type: correction
     title: "LNP formulation cytotoxicity"
     description: |
-      Day 380: Chen Lab reports their LNP formulation LNP-4 has <5%
-      cytotoxicity at therapeutic doses. Day 580: Kenji's lab
-      independently measures 22% cytotoxicity using a more sensitive
-      assay (LDH release vs. MTT). Discrepancy traced to assay
-      sensitivity difference. Revised formulation LNP-7 developed.
+      Mid-Jan 2027: Chen Lab reports their LNP formulation LNP-4 has
+      <5% cytotoxicity at therapeutic doses. Early Aug 2027: Kenji's
+      lab independently measures 22% cytotoxicity using a more
+      sensitive assay (LDH release vs. MTT). Discrepancy traced to
+      assay sensitivity difference. Revised formulation LNP-7 developed.
       Wrong belief is sourced from Chen Lab in the isolated session;
       correction is also raised first in the isolated session before
       Kenji authorizes any cross-session disclosure.

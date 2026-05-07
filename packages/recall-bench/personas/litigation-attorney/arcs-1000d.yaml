@@ -145,8 +145,8 @@ arcs:
       Opposing counsel moves for sanctions alleging Carmen's team failed
       to preserve Slack messages during litigation hold. Emergency response:
       forensic review, privilege log audit, declarations from IT. Motion
-      denied on day 240 but requires 15 days of intense work. Specific
-      Slack channel names, date ranges, and custodian names.
+      denied late August 2026 but requires roughly two weeks of intense
+      work. Specific Slack channel names, date ranges, and custodian names.
     startDay: 225
     endDay: 245
     primarySession: principal
@@ -197,10 +197,11 @@ arcs:
     description: |
       NexGen filed in California state court. Carmen considers removal
       to federal court (diversity jurisdiction) vs. staying in state.
-      Initial strategy (day 20): stay in state for favorable jury pool.
-      Day 80: discovery of additional defendants in different states
-      changes calculus. Day 95: motion to remove filed. Decision tracking
-      across three phases with shifting rationale.
+      Initial strategy (mid-Jan 2026): stay in state for favorable jury
+      pool. Late March 2026: discovery of additional defendants in
+      different states changes calculus. Early April 2026: motion to
+      remove filed. Decision tracking across three phases with shifting
+      rationale.
     startDay: 15
     endDay: 100
     primarySession: principal
@@ -213,11 +214,11 @@ arcs:
     type: decision
     title: "Settlement authority in Coastal merger"
     description: |
-      Client initially authorizes settlement at $8M (day 200). After
-      expert disqualification, authority reduced to $5M (day 410).
-      After favorable summary judgment ruling, client increases to
-      $12M (day 470). Each change has specific rationale tied to
-      case developments.
+      Client initially authorizes settlement at $8M (mid-Jul 2026).
+      After expert disqualification, authority reduced to $5M
+      (mid-Feb 2027). After favorable summary judgment ruling, client
+      increases to $12M (mid-Apr 2027). Each change has specific
+      rationale tied to case developments.
     startDay: 200
     endDay: 480
     primarySession: client-coastal
@@ -233,9 +234,10 @@ arcs:
     description: |
       For the patent case: pursue inter partes review at PTAB, raise
       invalidity in district court, or both? Carmen initially recommends
-      IPR-only (cheaper). After claim construction goes poorly (day 500),
-      pivots to parallel strategy. Budget implications force a choice
-      on day 560: IPR for two patents, district court for the third.
+      IPR-only (cheaper). After claim construction goes poorly (mid-May
+      2027), pivots to parallel strategy. Budget implications force a
+      choice in mid-July 2027: IPR for two patents, district court for
+      the third.
     startDay: 400
     endDay: 570
     primarySession: principal
@@ -248,11 +250,12 @@ arcs:
     type: decision
     title: "Bench trial vs. jury trial election in Garcia"
     description: |
-      Carmen weighs bench vs. jury trial. Initial assessment (day 600):
-      bench trial favored due to complex employment law issues. Day 720:
-      after favorable rulings on motions in limine that exclude
-      inflammatory evidence, switches recommendation to jury trial for
-      potential lower damages. Client accepts jury trial on day 730.
+      Carmen weighs bench vs. jury trial. Initial assessment (late Aug
+      2027): bench trial favored due to complex employment law issues.
+      Late Dec 2027: after favorable rulings on motions in limine that
+      exclude inflammatory evidence, switches recommendation to jury
+      trial for potential lower damages. Client accepts jury trial at
+      year-end 2027.
     startDay: 600
     endDay: 740
     primarySession: principal
@@ -269,9 +272,10 @@ arcs:
     description: |
       Carmen upskills on technology-assisted review (TAR) for large
       document productions. Specific TAR platform names, recall/precision
-      thresholds, and validation protocols learned early (days 50-80).
-      These technical details are not revisited after month 4 — recency
-      bias resistance targets. Applied in every major case.
+      thresholds, and validation protocols learned early (Feb–Mar 2026).
+      These technical details are not revisited after the first few
+      months — recency bias resistance targets. Applied in every major
+      case.
     startDay: 40
     endDay: 200
     primarySession: principal
@@ -350,10 +354,10 @@ arcs:
     type: correction
     title: "Hartwell VP's access date contradiction"
     description: |
-      Key witness (former VP) testifies in deposition on day 120 that
-      they last accessed the trade secret database on March 15. Email
-      forensics obtained on day 250 prove access continued through
-      June 30. Carmen documents the contradiction explicitly.
+      Key witness (former VP) testifies in deposition on 2026-04-30
+      that they last accessed the trade secret database on March 15.
+      Email forensics obtained on 2026-09-07 prove access continued
+      through June 30. Carmen documents the contradiction explicitly.
     startDay: 120
     endDay: 260
     primarySession: principal
@@ -370,10 +374,10 @@ arcs:
     type: correction
     title: "Coastal merger working capital baseline"
     description: |
-      Initial expert report (day 200) uses $42.3M as the working capital
-      baseline. Replacement expert (day 410) recalculates using different
-      methodology and arrives at $38.7M. The $3.6M difference becomes a
-      central dispute point.
+      Initial expert report (mid-Jul 2026) uses $42.3M as the working
+      capital baseline. Replacement expert (mid-Feb 2027) recalculates
+      using different methodology and arrives at $38.7M. The $3.6M
+      difference becomes a central dispute point.
     startDay: 200
     endDay: 420
     primarySession: principal
@@ -390,11 +394,11 @@ arcs:
     type: correction
     title: "Garcia retaliation claim timeliness"
     description: |
-      Carmen initially assesses (day 560) that one of Garcia's retaliation
-      claims is time-barred (filed outside 180-day EEOC window). Day 680:
-      plaintiff produces evidence of equitable tolling (employer concealed
-      the adverse action). Carmen revises assessment — claim is likely
-      timely.
+      Carmen initially assesses (mid-Jul 2027) that one of Garcia's
+      retaliation claims is time-barred (filed outside the 180-day EEOC
+      window). Mid-Nov 2027: plaintiff produces evidence of equitable
+      tolling (employer concealed the adverse action). Carmen revises
+      assessment — claim is likely timely.
     startDay: 560
     endDay: 690
     primarySession: principal
