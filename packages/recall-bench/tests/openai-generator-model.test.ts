@@ -76,7 +76,7 @@ describe('OpenAiGeneratorModel.complete', () => {
             model: string;
             messages: Array<{ role: string; content: string }>;
             temperature?: number;
-            max_tokens?: number;
+            max_completion_tokens?: number;
         };
         expect(params.model).toBe('gpt-4o');
         expect(params.messages).toEqual([
@@ -84,7 +84,7 @@ describe('OpenAiGeneratorModel.complete', () => {
             { role: 'user', content: 'USER' },
         ]);
         expect(params.temperature).toBe(0.4);
-        expect(params.max_tokens).toBe(256);
+        expect(params.max_completion_tokens).toBe(256);
         expect(result.text).toBe('hello world');  // trimmed
         expect(result.inputTokens).toBe(17);
         expect(result.outputTokens).toBe(4);
@@ -99,13 +99,14 @@ describe('OpenAiGeneratorModel.complete', () => {
         expect(model.model).toBe(OPENAI_DEFAULT_MODEL);
     });
 
-    it('omits temperature/max_tokens when not supplied', async () => {
+    it('omits temperature/max_completion_tokens when not supplied', async () => {
         const captured: { params?: unknown } = {};
         const model = new OpenAiGeneratorModel({ client: makeMockClient(captured) });
         await model.complete('SYS', 'USER');
         const params = captured.params as Record<string, unknown>;
         expect(params).not.toHaveProperty('temperature');
         expect(params).not.toHaveProperty('max_tokens');
+        expect(params).not.toHaveProperty('max_completion_tokens');
     });
 
     it('throws when no API key is available and no client is supplied', () => {

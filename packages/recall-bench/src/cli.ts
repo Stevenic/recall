@@ -11,7 +11,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { BenchmarkHarness } from './harness.js';
 import { formatTextReport, formatJsonReport, toHeatmapGrid } from './report.js';
 import { listPersonas } from './dataset.js';
-import { DayGenerator, loadPersonaDefinition, loadArcs, deriveSiblingDir } from './generator.js';
+import { SessionDayGenerator, loadPersonaDefinition, loadArcs, deriveSiblingDir } from './generator.js';
 import { PersonaCreator, serializePersonaYaml, serializeArcsYaml } from './persona-creator.js';
 import { ConversationGenerator, serializeConversation, serializeConversationJson } from './conversation-generator.js';
 import { CliGeneratorModel, isCliAgentName, CLI_AGENT_NAMES } from './cli-generator-model.js';
@@ -142,7 +142,7 @@ program
         await mkdir(memoriesDir, { recursive: true });
 
         const writtenDays = new Set<number>();
-        const generator = new DayGenerator(persona, story.arcs, model, {
+        const generator = new SessionDayGenerator(persona, story.arcs, model, {
             startDay,
             endDay,
             temperature: opts.temperature,
@@ -150,15 +150,14 @@ program
             historyWindow: opts.historyWindow,
             epoch: story.epoch,
             sessionLifecycles: story.sessions,
-            onDay: async (dayNumber, content, kind) => {
+            onDay: async (dayNumber, content, _kind) => {
                 const padded = String(dayNumber).padStart(4, '0');
                 const filename = `day-${padded}.md`;
                 await writeFile(join(memoriesDir, filename), content, 'utf-8');
                 writtenDays.add(dayNumber);
                 if (!opts.json) {
-                    const tag = `[${kind}]`.padEnd(6);
                     const dayLabel = `day ${String(dayNumber).padStart(4, ' ')}/${endDay}`;
-                    console.log(`  ${tag} ${dayLabel}  ${filename}  (${writtenDays.size} unique)`);
+                    console.log(`  [day]  ${dayLabel}  ${filename}  (${writtenDays.size} unique)`);
                 }
             },
         });

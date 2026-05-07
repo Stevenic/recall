@@ -104,6 +104,10 @@ export class OpenAiGeneratorModel implements GeneratorModel {
         userMessage: string,
         options?: GeneratorModelOptions,
     ): Promise<GeneratorModelResult> {
+        // Newer OpenAI models (gpt-5.x, o-series, etc.) require
+        // `max_completion_tokens` and reject the legacy `max_tokens` with a
+        // 400 error. `max_completion_tokens` is the canonical field on all
+        // current models, so we send that exclusively.
         const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
             model: this._model,
             messages: [
@@ -112,7 +116,7 @@ export class OpenAiGeneratorModel implements GeneratorModel {
             ],
         };
         if (options?.temperature !== undefined) params.temperature = options.temperature;
-        if (options?.maxTokens !== undefined) params.max_tokens = options.maxTokens;
+        if (options?.maxTokens !== undefined) params.max_completion_tokens = options.maxTokens;
 
         const response = await this._client.chat.completions.create(params);
         const text = response.choices[0]?.message?.content ?? '';

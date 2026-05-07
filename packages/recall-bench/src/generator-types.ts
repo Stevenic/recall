@@ -260,12 +260,8 @@ export interface GeneratorConfig {
     historyWindow?: number;
     /** Temperature for day generation. Default: 0.7. */
     temperature?: number;
-    /** Max output tokens per day. Default: 2000. */
+    /** Max output tokens per session call. Default: 2000. */
     maxTokens?: number;
-    /** Compress arc summaries every N days. Default: 10. */
-    summaryCompressInterval?: number;
-    /** Temperature for arc summary compression. Default: 0.2. */
-    summaryTemperature?: number;
     /** Starting day number (for resuming). Default: 1. */
     startDay?: number;
     /** Ending day number. Default: 1000. */
@@ -282,14 +278,16 @@ export interface GeneratorConfig {
      * sessions at prompt-build time.
      */
     sessionLifecycles?: SessionLifecycle[];
-    /** Minimum active days per week for gap filling (Pass 2). Default: 5. */
-    minDaysPerWeek?: number;
-    /** Callback after each day is generated. `kind` identifies which pass produced it. */
+    /** Callback after each day is fully assembled. `kind` is always `'day'` in v0.7+. */
     onDay?: (dayNumber: number, content: string, kind: GeneratedDayKind) => void | Promise<void>;
 }
 
-/** Which generation pass produced a given day. */
-export type GeneratedDayKind = 'arc' | 'gap';
+/**
+ * The kind of day produced. v0.7+ uses per-session generation and
+ * always emits `'day'` (one onDay call per assembled day file). The
+ * earlier `'arc' | 'gap'` distinction is gone.
+ */
+export type GeneratedDayKind = 'day';
 
 // ---------------------------------------------------------------------------
 // Generator Output

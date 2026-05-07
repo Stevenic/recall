@@ -32,7 +32,7 @@ export type { PersonaDataset, DayEntry } from './dataset.js';
 
 // Generator
 export {
-    DayGenerator,
+    SessionDayGenerator,
     loadPersonaDefinition,
     loadArcs,
     deriveSiblingDir,
@@ -42,6 +42,8 @@ export {
     computePhase,
     computeDensity,
     getActiveArcs,
+    computeActiveSessions,
+    computeEchoToday,
     getDirectives,
     getCorrectionStates,
     selectArcDays,
@@ -50,9 +52,8 @@ export {
     formatDate,
     getDayOfWeek,
     buildSystemPrompt,
-    buildUserMessage,
-    buildArcUserMessage,
-    buildGapUserMessage,
+    buildSessionSystemPrompt,
+    buildSessionUserMessage,
 } from './generator.js';
 export type {
     PersonaDefinition,
