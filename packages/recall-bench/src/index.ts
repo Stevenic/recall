@@ -51,7 +51,6 @@ export {
     computeCalendarDate,
     formatDate,
     getDayOfWeek,
-    buildSystemPrompt,
     buildSessionSystemPrompt,
     buildSessionUserMessage,
 } from './generator.js';

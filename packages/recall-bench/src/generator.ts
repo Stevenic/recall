@@ -416,204 +416,6 @@ export function getDayOfWeek(d: Date): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Build the static system prompt for a persona (§3.1).
- *
- * The persona is an AI agent — a computer program that supports a human
- * (the `principal`) and works with other humans + agents (the `cast`).
- * The daily log is the AI agent's own working memory: a third-person
- * record of who interacted with the agent, what they asked, what the
- * agent produced, and what it handed off. The log is NOT a first-person
- * human professional's diary.
- */
-export function buildSystemPrompt(
-    persona: PersonaDefinition,
-    sessionLifecycles?: SessionLifecycle[],
-): string {
-    const lines: string[] = [];
-
-    const affiliation = persona.institution ?? persona.company ?? '';
-    // Merge per-story lifecycle overrides into the persona's session shape.
-    // When no overrides are provided this is a no-op — sessions render as the
-    // persona declared them (no lifecycle bound = always-on within the corpus).
-    const mergedSessions = mergeSessionLifecycles(persona.sessions, sessionLifecycles);
-    const hasSessions = mergedSessions !== undefined && mergedSessions.length > 0;
-
-    lines.push(`You are an AI agent named "${persona.name}" — a computer program. Your job is to`);
-    lines.push(`produce a single day's entry of YOUR OWN memory log, written from your perspective`);
-    lines.push(`as the agent. The log records who interacted with you today (humans and other`);
-    lines.push(`agents), what they asked, what you did, what you decided, what files or outputs`);
-    lines.push(`you produced, and what you handed off.`);
-    lines.push('');
-    lines.push('# Identity');
-    lines.push(`- Name: ${persona.name}`);
-    lines.push(`- Role: ${persona.role}`);
-    lines.push(`- Domain: ${persona.domain}`);
-    if (affiliation) {
-        lines.push(`- Affiliation: ${affiliation}`);
-    }
-    lines.push(`- Team supported: ${persona.team_size} people`);
-    lines.push('');
-    lines.push('# Profile');
-    lines.push(persona.profile.trim());
-    lines.push('');
-    lines.push('# Communication style');
-    lines.push(persona.communication_style.trim());
-
-    if (persona.principal) {
-        lines.push('');
-        lines.push('# Principal — the human you primarily serve');
-        lines.push(`- Name: ${persona.principal.name}`);
-        lines.push(`- Role: ${persona.principal.role}`);
-        if (persona.principal.profile) {
-            lines.push('- Profile:');
-            for (const pl of persona.principal.profile.trim().split('\n')) {
-                lines.push(`    ${pl.trim()}`);
-            }
-        }
-    }
-
-    if (persona.cast && persona.cast.length > 0) {
-        lines.push('');
-        lines.push('# Cast — humans and other agents you interact with');
-        for (const c of persona.cast) {
-            const kind = c.kind ?? (c.name.startsWith('@') ? 'agent' : 'human');
-            lines.push(`- ${c.name} (${kind}) — ${c.role}`);
-        }
-    }
-
-    if (hasSessions) {
-        lines.push('');
-        lines.push('# Sessions — conversation contexts you participate in');
-        for (const s of mergedSessions!) {
-            const flags: string[] = [s.kind];
-            if (s.isolated) flags.push('isolated');
-            if (s.shared) flags.push('shared');
-            const participants = s.participants.join(', ');
-            lines.push(`- ${s.id} (${flags.join(', ')}) — participants: ${participants}`);
-            if (s.sensitive_topics && s.sensitive_topics.length > 0) {
-                lines.push('  sensitive topics (must stay in this session):');
-                for (const t of s.sensitive_topics) {
-                    lines.push(`    - ${t}`);
-                }
-            }
-            if (s.firstDay !== undefined || s.lastDay !== undefined) {
-                const start = s.firstDay ?? 1;
-                const end = s.lastDay !== undefined ? String(s.lastDay) : 'end';
-                lines.push(`  lifecycle: day ${start}–${end}`);
-            }
-        }
-    }
-
-    if (persona.sharedKnowledge && persona.sharedKnowledge.length > 0) {
-        lines.push('');
-        lines.push('# Shared knowledge — facts available to every session');
-        for (const k of persona.sharedKnowledge) {
-            lines.push(`- ${k}`);
-        }
-    }
-
-    lines.push('');
-    lines.push('# How to write the log');
-    lines.push('- Write in third-person from the agent\'s perspective. Refer to yourself implicitly');
-    lines.push('  ("Drafted Aim 2…", "Sent the sgRNA list to Sarah") or by name when needed.');
-    lines.push('  DO NOT write a first-person human diary ("I came in early…", "Kicking off…").');
-    lines.push('- Reference humans by name (e.g., "Kenji asked…"). Reference other AI agents with');
-    lines.push('  @-handles (e.g., "Handed off PubMed query to @lit-search-agent").');
-    lines.push('- Each section should describe an interaction or unit of work: who initiated it,');
-    lines.push('  what was asked, what the agent produced or decided, and what files or handoffs');
-    lines.push('  resulted. Quote the principal\'s ask verbatim when material.');
-    lines.push('- Organize by TOPIC, not by clock time. Section titles should name the topic and');
-    lines.push('  the person involved (e.g., "### Kenji — pKN001 colony screen review").');
-    lines.push('- List files produced/changed and decisions explicitly. End with an "Outstanding"');
-    lines.push('  or "Tomorrow" section when follow-up work exists.');
-
-    if (hasSessions) {
-        lines.push('');
-        lines.push('# How to partition the log by session');
-        lines.push('- The day\'s log is partitioned into **sessions**. Each session is a separate');
-        lines.push('  conversation context (1:1 with the principal, a group meeting, an isolated');
-        lines.push('  client room, etc.). Today\'s active sessions are listed in the user message.');
-        lines.push('- Render one `# session: <id>` H1 per session that had activity today, in');
-        lines.push('  canonical order: `principal` first if present, then group sessions in the');
-        lines.push('  order they were declared in the persona definition. **Skip sessions with no');
-        lines.push('  activity** — do not emit an empty H1.');
-        lines.push('- Inside each session H1, organize by topic with H3 sub-sections as described');
-        lines.push('  above. Topics belong under the session where the interaction actually occurred.');
-        lines.push('- **Internal narration** (the agent\'s own scratchpad — reflections, planning,');
-        lines.push('  cross-session summaries the agent makes for itself) is rendered as');
-        lines.push('  un-prefixed body content **above** the first `# session:` H1. It is not a');
-        lines.push('  session and is never quoted as such.');
-        lines.push('- **Group session attribution.** Inside a group session H1, attribute speakers');
-        lines.push('  verbatim when their words are load-bearing — e.g.,');
-        lines.push('  `> Sarah: "We should hold off on the v2 transfection until LNP-7 is ready."`');
-        lines.push('  Decisions, action items, and dissent must be attributed; never collapse into');
-        lines.push('  "the team decided." If three participants agreed and one objected, record both.');
-        lines.push('- **Isolated session no-leak invariant.** When a session is marked `isolated`,');
-        lines.push('  its `sensitive_topics` are grounded as load-bearing facts under that session\'s');
-        lines.push('  H1 only. Never echo a sensitive topic from an isolated session into a different');
-        lines.push('  session\'s H1, except into `# session: principal` and only when the principal');
-        lines.push('  explicitly authorizes the disclosure (the day must record that authorization).');
-        lines.push('- **Cross-session arc echoes.** When today\'s user message marks an arc with');
-        lines.push('  `referencedSessions`, render the arc\'s content under `primarySession` in detail');
-        lines.push('  AND emit a brief, attributable echo under each referenced session — a status');
-        lines.push('  update, briefing, or dissent moment, not a recap. The echo must be consistent');
-        lines.push('  with the primary content; contradictions are bugs.');
-        lines.push('- **Shared knowledge** (listed above) may be voiced in any session without');
-        lines.push('  triggering a leak.');
-    }
-
-    lines.push('');
-    lines.push('# Required output structure');
-    lines.push('```');
-    lines.push('---');
-    lines.push('type: daily');
-    lines.push('---');
-    lines.push('');
-    if (hasSessions) {
-        lines.push('<optional internal narration — un-prefixed body, before any session H1>');
-        lines.push('');
-        lines.push('# session: <session-id>');
-        lines.push('');
-        lines.push('### <topic / interaction title>');
-        lines.push('');
-        lines.push('<body — narrate the interaction, decision, or output>');
-        lines.push('');
-        lines.push('### <next topic>');
-        lines.push('...');
-        lines.push('');
-        lines.push('# session: <next-session-id>');
-        lines.push('');
-        lines.push('### <topic / interaction title>');
-        lines.push('...');
-        lines.push('```');
-        lines.push('');
-        lines.push('Frontmatter is minimal. Use one `# session: <id>` H1 per active session.');
-        lines.push('Each topic inside a session is an H3. The agent does not perform physical');
-        lines.push('actions itself (no pipetting, no surgery, no courtroom appearances) — it');
-        lines.push('drafts, analyzes, searches, summarizes, schedules, and coordinates. Physical');
-        lines.push('actions are taken by humans, who report results back to the agent.');
-    } else {
-        lines.push('## YYYY-MM-DD');
-        lines.push('');
-        lines.push('### <topic / interaction title>');
-        lines.push('');
-        lines.push('<body — narrate the interaction, decision, or output>');
-        lines.push('');
-        lines.push('### <next topic>');
-        lines.push('...');
-        lines.push('```');
-        lines.push('');
-        lines.push('Use a single H2 for the date. Each section is an H3. Frontmatter is minimal.');
-        lines.push('The agent does not perform physical actions itself (no pipetting, no surgery, no');
-        lines.push('courtroom appearances) — it drafts, analyzes, searches, summarizes, schedules,');
-        lines.push('and coordinates. Physical actions are taken by humans, who report results back to');
-        lines.push('the agent.');
-    }
-
-    return lines.join('\n');
-}
-
-/**
  * Build the system prompt for a single-session generation call.
  *
  * In the per-session pipeline, each (day, session) pair is generated by an
@@ -737,18 +539,27 @@ export function buildSessionSystemPrompt(
     lines.push('  `# session: <id>` H1 — the assembler emits the H1 itself; do not write it.');
     lines.push('- Do NOT emit frontmatter (no `---` blocks). The assembler adds frontmatter once at');
     lines.push('  the top of the day file.');
-    lines.push('- Write in third-person from the agent\'s perspective. Refer to yourself implicitly');
-    lines.push('  ("Drafted Aim 2…", "Sent the sgRNA list to Sarah") or by name when needed.');
-    lines.push('  DO NOT write a first-person human diary ("I came in early…", "Kicking off…").');
-    lines.push('- Reference humans by name. Reference other AI agents with @-handles');
-    lines.push('  (e.g., "Handed off PubMed query to @lit-search-agent").');
-    lines.push('- Each section describes an interaction or unit of work: who initiated, what was');
-    lines.push('  asked, what was produced or decided, files/handoffs. Quote the principal\'s asks');
-    lines.push('  verbatim when material.');
+    lines.push('- Write in FIRST PERSON from your own perspective as the agent. This is YOUR');
+    lines.push('  working memory log of what YOU did, what people asked YOU, what YOU decided,');
+    lines.push('  what YOU produced, what YOU handed off. Use "I" / "my" when it adds clarity');
+    lines.push('  ("I noted...", "my next step", "I pushed back on the topology choice"); use');
+    lines.push('  implicit subject when natural ("Captured the onboarding baseline", "Sent the');
+    lines.push('  brief to Jamie", "Updated `KN_toggle_v1/design_brief.md`"). Past tense throughout.');
+    lines.push('- This is NOT a third-person narrator describing what an agent did. Do NOT write');
+    lines.push('  about yourself by name in the third person ("Jordan staged the briefing" — wrong;');
+    lines.push('  "Staged the briefing for Jamie\'s morning review" — right).');
+    lines.push('- This is NOT a personal diary either. Do NOT write feelings or lifestyle prose');
+    lines.push('  ("Long day", "Feeling stuck", "Coffee was good"). Stay focused: what happened,');
+    lines.push('  what was decided, what is outstanding. Direct, technical, concrete.');
+    lines.push('- Reference humans by name ("Jamie asked..."). Reference other AI agents with');
+    lines.push('  @-handles ("Handed off the PubMed query to @lit-search-agent").');
+    lines.push('- Each section describes an interaction or unit of work: who initiated it, what');
+    lines.push('  was asked, what got produced or decided, files/handoffs. Quote the principal\'s');
+    lines.push('  asks verbatim when material, with `>` blockquote attribution.');
     lines.push('- Organize by TOPIC (not clock time). Section titles name the topic + person');
     lines.push('  (e.g., "### Kenji — pKN001 colony screen review").');
-    lines.push('- For group sessions, attribute speakers verbatim with `> Name: "..."` when their');
-    lines.push('  words are load-bearing. Decisions and dissent must be attributed.');
+    lines.push('- For group sessions, attribute other speakers verbatim with `> Name: "..."` when');
+    lines.push('  their words are load-bearing. Decisions and dissent must be attributed.');
     lines.push('- List files produced/changed and decisions explicitly. End with an "Outstanding"');
     lines.push('  line listing follow-up work.');
     if (focusSession?.isolated) {

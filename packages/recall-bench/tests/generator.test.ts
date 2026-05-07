@@ -3,8 +3,6 @@ import {
     computePhase,
     computeDensity,
     getActiveArcs,
-    computeActiveSessions,
-    computeEchoToday,
     getDirectives,
     getCorrectionStates,
     selectArcDays,
@@ -12,12 +10,8 @@ import {
     computeCalendarDate,
     formatDate,
     getDayOfWeek,
-    buildSystemPrompt,
-    buildSessionSystemPrompt,
-    buildSessionUserMessage,
-    SessionDayGenerator,
 } from '../src/generator.js';
-import type { ArcDefinition, PersonaDefinition, GeneratorModel, GeneratorModelOptions, GeneratorModelResult, ActiveArc, Directive, CorrectionState, RecentDay, SessionDef } from '../src/generator-types.js';
+import type { ActiveArc, ArcDefinition, CorrectionState, Directive, GeneratorModel, PersonaDefinition } from '../src/generator-types.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -422,64 +416,4 @@ describe('calendar date helpers', () => {
 // ---------------------------------------------------------------------------
 // Prompt assembly
 // ---------------------------------------------------------------------------
-
-describe('buildSystemPrompt', () => {
-    it('includes persona fields', () => {
-        const prompt = buildSystemPrompt(testPersona);
-        expect(prompt).toContain('River Chen');
-        expect(prompt).toContain('Senior Backend Engineer');
-        expect(prompt).toContain('B2B SaaS platform');
-        expect(prompt).toContain('Nexus');
-        expect(prompt).toContain('8');
-        expect(prompt).toContain('Experienced backend engineer');
-        expect(prompt).toContain('Direct and technical');
-    });
-
-    it('frames the persona as an AI agent narrator (not a human diarist)', () => {
-        const prompt = buildSystemPrompt(testPersona);
-        expect(prompt).toContain('AI agent');
-        expect(prompt).toContain('computer program');
-        expect(prompt).toContain('third-person');
-        // Must steer the LLM away from first-person human style.
-        expect(prompt).toMatch(/Do NOT write a first-person/i);
-    });
-
-    it('renders principal and cast when supplied', () => {
-        const persona: PersonaDefinition = {
-            ...testPersona,
-            principal: {
-                name: 'Kenji Nakamura',
-                role: 'Assistant Professor / PI',
-                profile: 'Runs a synthetic biology lab.',
-            },
-            cast: [
-                { name: 'Sarah Kim', role: 'Senior postdoc', kind: 'human' },
-                { name: '@lit-search-agent', role: 'Literature search agent', kind: 'agent' },
-            ],
-        };
-        const prompt = buildSystemPrompt(persona);
-        expect(prompt).toContain('Principal');
-        expect(prompt).toContain('Kenji Nakamura');
-        expect(prompt).toContain('Cast');
-        expect(prompt).toContain('Sarah Kim (human)');
-        expect(prompt).toContain('@lit-search-agent (agent)');
-    });
-
-    it('falls back gracefully when principal and cast are absent', () => {
-        const prompt = buildSystemPrompt(testPersona);
-        expect(prompt).not.toContain('# Principal');
-        expect(prompt).not.toContain('# Cast');
-    });
-
-    it('uses institution when company is absent', () => {
-        const persona: PersonaDefinition = {
-            ...testPersona,
-            company: undefined,
-            institution: 'Pacific State University',
-        };
-        const prompt = buildSystemPrompt(persona);
-        expect(prompt).toContain('Pacific State University');
-        expect(prompt).not.toContain('Nexus');
-    });
-});
 
