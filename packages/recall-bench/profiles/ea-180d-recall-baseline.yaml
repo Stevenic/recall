@@ -35,8 +35,8 @@ models:
   generation: azure:gpt-5.4-mini
 
 harness:
-  # Compiled adapter from packages/recall-bench/src/recall-adapter.ts
-  adapter: ../dist/recall-adapter.js
+  # Compiled adapter from bench-harnesses/recall/src/index.ts
+  adapter: ../../../bench-harnesses/recall/dist/index.js
   factory: createRecallAdapter
   config:
     name: Recall (baseline)

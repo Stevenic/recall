@@ -14,6 +14,7 @@ import { listPersonas } from './dataset.js';
 import { SessionDayGenerator, loadPersonaDefinition, loadArcs, deriveSiblingDir } from './generator.js';
 import { PersonaCreator, serializePersonaYaml, serializeArcsYaml } from './persona-creator.js';
 import { ConversationGenerator, serializeConversation, serializeConversationJson } from './conversation-generator.js';
+import { ToolCallGenerator } from './tool-call-generator.js';
 import { generateQa, generateBoundaryQa } from './qa-generator.js';
 import { CliGeneratorModel, isCliAgentName, CLI_AGENT_NAMES } from './cli-generator-model.js';
 import { OpenAiGeneratorModel, isOpenAiSpec, parseOpenAiSpec } from './openai-generator-model.js';
@@ -46,8 +47,8 @@ program
     .option('--data <dir>', 'Path to dataset directory containing persona folders. Required if not derivable from profile.')
     .option('--judge <spec>', `Judge selector: a CLI agent name (${CLI_AGENT_NAMES.join(', ')}), a model spec (provider:model;endpoint where provider is openai/anthropic/azure), an OpenAI shorthand ('openai' or 'openai:<model-id>'), or a path to a JS module exporting a JudgeModel. Default: stub judge that returns zeros.`)
     .option('--appellate-judge <spec>', 'Optional second judge invoked only for primary-judge failures (the "supreme court"). Accepts the same spec syntax as --judge. The appellate verdict is final; both scores are recorded.')
-    .option('--failure-log <path>', 'Write one JSONL record per appellate-reviewed failure to this path (Q, ref, system answer, both scores, retrieval). Default: derived from --json-out by replacing .json with .failures.jsonl.')
-    .option('--progress-jsonl <path>', 'Stream per-checkpoint progress (header + one record per checkpoint + summary) as JSON lines. Lets the heatmap script render an in-flight view. Default: derived from --json-out by replacing .json with .progress.jsonl.')
+    .option('--failure-log <path>', 'Write one JSONL record per appellate-reviewed failure to this path (Q, ref, system answer, both scores, retrieval). Default: <dir-of-json-out>/failures.jsonl.')
+    .option('--progress-jsonl <path>', 'Stream per-checkpoint progress (header + one record per checkpoint + summary) as JSON lines. Lets the heatmap script render an in-flight view. Default: <dir-of-json-out>/progress.jsonl.')
     .option('--resume <path>', 'Resume a previously-interrupted run by reading checkpoint records from this JSONL file. Cached ranges skip their eval phase; the adapter still re-ingests the corpus up to the cached cutoff so subsequent uncached ranges see the right state. Typically the same path as --progress-jsonl from the prior run.')
     .option('--personas <ids...>', 'Persona IDs to benchmark (default: all)')
     .option('--arcs <filename>', 'Arcs file inside each persona dir; pairs memories/qa dirs to load. Default: arcs-1000d.yaml. Use arcs-180d.yaml for the 180-day variant.')
@@ -61,7 +62,7 @@ program
     .option('--groups-enabled', 'Enable group-aware categories (group-session-attribution, information-boundary). Default off — those categories add noise unless the memory system claims session-level support.')
     .option('--json', 'Output JSON instead of text')
     .option('--heatmap', 'Output only the heatmap grid as JSON')
-    .option('--json-out <path>', 'Also write the full JSON BenchmarkResult to this file. When set, the bench also writes a sibling .png heatmap alongside it (set --no-heatmap-png to skip).')
+    .option('--json-out <path>', 'Write the full JSON BenchmarkResult to this file. Convention: pass a per-run directory path like bench-results/drafts/<run-id>/result.json — the bench writes canonical siblings heatmap.png, progress.jsonl, failures.jsonl into the same directory. (Set --no-heatmap-png to skip the PNG.)')
     .option('--no-heatmap-png', 'Disable the automatic heatmap PNG render that accompanies --json-out.')
     .option('--heatmap-script <path>', 'Override the path to generate-heatmap.mjs. Default: resolved relative to the recall-bench dist.')
     .action(async (opts) => {
@@ -130,15 +131,17 @@ program
 
         if (appellateJudge) config.appellateJudge = appellateJudge;
         // Derive failure log path from --json-out when not explicitly set.
+        // Convention: per-run directory holds canonical sibling filenames
+        // (result.json + heatmap.png + progress.jsonl + failures.jsonl).
         const failureLog =
             opts.failureLog ??
-            (opts.jsonOut ? resolve(opts.jsonOut).replace(/\.json$/i, '') + '.failures.jsonl' : undefined);
+            (opts.jsonOut ? join(dirname(resolve(opts.jsonOut)), 'failures.jsonl') : undefined);
         if (failureLog && appellateJudge) config.failureLogPath = failureLog;
 
         // Derive progress JSONL path from --json-out when not explicitly set.
         const progressJsonl =
             opts.progressJsonl ??
-            (opts.jsonOut ? resolve(opts.jsonOut).replace(/\.json$/i, '') + '.progress.jsonl' : undefined);
+            (opts.jsonOut ? join(dirname(resolve(opts.jsonOut)), 'progress.jsonl') : undefined);
         if (progressJsonl) config.progressJsonlPath = progressJsonl;
 
         // Resume from a prior run's progress JSONL when --resume is given.
@@ -151,12 +154,15 @@ program
 
         if (opts.jsonOut) {
             const abs = resolve(opts.jsonOut);
+            await mkdir(dirname(abs), { recursive: true });
             await writeFile(abs, formatJsonReport(result), 'utf-8');
             process.stderr.write(`[bench] JSON results → ${abs}\n`);
 
             // Auto-render a heatmap PNG alongside the JSON unless suppressed.
+            // Sibling filename is canonical (heatmap.png) per the per-run
+            // directory convention.
             if (opts.heatmapPng !== false) {
-                const pngPath = abs.replace(/\.json$/i, '') + '.png';
+                const pngPath = join(dirname(abs), 'heatmap.png');
                 const scriptPath = opts.heatmapScript ?? resolveDefaultHeatmapScript();
                 try {
                     await renderHeatmapPng(scriptPath, abs, pngPath);
@@ -436,6 +442,90 @@ program
                 totalInputTokens: result.totalInputTokens,
                 totalOutputTokens: result.totalOutputTokens,
                 outputDir: conversationsDir,
+            }, null, 2));
+        }
+    });
+
+program
+    .command('generate-tool-calls')
+    .description('Generate memorySave tool-call YAML for each day from existing daily logs (Pass 3)')
+    .requiredOption('--persona <dir>', 'Path to persona directory (contains persona.yaml + arcs file + memories dir)')
+    .requiredOption('--model <name|path>', `Model selector: a CLI agent name (${CLI_AGENT_NAMES.join(', ')}), an OpenAI spec, a model spec (azure:<deployment>;<endpoint>), or a path to a JS module exporting a GeneratorModel`)
+    .option('--arcs <filename>', 'Arcs file within the persona dir; convention: arcs-<NNN>d.yaml. Supplies the calendar epoch. Default: arcs-1000d.yaml.', 'arcs-1000d.yaml')
+    .option('--memories-dir <dirname>', 'Memory input dir name; defaults to "memories" or "memories-<suffix>" derived from --arcs')
+    .option('--tools-dir <dirname>', 'Tool-call output dir name; defaults to "tools" or "tools-<suffix>" derived from --arcs')
+    .option('--days <n>', 'Total days to generate; sets --start 1 --end <n>. Mutually exclusive with --start/--end.', parseIntArg)
+    .option('--start <n>', 'Starting day number', parseIntArg, 1)
+    .option('--end <n>', 'Ending day number', parseIntArg, 1000)
+    .option('--temperature <n>', 'Generation temperature (default 0.3 — lower than convo gen, more structural)', parseFloatArg, 0.3)
+    .option('--max-tokens <n>', 'Max output tokens per day', parseIntArg, 4000)
+    .option('--timeout <ms>', 'Per-call timeout for CLI agents', parseIntArg, 120000)
+    .option('--overwrite', 'Re-generate days whose tool-call file already exists (default: skip existing)')
+    .option('--json', 'Output JSON summary instead of progress text')
+    .action(async (opts) => {
+        const personaDir = resolve(opts.persona);
+        const persona = await loadPersonaDefinition(personaDir);
+        const story = await loadArcs(personaDir, opts.arcs);
+        const epoch = story.epoch ?? persona.epoch;
+        if (!epoch) {
+            throw new Error(`No epoch found. Set it in ${opts.arcs} (preferred) or persona.yaml.`);
+        }
+        const model = await resolveModel(opts.model, opts.timeout);
+
+        let startDay = opts.start;
+        let endDay = opts.end;
+        if (opts.days !== undefined) {
+            startDay = 1;
+            endDay = opts.days;
+        }
+
+        const memoriesDirName = opts.memoriesDir ?? deriveSiblingDir(opts.arcs, 'memories');
+        const toolsDirName = opts.toolsDir ?? deriveSiblingDir(opts.arcs, 'tools');
+        const memoriesDir = join(personaDir, memoriesDirName);
+        const toolsDir = join(personaDir, toolsDirName);
+        await mkdir(toolsDir, { recursive: true });
+
+        const { existsSync } = await import('node:fs');
+        const overwrite = Boolean(opts.overwrite);
+
+        let dayCount = 0;
+        const generator = new ToolCallGenerator(persona, model, {
+            startDay,
+            endDay,
+            epoch,
+            temperature: opts.temperature,
+            maxTokens: opts.maxTokens,
+            onDay: async (dayNumber, yamlBody) => {
+                const padded = String(dayNumber).padStart(4, '0');
+                const outPath = join(toolsDir, `day-${padded}.yaml`);
+                if (!overwrite && existsSync(outPath)) {
+                    if (!opts.json) {
+                        process.stdout.write(`\r  Skipped day ${dayNumber} (file exists)        `);
+                    }
+                    return;
+                }
+                await writeFile(outPath, yamlBody, 'utf-8');
+                dayCount++;
+                if (!opts.json) {
+                    process.stdout.write(`\r  Generated tool calls ${dayCount} (day ${dayNumber}/${endDay})        `);
+                }
+            },
+        });
+
+        const result = await generator.generateAll(memoriesDir);
+
+        if (!opts.json) {
+            console.log('');
+            console.log(`Done. Generated ${dayCount} tool-call files for "${persona.name}" (${persona.id}).`);
+            console.log(`  Tokens — input: ${result.totalInputTokens}, output: ${result.totalOutputTokens}`);
+            console.log(`  Output: ${toolsDir}`);
+        } else {
+            console.log(JSON.stringify({
+                personaId: result.personaId,
+                daysGenerated: dayCount,
+                totalInputTokens: result.totalInputTokens,
+                totalOutputTokens: result.totalOutputTokens,
+                outputDir: toolsDir,
             }, null, 2));
         }
     });

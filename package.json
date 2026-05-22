@@ -2,13 +2,14 @@
   "name": "recall-monorepo",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "bench-harnesses/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=packages/core && npm run build --workspace=packages/recall-bench",
-    "test": "npm test --workspace=packages/core && npm test --workspace=packages/recall-bench",
-    "lint": "npm run lint --workspace=packages/core && npm run lint --workspace=packages/recall-bench",
-    "clean": "npm run clean --workspace=packages/core && npm run clean --workspace=packages/recall-bench"
+    "build": "npm run build --workspace=packages/core && npm run build --workspace=packages/recall-bench && npm run build --workspace=bench-harnesses/recall",
+    "test": "npm test --workspace=packages/core && npm test --workspace=packages/recall-bench && npm test --workspace=bench-harnesses/recall",
+    "lint": "npm run lint --workspace=packages/core && npm run lint --workspace=packages/recall-bench && npm run lint --workspace=bench-harnesses/recall",
+    "clean": "npm run clean --workspace=packages/core && npm run clean --workspace=packages/recall-bench && npm run clean --workspace=bench-harnesses/recall"
   },
   "engines": {
     "node": ">=18.0.0"

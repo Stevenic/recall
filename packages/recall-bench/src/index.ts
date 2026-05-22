@@ -6,6 +6,8 @@
 export type {
     MemorySystemAdapter,
     DayMetadata,
+    QueryDetail,
+    RetrievalEntry,
     JudgeModel,
     JudgeScore,
     QAPair,

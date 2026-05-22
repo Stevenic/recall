@@ -145,3 +145,7 @@ vite.config.ts.timestamp-*
 
 # Claude Code harness scratch (per-machine, transient)
 .claude/
+
+# Bench draft runs — scratch/in-progress results not yet promoted to a
+# committed per-system folder under bench-results/<system>/.
+bench-results/drafts/

@@ -364,3 +364,73 @@ export interface ConversationGenerationResult {
     totalInputTokens: number;
     totalOutputTokens: number;
 }
+
+// ---------------------------------------------------------------------------
+// Tool-Call Generator Types (Pass 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single tool call the agent would have made on this day. In v0.1 the only
+ * tool is `memorySave`; `content` is the free-text payload that goes into the
+ * memory store. Session attribution names which `# session: <id>` the item
+ * lives under in the day's memory log (or `internal` for pre-H1 narration).
+ *
+ * See specs/recall-bench-loki.md §3.1.
+ */
+export interface ToolCallEntry {
+    session: string;
+    tool: 'memorySave';
+    content: string;
+}
+
+/**
+ * The full tool-call file for one day. Written to
+ * `personas/<id>/tools-NNNd/day-NNNN.yaml`.
+ */
+export interface ToolCallFile {
+    day: number;
+    date: string;
+    day_of_week: string;
+    persona: string;
+    calls: ToolCallEntry[];
+}
+
+/**
+ * One day's generation output (in-memory; serialized to YAML by the caller).
+ */
+export interface GeneratedToolCalls {
+    dayNumber: number;
+    calendarDate: string;
+    dayOfWeek: string;
+    calls: ToolCallEntry[];
+    inputTokens?: number;
+    outputTokens?: number;
+}
+
+export interface ToolCallGeneratorConfig {
+    /** Temperature for tool-call generation. Default: 0.3 (lower than convo gen — more structural). */
+    temperature?: number;
+    /** Max output tokens per day. Default: 4000. */
+    maxTokens?: number;
+    /** Starting day number. Default: 1. */
+    startDay?: number;
+    /** Ending day number. Default: 1000. */
+    endDay?: number;
+    /**
+     * Calendar anchor for the corpus this generator is producing tool calls
+     * for. Overrides PersonaDefinition.epoch. Set this from the loaded story
+     * file's `epoch` so the same persona can drive different stories anchored
+     * at different real-world start dates. Required when neither the persona
+     * nor the memory-log frontmatter carries a date.
+     */
+    epoch?: string;
+    /** Callback after each day's tool calls are generated (raw YAML body). */
+    onDay?: (dayNumber: number, yaml: string) => void | Promise<void>;
+}
+
+export interface ToolCallGenerationResult {
+    personaId: string;
+    days: GeneratedToolCalls[];
+    totalInputTokens: number;
+    totalOutputTokens: number;
+}
