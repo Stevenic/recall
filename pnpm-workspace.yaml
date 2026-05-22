@@ -1,0 +1,3 @@
+allowBuilds:
+  canvas: true
+  protobufjs: set this to true or false

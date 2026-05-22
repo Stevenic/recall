@@ -5,8 +5,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import YAML from 'yaml';
-import type { DayMetadata, QAPair, TimeRangeKey } from './types.js';
-import { TIME_RANGES } from './types.js';
+import type { DayMetadata, QAPair, TimeRange } from './types.js';
 import { deriveSiblingDir } from './generator.js';
 
 // ---------------------------------------------------------------------------
@@ -120,9 +119,8 @@ export async function loadPersona(
  * Filter Q&A pairs to only those answerable within a given time range.
  * A pair is included if ALL of its relevant_days fall within the cutoff.
  */
-export function filterQAByRange(pairs: QAPair[], range: TimeRangeKey): QAPair[] {
-    const cutoff = TIME_RANGES[range];
-    return pairs.filter(qa => qa.relevantDays.every(d => d <= cutoff));
+export function filterQAByRange(pairs: QAPair[], range: TimeRange): QAPair[] {
+    return pairs.filter(qa => qa.relevantDays.every(d => d <= range.days));
 }
 
 /**

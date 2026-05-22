@@ -1,5 +1,5 @@
 - id: executive-assistant-q001
-  question: On day 1, what was the initial assumption about Jamie’s morning briefing time before it was corrected?
+  question: On 2026-01-01, what was the initial assumption about Jamie’s morning briefing time before it was corrected?
   answer: 7:00 AM.
   category: factual-recall
   difficulty: easy
@@ -96,7 +96,7 @@
     - 7
   requires_synthesis: false
 - id: executive-assistant-q011
-  question: What was the real target identity for Condor recorded on day 7?
+  question: What was the real target identity for Condor recorded on 2026-01-07?
   answer: Northstar Components, Inc.
   category: factual-recall
   difficulty: easy
@@ -104,7 +104,7 @@
     - 7
   requires_synthesis: false
 - id: executive-assistant-q012
-  question: What was the Condor approach posture on day 7?
+  question: What was the Condor approach posture on 2026-01-07?
   answer: Quiet, banker-led outreach only, with no executive-to-executive contact until the NDA was fully in place and Rashid cleared the contact protocol.
   category: decision-tracking
   difficulty: medium
@@ -112,7 +112,7 @@
     - 7
   requires_synthesis: false
 - id: executive-assistant-q013
-  question: What morning briefing time did Jordan treat as the standing rule for Jamie on day 14?
+  question: What morning briefing time did Jordan treat as the standing rule for Jamie on 2026-01-14?
   answer: 6:30 AM on weekdays, before Jamie looks at her phone.
   category: factual-recall
   difficulty: easy
@@ -128,7 +128,7 @@
     - 14
   requires_synthesis: false
 - id: executive-assistant-q015
-  question: As of day 14, what was the Q1 board meeting targeted for, and what major event overlapped it?
+  question: As of 2026-01-14, what was the Q1 board meeting targeted for, and what major event overlapped it?
   answer: The Q1 board was targeted for around 2026-03-26, and it overlapped with Q1 earnings on 2026-03-31.
   category: temporal-reasoning
   difficulty: medium
@@ -154,7 +154,7 @@
     - 14
   requires_synthesis: false
 - id: executive-assistant-q018
-  question: What was the latest status of Project Condor on day 14?
+  question: What was the latest status of Project Condor on 2026-01-14?
   answer: NDA executed; diligence kickoff in progress.
   category: contradiction-resolution
   difficulty: easy
@@ -172,7 +172,7 @@
     - 14
   requires_synthesis: false
 - id: executive-assistant-q020
-  question: What indicative purchase-price range and walkaway floor were recorded for Project Condor on day 14?
+  question: What indicative purchase-price range and walkaway floor were recorded for Project Condor on 2026-01-14?
   answer: The indicative purchase-price range was $620M to $760M enterprise value, and the walkaway floor was $650M enterprise value.
   category: factual-recall
   difficulty: medium
@@ -210,7 +210,7 @@
     - 14
   requires_synthesis: false
 - id: executive-assistant-q024
-  question: What school and medical items were kept in the private family plan by day 14?
+  question: What school and medical items were kept in the private family plan by 2026-01-14?
   answer: Riley parent conference on 2026-01-23, Riley winter athletics banquet on 2026-02-06, Tess winter showcase on 2026-01-30, Tess parent-teacher conference on 2026-02-04, Jamie annual physical on 2026-01-14, Tess dentist on 2026-01-20, and Alex follow-up on 2026-01-22.
   category: synthesis
   difficulty: medium
@@ -221,8 +221,8 @@
     - 14
   requires_synthesis: true
 - id: executive-assistant-q025
-  question: What was Jamie’s corrected weekday briefing time in the window, and did Jordan change it again on day 21?
-  answer: 6:30 AM, and no further change was made on day 21.
+  question: What was Jamie’s corrected weekday briefing time in the window, and did Jordan change it again on 2026-01-21?
+  answer: 6:30 AM, and no further change was made on 2026-01-21.
   category: contradiction-resolution
   difficulty: easy
   relevant_days:
@@ -231,7 +231,7 @@
     - 21
   requires_synthesis: false
 - id: executive-assistant-q026
-  question: What target company name did Jordan keep confined inside Project Condor on day 20?
+  question: What target company name did Jordan keep confined inside Project Condor on 2026-01-20?
   answer: Northstar Gridworks, Inc.
   category: factual-recall
   difficulty: easy
@@ -239,7 +239,7 @@
     - 20
   requires_synthesis: false
 - id: executive-assistant-q027
-  question: What was the walkaway valuation floor Jordan kept for Project Condor by day 21?
+  question: What was the walkaway valuation floor Jordan kept for Project Condor by 2026-01-21?
   answer: $650M enterprise value.
   category: factual-recall
   difficulty: easy
@@ -370,7 +370,7 @@
     - 21
   requires_synthesis: false
 - id: executive-assistant-q037
-  question: What customer triggered the P0 service-availability escalation on day 28?
+  question: What customer triggered the P0 service-availability escalation on 2026-01-28?
   answer: Caldwell Group, Mosaic’s largest enterprise customer.
   category: factual-recall
   difficulty: easy
@@ -378,7 +378,7 @@
     - 28
   requires_synthesis: false
 - id: executive-assistant-q038
-  question: At what time did Greg page Jamie about the Caldwell Group escalation on day 28?
+  question: At what time did Greg page Jamie about the Caldwell Group escalation on 2026-01-28?
   answer: 06:42 PT.
   category: factual-recall
   difficulty: easy
@@ -512,7 +512,7 @@
     - 28
   requires_synthesis: false
 - id: executive-assistant-q048
-  question: Which family event on day 22 was explicitly noted as being on 2026-01-22 at 1:15 PM?
+  question: Which family event on 2026-01-22 was explicitly noted as being on 2026-01-22 at 1:15 PM?
   answer: Alex follow-up.
   category: factual-recall
   difficulty: easy
@@ -681,7 +681,7 @@
     - 42
   requires_synthesis: false
 - id: executive-assistant-q062
-  question: What was the latest state of Jamie’s authorization ladder by day 42?
+  question: What was the latest state of Jamie’s authorization ladder by 2026-02-11?
   answer: "It remained unchanged: read-only access at onboarding, send-on-behalf for routine logistics email at the end of January, send-as for inbox triage auto-replies with an audit trail at the end of March, and independent expense approval up to $500 at the end of May."
   category: contradiction-resolution
   difficulty: easy
@@ -737,7 +737,7 @@
     - 42
   requires_synthesis: false
 - id: executive-assistant-q066
-  question: What was the latest working recommendation Jordan gave on Project Condor by day 42?
+  question: What was the latest working recommendation Jordan gave on Project Condor by 2026-02-11?
   answer: No move to negotiation prep yet; continue diligence synthesis and wait for contract-level review of the largest enterprise agreements plus financing pressure-test against the current valuation floor.
   category: decision-tracking
   difficulty: medium
@@ -981,14 +981,14 @@
   requires_synthesis: false
 - id: executive-assistant-q085
   question: On which day did Jordan note that Yuki’s FP&A team produced the first concrete revenue and opex estimates for the Q1 FY27 close?
-  answer: Day 50, 2026-02-19 (Thursday).
+  answer: 2026-02-19, 2026-02-19 (Thursday).
   category: factual-recall
   difficulty: easy
   relevant_days:
     - 50
   requires_synthesis: false
 - id: executive-assistant-q086
-  question: What was the standing briefing time in Jamie’s baseline that Jordan kept unchanged on Day 50?
+  question: What was the standing briefing time in Jamie’s baseline that Jordan kept unchanged on 2026-02-19?
   answer: 6:30 AM weekdays.
   category: factual-recall
   difficulty: easy
@@ -996,7 +996,7 @@
     - 50
   requires_synthesis: false
 - id: executive-assistant-q087
-  question: What did Jordan identify as the main driver of the Q1 quarter trending below internal forecast across the Day 50–56 window?
+  question: What did Jordan identify as the main driver of the Q1 quarter trending below internal forecast across the 2026-02-19–56 window?
   answer: Industrial-controls softness.
   category: synthesis
   difficulty: medium
@@ -1010,7 +1010,7 @@
     - 56
   requires_synthesis: true
 - id: executive-assistant-q088
-  question: What valuation correction did Jordan record for Project Condor on Day 55, and what earlier figure did it supersede?
+  question: What valuation correction did Jordan record for Project Condor on 2026-02-24, and what earlier figure did it supersede?
   answer: The revised base case was $465M with a $40M synergy assumption, superseding the earlier $510M base case with $50M synergy.
   category: contradiction-resolution
   difficulty: medium
@@ -1018,7 +1018,7 @@
     - 55
   requires_synthesis: false
 - id: executive-assistant-q089
-  question: What was the current working walkaway floor for Project Condor after the Day 50–56 diligence updates?
+  question: What was the current working walkaway floor for Project Condor after the 2026-02-19–56 diligence updates?
   answer: $650M EV.
   category: factual-recall
   difficulty: easy
@@ -1099,7 +1099,7 @@
     - 56
   requires_synthesis: true
 - id: executive-assistant-q095
-  question: What change did Jordan record in the Caldwell Group incident on Day 55 and Day 56?
+  question: What change did Jordan record in the Caldwell Group incident on 2026-02-24 and 2026-02-25?
   answer: Theresa Caldwell signaled satisfaction with the remediation, and the relationship reset was confirmed, moving the posture from active remediation to recovery follow-through.
   category: synthesis
   difficulty: medium
@@ -1283,7 +1283,7 @@
     - 63
   requires_synthesis: true
 - id: executive-assistant-q109
-  question: On day 70, what narrative shift did Jamie want for the Q1 miss?
+  question: On 2026-03-11, what narrative shift did Jamie want for the Q1 miss?
   answer: He wanted the story framed around profitable growth, not apology.
   category: decision-tracking
   difficulty: easy
@@ -1291,7 +1291,7 @@
     - 70
   requires_synthesis: false
 - id: executive-assistant-q110
-  question: What was the current working base case valuation for Project Condor on day 70?
+  question: What was the current working base case valuation for Project Condor on 2026-03-11?
   answer: $465M.
   category: factual-recall
   difficulty: easy
@@ -1299,7 +1299,7 @@
     - 70
   requires_synthesis: false
 - id: executive-assistant-q111
-  question: What was the current working synergy assumption for Project Condor on day 70?
+  question: What was the current working synergy assumption for Project Condor on 2026-03-11?
   answer: $40M.
   category: factual-recall
   difficulty: easy
@@ -1307,7 +1307,7 @@
     - 70
   requires_synthesis: false
 - id: executive-assistant-q112
-  question: What did Henry Whitfield ask for first in the Q1 board pre-read on day 70?
+  question: What did Henry Whitfield ask for first in the Q1 board pre-read on 2026-03-11?
   answer: Bottom line first on Condor and the Q1 outlook.
   category: factual-recall
   difficulty: easy
@@ -1315,7 +1315,7 @@
     - 70
   requires_synthesis: false
 - id: executive-assistant-q113
-  question: What was the status of the FY27 H1 budget cycle on day 70?
+  question: What was the status of the FY27 H1 budget cycle on 2026-03-11?
   answer: It stayed in assumptions-reset mode.
   category: factual-recall
   difficulty: easy
@@ -1323,7 +1323,7 @@
     - 70
   requires_synthesis: false
 - id: executive-assistant-q114
-  question: Did day 70 change the Condor walkaway floor from $650M EV?
+  question: Did 2026-03-11 change the Condor walkaway floor from $650M EV?
   answer: No.
   category: negative-recall
   difficulty: easy
@@ -1331,7 +1331,7 @@
     - 70
   requires_synthesis: false
 - id: executive-assistant-q115
-  question: On day 70, what were the standing hard blocks for Riley Park and Tess Park?
+  question: On 2026-03-11, what were the standing hard blocks for Riley Park and Tess Park?
   answer: Riley Park had Tuesday evenings reserved for basketball, and Tess Park had Thursday mornings reserved for school drop-off.
   category: factual-recall
   difficulty: easy
@@ -1339,7 +1339,7 @@
     - 70
   requires_synthesis: false
 - id: executive-assistant-q116
-  question: What was the latest board timing for the Q1 and Q2 board meetings on day 70?
+  question: What was the latest board timing for the Q1 and Q2 board meetings on 2026-03-11?
   answer: The Q1 board remained around 2026-03-26, and the Q2 board remained around 2026-06-19.
   category: factual-recall
   difficulty: easy
@@ -1361,8 +1361,8 @@
     - 70
   requires_synthesis: true
 - id: executive-assistant-q118
-  question: How did the Q1 earnings narrative evolve from day 64 to day 70?
-  answer: It stayed below forecast and internal-only on days 64–69, then on day 70 the miss crystallized and Jamie wanted it framed around profitable growth instead of apology.
+  question: How did the Q1 earnings narrative evolve from 2026-03-05 to 2026-03-11?
+  answer: It stayed below forecast and internal-only on days 64–69, then on 2026-03-11 the miss crystallized and Jamie wanted it framed around profitable growth instead of apology.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -1375,7 +1375,7 @@
     - 70
   requires_synthesis: true
 - id: executive-assistant-q119
-  question: What permission level did Jamie have by the end of day 70?
+  question: What permission level did Jamie have by the end of 2026-03-11?
   answer: "The ladder remained unchanged: read-only on onboarding, send-on-behalf at end of January, send-as for inbox triage auto-replies with audit trail at end of March, and independent expense approval up to $500 at end of May."
   category: contradiction-resolution
   difficulty: medium
@@ -1389,7 +1389,7 @@
     - 70
   requires_synthesis: true
 - id: executive-assistant-q120
-  question: Was any lender process authorized for Project Condor by day 70?
+  question: Was any lender process authorized for Project Condor by 2026-03-11?
   answer: No; lender outreach and any external financing process were still on hold.
   category: negative-recall
   difficulty: medium
@@ -2355,7 +2355,7 @@
   requires_synthesis: false
 - id: executive-assistant-q205
   question: On which day did Jordan record that the Caldwell Group onsite visit was physically done and that 3 Daniel commitments plus 2 Jamie commitments had been captured?
-  answer: 2026-04-30 (Day 121).
+  answer: 2026-04-30 (2026-05-01).
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -3494,7 +3494,7 @@
   requires_synthesis: false
 - id: executive-assistant-q301
   question: On which day did Jamie first explicitly say the Q1/Q2 board cycle should stay in concluding mode unless he reopened it?
-  answer: Day 174, 2026-06-22 (Monday).
+  answer: 2026-06-23, 2026-06-22 (Monday).
   category: factual-recall
   difficulty: easy
   relevant_days:

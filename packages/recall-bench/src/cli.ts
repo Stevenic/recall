@@ -5,7 +5,7 @@
  */
 
 import { Command } from 'commander';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve, dirname, join } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { BenchmarkHarness } from './harness.js';
@@ -17,11 +17,13 @@ import { ConversationGenerator, serializeConversation, serializeConversationJson
 import { generateQa, generateBoundaryQa } from './qa-generator.js';
 import { CliGeneratorModel, isCliAgentName, CLI_AGENT_NAMES } from './cli-generator-model.js';
 import { OpenAiGeneratorModel, isOpenAiSpec, parseOpenAiSpec } from './openai-generator-model.js';
+import { isModelSpec, createModelFromSpec } from './model-spec.js';
 import { LlmJudge } from './llm-judge.js';
 import { GrpcMemoryAdapter } from './grpc-memory-adapter.js';
+import { loadProfile, applyProfileEnv, resolveProfilePath, type Profile } from './profile.js';
 import type { GeneratorModel } from './generator-types.js';
-import type { HarnessConfig, TimeRangeKey, JudgeModel, MemorySystemAdapter } from './types.js';
-import { TIME_RANGES } from './types.js';
+import type { HarnessConfig, TimeRange, JudgeModel, MemorySystemAdapter } from './types.js';
+import { DEFAULT_RANGES, parseTimeRange } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,33 +41,132 @@ program
 program
     .command('run')
     .description('Run a benchmark against a memory system adapter')
-    .requiredOption('--adapter <url|path>', 'gRPC URL (grpc://host:port) or path to adapter module')
-    .requiredOption('--data <dir>', 'Path to dataset directory containing persona folders')
-    .option('--judge <spec>', `Judge selector: a model spec (${CLI_AGENT_NAMES.join(', ')}, openai, openai:<model-id>) wrapped in an LLM judge, or a path to a JS module exporting a JudgeModel. Default: stub judge that returns zeros.`)
+    .option('--profile <path>', 'Path to a YAML profile that supplies adapter/data/models/run settings. Explicit flags override profile values.')
+    .option('--adapter <url|path>', 'gRPC URL (grpc://host:port) or path to adapter module. Required if not in profile.')
+    .option('--data <dir>', 'Path to dataset directory containing persona folders. Required if not derivable from profile.')
+    .option('--judge <spec>', `Judge selector: a CLI agent name (${CLI_AGENT_NAMES.join(', ')}), a model spec (provider:model;endpoint where provider is openai/anthropic/azure), an OpenAI shorthand ('openai' or 'openai:<model-id>'), or a path to a JS module exporting a JudgeModel. Default: stub judge that returns zeros.`)
+    .option('--appellate-judge <spec>', 'Optional second judge invoked only for primary-judge failures (the "supreme court"). Accepts the same spec syntax as --judge. The appellate verdict is final; both scores are recorded.')
+    .option('--failure-log <path>', 'Write one JSONL record per appellate-reviewed failure to this path (Q, ref, system answer, both scores, retrieval). Default: derived from --json-out by replacing .json with .failures.jsonl.')
+    .option('--progress-jsonl <path>', 'Stream per-checkpoint progress (header + one record per checkpoint + summary) as JSON lines. Lets the heatmap script render an in-flight view. Default: derived from --json-out by replacing .json with .progress.jsonl.')
+    .option('--resume <path>', 'Resume a previously-interrupted run by reading checkpoint records from this JSONL file. Cached ranges skip their eval phase; the adapter still re-ingests the corpus up to the cached cutoff so subsequent uncached ranges see the right state. Typically the same path as --progress-jsonl from the prior run.')
     .option('--personas <ids...>', 'Persona IDs to benchmark (default: all)')
-    .option('--ranges <ranges...>', 'Time ranges to evaluate (30d, 90d, 6mo, 1y, full)', parseRanges)
-    .option('--seed <n>', 'Shuffle seed (0 = no shuffle)', parseIntArg, 42)
-    .option('--timeout <ms>', 'Per-question timeout', parseIntArg, 30000)
+    .option('--arcs <filename>', 'Arcs file inside each persona dir; pairs memories/qa dirs to load. Default: arcs-1000d.yaml. Use arcs-180d.yaml for the 180-day variant.')
+    .option('--ranges <ranges...>', 'Time-range checkpoints. Each entry is a day count or named alias: 30, 30d, 6mo, 1y, full. Pass several to build a multi-checkpoint heatmap (e.g. --ranges 6d,12d,18d,24d).', parseRanges)
+    .option('--seed <n>', 'Shuffle seed (0 = no shuffle)', parseIntArg)
+    .option('--timeout <ms>', 'Per-question timeout', parseIntArg)
     .option('--grpc-timeout <ms>', 'Per-RPC timeout for gRPC adapter', parseIntArg, 120000)
-    .option('--parallelism <n>', 'Max concurrent queries', parseIntArg, 1)
+    .option('--parallelism <n>', 'Max concurrent queries', parseIntArg)
+    .option('--sample <n>', 'Per-checkpoint historical-question sample cap. New questions are always evaluated; older ones are randomly sampled (seeded). Omit for full eval.', parseIntArg)
+    .option('--judge-memory-window <n>', 'Days-around-relevant-day window the judge sees as grounding context. 0 disables (reference-only). Default: 0.', parseIntArg)
+    .option('--groups-enabled', 'Enable group-aware categories (group-session-attribution, information-boundary). Default off — those categories add noise unless the memory system claims session-level support.')
     .option('--json', 'Output JSON instead of text')
     .option('--heatmap', 'Output only the heatmap grid as JSON')
+    .option('--json-out <path>', 'Also write the full JSON BenchmarkResult to this file. When set, the bench also writes a sibling .png heatmap alongside it (set --no-heatmap-png to skip).')
+    .option('--no-heatmap-png', 'Disable the automatic heatmap PNG render that accompanies --json-out.')
+    .option('--heatmap-script <path>', 'Override the path to generate-heatmap.mjs. Default: resolved relative to the recall-bench dist.')
     .action(async (opts) => {
-        const adapter = await resolveAdapter(opts.adapter, opts.grpcTimeout);
-        const judge = opts.judge
-            ? await resolveJudge(opts.judge, opts.timeout)
+        const profile = opts.profile ? await loadProfile(opts.profile) : null;
+        if (profile) applyProfileEnv(profile);
+
+        const adapterSpec =
+            opts.adapter ??
+            (profile?.harness ? resolveMaybeProfilePath(profile, profile.harness.adapter) : undefined);
+        if (!adapterSpec) {
+            throw new Error('Missing adapter — provide --adapter or set harness.adapter in the profile.');
+        }
+
+        const dataDir = resolveDataDir(opts.data, profile);
+        if (!dataDir) {
+            throw new Error('Missing data dir — provide --data or set persona.dir in the profile.');
+        }
+
+        const judgeSpec = opts.judge ?? profile?.models?.judge;
+        const judgeTimeout = opts.timeout ?? profile?.run?.timeout;
+        const appellateSpec = opts.appellateJudge ?? profile?.models?.appellateJudge;
+
+        const adapter = await resolveAdapter(adapterSpec, opts.grpcTimeout, profile);
+        const judge = judgeSpec
+            ? await resolveJudge(judgeSpec, judgeTimeout)
             : createStubJudge();
+        const appellateJudge = appellateSpec
+            ? await resolveJudge(appellateSpec, judgeTimeout)
+            : undefined;
+
+        const personas =
+            opts.personas ?? (profile?.persona ? [profile.persona.id] : undefined);
+
+        const harnessConfig = profile?.harness?.config as Record<string, unknown> | undefined;
+        const synthesisModel = typeof harnessConfig?.synthesisModel === 'string'
+            ? harnessConfig.synthesisModel
+            : undefined;
+        const embeddingProvider = typeof harnessConfig?.embeddingProvider === 'string'
+            ? harnessConfig.embeddingProvider
+            : undefined;
+        const embeddingModel = typeof harnessConfig?.embeddingModel === 'string'
+            ? harnessConfig.embeddingModel
+            : undefined;
 
         const config: HarnessConfig = {
-            personas: opts.personas,
-            ranges: opts.ranges,
-            shuffleSeed: opts.seed,
-            questionTimeoutMs: opts.timeout,
-            parallelism: opts.parallelism,
+            personas,
+            ranges: opts.ranges ?? profile?.run?.ranges,
+            shuffleSeed: opts.seed ?? profile?.run?.seed ?? 42,
+            questionTimeoutMs: opts.timeout ?? profile?.run?.timeout ?? 30_000,
+            parallelism: opts.parallelism ?? profile?.run?.parallelism ?? 1,
+            arcsFile: opts.arcs ?? profile?.persona?.arcs ?? 'arcs-1000d.yaml',
         };
+        const sampleSetting = opts.sample ?? profile?.run?.sample;
+        if (sampleSetting !== undefined) config.sample = sampleSetting;
+        const judgeMemoryWindowSetting = opts.judgeMemoryWindow ?? profile?.run?.judgeMemoryWindow;
+        if (judgeMemoryWindowSetting !== undefined) config.judgeMemoryWindow = judgeMemoryWindowSetting;
+        const groupsEnabledSetting = opts.groupsEnabled ?? profile?.run?.groupsEnabled;
+        if (groupsEnabledSetting !== undefined) config.groupsEnabled = groupsEnabledSetting;
+        const modelLabels: NonNullable<HarnessConfig['modelLabels']> = {};
+        if (synthesisModel) modelLabels.synthesisModel = synthesisModel;
+        if (embeddingProvider) modelLabels.embeddingProvider = embeddingProvider;
+        if (embeddingModel) modelLabels.embeddingModel = embeddingModel;
+        if (judgeSpec) modelLabels.judgeModel = judgeSpec;
+        if (appellateSpec) modelLabels.appellateJudgeModel = appellateSpec;
+        if (Object.keys(modelLabels).length > 0) config.modelLabels = modelLabels;
 
-        const harness = new BenchmarkHarness(adapter, judge, opts.data, config);
+        if (appellateJudge) config.appellateJudge = appellateJudge;
+        // Derive failure log path from --json-out when not explicitly set.
+        const failureLog =
+            opts.failureLog ??
+            (opts.jsonOut ? resolve(opts.jsonOut).replace(/\.json$/i, '') + '.failures.jsonl' : undefined);
+        if (failureLog && appellateJudge) config.failureLogPath = failureLog;
+
+        // Derive progress JSONL path from --json-out when not explicitly set.
+        const progressJsonl =
+            opts.progressJsonl ??
+            (opts.jsonOut ? resolve(opts.jsonOut).replace(/\.json$/i, '') + '.progress.jsonl' : undefined);
+        if (progressJsonl) config.progressJsonlPath = progressJsonl;
+
+        // Resume from a prior run's progress JSONL when --resume is given.
+        if (opts.resume) {
+            config.resumeFromJsonlPath = resolve(opts.resume);
+        }
+
+        const harness = new BenchmarkHarness(adapter, judge, dataDir, config);
         const result = await harness.run();
+
+        if (opts.jsonOut) {
+            const abs = resolve(opts.jsonOut);
+            await writeFile(abs, formatJsonReport(result), 'utf-8');
+            process.stderr.write(`[bench] JSON results → ${abs}\n`);
+
+            // Auto-render a heatmap PNG alongside the JSON unless suppressed.
+            if (opts.heatmapPng !== false) {
+                const pngPath = abs.replace(/\.json$/i, '') + '.png';
+                const scriptPath = opts.heatmapScript ?? resolveDefaultHeatmapScript();
+                try {
+                    await renderHeatmapPng(scriptPath, abs, pngPath);
+                    process.stderr.write(`[bench] Heatmap PNG → ${pngPath}\n`);
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    process.stderr.write(`[bench] Heatmap PNG skipped: ${msg}\n`);
+                }
+            }
+        }
 
         if (opts.heatmap) {
             const grid = toHeatmapGrid(result.heatmap, result.ranges);
@@ -96,16 +197,19 @@ program
 
 program
     .command('ranges')
-    .description('Show available time ranges and their day cutoffs')
+    .description('Show the default time-range checkpoints. Any positive day count is also accepted as a range; named aliases (30d, 6mo, 1y, full) and "Nd"/"Nmo"/"Ny" formats are supported in --ranges and in profile YAML.')
     .option('--json', 'Output JSON')
     .action((opts) => {
         if (opts.json) {
-            console.log(JSON.stringify(TIME_RANGES, null, 2));
+            console.log(JSON.stringify(DEFAULT_RANGES, null, 2));
         } else {
-            console.log('Available time ranges:');
-            for (const [key, days] of Object.entries(TIME_RANGES)) {
-                console.log(`  ${key.padEnd(6)} → ${days} days`);
+            console.log('Default time ranges:');
+            for (const r of DEFAULT_RANGES) {
+                console.log(`  ${r.label.padEnd(6)} → ${r.days} days`);
             }
+            console.log('');
+            console.log('Custom ranges: pass any positive number of days, with optional "d" suffix.');
+            console.log('Example: --ranges 6d,12d,18d,24d,30d,36d,42d,...');
         }
     });
 
@@ -460,20 +564,47 @@ program.parse();
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseRanges(value: string): TimeRangeKey[] {
-    return value.split(',').map(s => {
-        const trimmed = s.trim() as TimeRangeKey;
-        if (!(trimmed in TIME_RANGES)) {
-            throw new Error(`Invalid range: ${trimmed}. Valid: ${Object.keys(TIME_RANGES).join(', ')}`);
-        }
-        return trimmed;
-    });
+function parseRanges(value: string): TimeRange[] {
+    return value.split(',').map(s => parseTimeRange(s.trim()));
 }
 
 async function loadModule<T>(modulePath: string): Promise<T> {
+    // Convert to a file:// URL so Node's ESM loader accepts the absolute path
+    // on Windows (where bare drive-letter paths like "C:/..." are rejected).
     const abs = resolve(modulePath);
-    const mod = await import(abs);
+    const mod = await import(pathToFileURL(abs).href);
     return mod.default as T;
+}
+
+/**
+ * Load a module's full namespace (default + named exports). Used when we want
+ * to pick a named factory export rather than the default.
+ */
+async function loadModuleNamespace(modulePath: string): Promise<Record<string, unknown>> {
+    const abs = resolve(modulePath);
+    return (await import(pathToFileURL(abs).href)) as Record<string, unknown>;
+}
+
+/**
+ * Resolve a possibly-relative path stored in a profile against the profile's
+ * own directory. Absolute paths and gRPC URLs pass through unchanged.
+ */
+function resolveMaybeProfilePath(profile: Profile, value: string): string {
+    if (GrpcMemoryAdapter.isGrpcUrl(value)) return value;
+    return resolveProfilePath(profile, value);
+}
+
+/**
+ * Resolve the dataset directory: prefer explicit --data, otherwise derive it
+ * from the profile's `persona.dir` (its parent is the personas root).
+ */
+function resolveDataDir(cliData: string | undefined, profile: Profile | null): string | undefined {
+    if (cliData) return resolve(cliData);
+    if (profile?.persona?.dir) {
+        const personaDir = resolveProfilePath(profile, profile.persona.dir);
+        return dirname(personaDir);
+    }
+    return undefined;
 }
 
 /**
@@ -484,7 +615,7 @@ async function loadModule<T>(modulePath: string): Promise<T> {
  * load a custom JudgeModel directly.
  */
 async function resolveJudge(spec: string, timeout?: number): Promise<JudgeModel> {
-    if (isCliAgentName(spec) || isOpenAiSpec(spec)) {
+    if (isCliAgentName(spec) || isOpenAiSpec(spec) || isModelSpec(spec)) {
         const model = await resolveModel(spec, timeout);
         return new LlmJudge(model);
     }
@@ -510,8 +641,13 @@ async function resolveModel(nameOrPath: string, timeout?: number): Promise<Gener
         if (timeout !== undefined) config.timeout = timeout;
         return new OpenAiGeneratorModel(config);
     }
+    if (isModelSpec(nameOrPath)) {
+        const opts: { timeout?: number } = {};
+        if (timeout !== undefined) opts.timeout = timeout;
+        return createModelFromSpec(nameOrPath, opts);
+    }
     const abs = resolve(nameOrPath);
-    const mod = await import(abs);
+    const mod = await import(pathToFileURL(abs).href);
     return mod.default as GeneratorModel;
 }
 
@@ -519,11 +655,51 @@ async function resolveModel(nameOrPath: string, timeout?: number): Promise<Gener
  * Resolve an --adapter value to a MemorySystemAdapter.
  * Accepts a gRPC URL (grpc://host:port) or a path to a JS module.
  */
-async function resolveAdapter(urlOrPath: string, grpcTimeout?: number): Promise<MemorySystemAdapter> {
+async function resolveAdapter(
+    urlOrPath: string,
+    grpcTimeout?: number,
+    profile?: Profile | null,
+): Promise<MemorySystemAdapter> {
     if (GrpcMemoryAdapter.isGrpcUrl(urlOrPath)) {
         return GrpcMemoryAdapter.fromUrl(urlOrPath, { timeout: grpcTimeout });
     }
+    // If the profile names a factory export, call it with the harness config.
+    // Otherwise consume the module's default export as a ready-made adapter.
+    const factoryName = profile?.harness?.factory;
+    if (factoryName) {
+        const ns = await loadModuleNamespace(urlOrPath);
+        const factory = ns[factoryName];
+        if (typeof factory !== 'function') {
+            const available = Object.keys(ns)
+                .filter((k) => typeof ns[k] === 'function')
+                .join(', ');
+            throw new Error(
+                `Adapter module ${urlOrPath} does not export a callable "${factoryName}". Available callables: ${available || '(none)'}.`,
+            );
+        }
+        const cfg = profile?.harness?.config ?? {};
+        const result = await Promise.resolve((factory as (cfg: unknown) => unknown)(cfg));
+        if (!isMemorySystemAdapter(result)) {
+            throw new Error(
+                `Factory "${factoryName}" in ${urlOrPath} did not return a MemorySystemAdapter (got ${typeof result}).`,
+            );
+        }
+        return result;
+    }
     return loadModule<MemorySystemAdapter>(urlOrPath);
+}
+
+function isMemorySystemAdapter(value: unknown): value is MemorySystemAdapter {
+    if (typeof value !== 'object' || value === null) return false;
+    const v = value as Record<string, unknown>;
+    return (
+        typeof v.name === 'string' &&
+        typeof v.setup === 'function' &&
+        typeof v.ingestDay === 'function' &&
+        typeof v.finalizeIngestion === 'function' &&
+        typeof v.query === 'function' &&
+        typeof v.teardown === 'function'
+    );
 }
 
 /** Stub judge for dry runs — returns max scores. */
@@ -533,4 +709,39 @@ function createStubJudge(): JudgeModel {
             return { correctness: 0, completeness: 0, hallucination: 0, reasoning: 'No judge configured — stub scores.' };
         },
     };
+}
+
+/**
+ * Default location of the heatmap renderer relative to the recall-bench dist.
+ * Expected repo layout: <repo>/scripts/generate-heatmap.mjs while the CLI
+ * lives at <repo>/packages/recall-bench/dist/cli.js — so three levels up.
+ */
+function resolveDefaultHeatmapScript(): string {
+    return resolve(__dirname, '..', '..', '..', 'scripts', 'generate-heatmap.mjs');
+}
+
+/**
+ * Spawn the heatmap script as a child process and wait for completion.
+ * Wired as a child process (not an import) because `generate-heatmap.mjs`
+ * depends on the `canvas` native module which we don't want pulled into
+ * recall-bench's dependency graph.
+ */
+async function renderHeatmapPng(scriptPath: string, jsonPath: string, pngPath: string): Promise<void> {
+    const { existsSync } = await import('node:fs');
+    if (!existsSync(scriptPath)) {
+        throw new Error(`heatmap script not found at ${scriptPath} (override with --heatmap-script)`);
+    }
+    const { spawn } = await import('node:child_process');
+    await new Promise<void>((res, rej) => {
+        const child = spawn(process.execPath, [scriptPath, '--input', jsonPath, '--output', pngPath], {
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        let stderr = '';
+        child.stderr?.on('data', (d) => { stderr += d.toString(); });
+        child.on('error', rej);
+        child.on('exit', (code) => {
+            if (code === 0) res();
+            else rej(new Error(`heatmap script exited ${code}${stderr ? `: ${stderr.trim()}` : ''}`));
+        });
+    });
 }

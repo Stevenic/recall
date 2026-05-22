@@ -4,6 +4,8 @@ import {
     formatJudgeInputs,
     parseJudgeOutput,
     LLM_JUDGE_SYSTEM_PROMPT,
+    LLM_JUDGE_GROUNDED_SYSTEM_PROMPT,
+    LLM_JUDGE_BOUNDARY_SYSTEM_PROMPT,
 } from '../src/llm-judge.js';
 import type { GeneratorModel, GeneratorModelOptions, GeneratorModelResult } from '../src/generator-types.js';
 
@@ -22,6 +24,56 @@ describe('formatJudgeInputs', () => {
         expect(out).toContain('QUESTION:\nQ?');
         expect(out).toContain('REFERENCE ANSWER:\nREF');
         expect(out).toContain('SYSTEM ANSWER:\nSYS');
+        expect(out).not.toContain('MEMORY CONTEXT');
+    });
+
+    it('prepends MEMORY CONTEXT when context is provided', () => {
+        const out = formatJudgeInputs('Q?', 'REF', 'SYS', {
+            memoryExcerpts: '--- DAY 5 ---\nfoo bar',
+        });
+        expect(out.indexOf('MEMORY CONTEXT')).toBeLessThan(out.indexOf('QUESTION:'));
+        expect(out).toContain('--- DAY 5 ---\nfoo bar');
+    });
+
+    it('treats empty/whitespace memoryExcerpts as no context', () => {
+        const out = formatJudgeInputs('Q?', 'REF', 'SYS', { memoryExcerpts: '   ' });
+        expect(out).not.toContain('MEMORY CONTEXT');
+    });
+});
+
+describe('LlmJudge prompt selection', () => {
+    it('uses reference-only prompt when no context is supplied', async () => {
+        const stub = new StubModel('{"correctness":3,"completeness":2,"hallucination":1}');
+        const judge = new LlmJudge(stub);
+        await judge.score('Q?', 'REF', 'SYS');
+        expect(stub.captured.systemPrompt).toBe(LLM_JUDGE_SYSTEM_PROMPT);
+        expect(stub.captured.userMessage).not.toContain('MEMORY CONTEXT');
+    });
+
+    it('uses grounded prompt and threads context when memoryExcerpts are present', async () => {
+        const stub = new StubModel('{"correctness":3,"completeness":2,"hallucination":1}');
+        const judge = new LlmJudge(stub);
+        await judge.score('Q?', 'REF', 'SYS', { memoryExcerpts: '--- DAY 7 ---\nthe content' });
+        expect(stub.captured.systemPrompt).toBe(LLM_JUDGE_GROUNDED_SYSTEM_PROMPT);
+        expect(stub.captured.userMessage).toContain('MEMORY CONTEXT');
+        expect(stub.captured.userMessage).toContain('--- DAY 7 ---');
+    });
+
+    it('uses boundary prompt when expectedDisclosure is present and surfaces ACL fields', async () => {
+        const stub = new StubModel('{"correctness":3,"completeness":2,"hallucination":1}');
+        const judge = new LlmJudge(stub);
+        await judge.score('Q?', 'REF', 'SYS', {
+            memoryExcerpts: '--- DAY 5 ---\nsensitive content',
+            expectedDisclosure: 'refuse',
+            querySession: 'principal',
+            forbiddenSessions: ['legal-deposition'],
+        });
+        expect(stub.captured.systemPrompt).toBe(LLM_JUDGE_BOUNDARY_SYSTEM_PROMPT);
+        expect(stub.captured.userMessage).toContain('EXPECTED DISCLOSURE: refuse');
+        expect(stub.captured.userMessage).toContain('QUERY SESSION: principal');
+        expect(stub.captured.userMessage).toContain('FORBIDDEN SESSIONS: legal-deposition');
+        // Grounding context still flows through.
+        expect(stub.captured.userMessage).toContain('MEMORY CONTEXT');
     });
 });
 

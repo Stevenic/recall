@@ -1,0 +1,87 @@
+# Run the executive-assistant 180-day persona against the OpenClaw harness.
+#
+# Inner paths are relative to this file. To use:
+#   1. Copy/symlink the .env (or update env.file) so OPENAI_API_KEY is loaded.
+#   2. Build the OpenClaw harness:
+#        pnpm --filter @openclaw/recall-bench-openclaw build
+#      and update harness.adapter below to point at the dist.
+#   3. Run:
+#        recall-bench run --profile packages/recall-bench/profiles/ea-180d-openclaw.yaml
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  # Primary ("trial court") judge — sees every evaluation. Cheap & fast.
+  # Switched to Azure Foundry; endpoint/api-key/api-version come from
+  # AZURE_OPENAI_* env vars loaded via env.file. The model id after the
+  # colon is the Azure deployment name.
+  judge: azure:gpt-5.4-mini
+  # Appellate ("supreme court") judge — invoked only when the primary's
+  # verdict qualifies as a failure (composite < 4/6 OR hallucination=0 OR
+  # correctness=0). The appellate's verdict is final; the primary's score is
+  # preserved on the QuestionResult for diagnostics. Failures are also
+  # logged to <json-out>.failures.jsonl with retrieved memory chunks so we
+  # can post-hoc analyze why each failure happened.
+  appellateJudge: azure:gpt-5.4
+  # Used by the harness for prose synthesis after retrieval (passed via
+  # harness.config.synthesisModel below — the harness reads its own config).
+  generation: azure:gpt-5.4-mini
+
+harness:
+  # Update this path to your local OpenClaw checkout's built dist.
+  adapter: C:/source/openclaw/recall-bench-openclaw/dist/index.js
+  factory: createOpenClawAdapter
+  config:
+    embeddingProvider: openai       # explicit hybrid (BM25 + vector KNN)
+    embeddingModel: text-embedding-3-small
+    synthesisModel: gpt-5.4-mini    # interpreted as Azure deployment name below
+    maxSearchResults: 15
+    minScore: 0.1
+    # Answer mode:
+    #   "agent"     — LLM drives memory_search/memory_get as tools, mirroring
+    #                 how OpenClaw's real agents use memory. The system answer
+    #                 is the agent's final turn after a tool-call loop.
+    #   "synthesis" — Legacy: harness retrieves up front and stuffs all chunks
+    #                 into a single synthesis call. Faster but doesn't match
+    #                 OpenClaw's actual usage pattern.
+    answerMode: agent
+    agentMaxIterations: 6
+    # Synthesis-side LLM provider for the OpenClaw harness's agent client.
+    # "azure" routes through Azure Foundry using AZURE_OPENAI_API_KEY,
+    # AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION env vars; the model
+    # field above is treated as the Azure deployment name.
+    synthesisProvider: azure
+
+run:
+  # 30 checkpoints every 6 days from day 6 through day 180 — full heatmap of
+  # how recall evolves across the corpus. Incremental ingest model means the
+  # corpus is built up once, not re-ingested per checkpoint.
+  ranges:
+    start: 6
+    end: 180
+    step: 6
+  seed: 42
+  timeout: 60000
+  parallelism: 1
+  # Always evaluate every question that first becomes eligible at this
+  # checkpoint; then randomly sample N already-seen ("historical") questions
+  # to bound the per-checkpoint cost. ~60 evals/checkpoint at N=50.
+  sample: 50
+  # Days-around-relevant-day window the judge sees as grounding context.
+  # ±1 day per Q&A pair; 0 disables (reference-only mode). With this on,
+  # the judge scores `hallucination` against actual memories, not the
+  # (often-terse) reference, eliminating the "elaboration ≠ hallucination"
+  # measurement artifact.
+  judgeMemoryWindow: 1
+  # Group-aware categories (`group-session-attribution`,
+  # `information-boundary`). OpenClaw's built-in memory has no concept of
+  # per-session ACLs today, so these categories add only noise — kept off
+  # by default. Flip to `true` once a system claims session-level support
+  # (or to specifically measure how badly a non-supporting system fails).
+  groupsEnabled: false

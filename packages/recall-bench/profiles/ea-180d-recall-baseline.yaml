@@ -1,0 +1,84 @@
+# Run the executive-assistant 180-day persona against the Recall harness
+# (compaction + search baseline, no dreaming).
+#
+# This is the v0.1 baseline before the silo lattice / wiki-promotion work
+# lands. It exercises Recall's eidetic logs + two-phase search + compaction
+# (daily → weekly → monthly → wisdom). The wiki layer is enabled at the
+# config level (so stubs and the index are valid) but dreaming is off, so
+# the wiki never gets synthesized — pure recall-from-compacted-logs.
+#
+# To run:
+#   recall-bench run --profile packages/recall-bench/profiles/ea-180d-recall-baseline.yaml \
+#                    --json-out runs/ea-180d-recall-baseline.json
+#
+# Reads OPENAI_API_KEY / AZURE_OPENAI_API_KEY etc. from the .env loaded
+# via env.file below.
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  # Primary ("trial court") judge — sees every evaluation. Cheap & fast.
+  # Azure deployment; endpoint/api-key/api-version from AZURE_OPENAI_* env vars.
+  judge: azure:gpt-5.4-mini
+  # Appellate ("supreme court") judge — invoked only when the primary's
+  # verdict qualifies as a failure (composite < 4/6 OR hallucination=0 OR
+  # correctness=0). Appellate verdict is final; the primary's score is
+  # preserved on the QuestionResult for diagnostics.
+  appellateJudge: azure:gpt-5.4
+  # Display label only — the synthesis model is configured in harness.config.
+  generation: azure:gpt-5.4-mini
+
+harness:
+  # Compiled adapter from packages/recall-bench/src/recall-adapter.ts
+  adapter: ../dist/recall-adapter.js
+  factory: createRecallAdapter
+  config:
+    name: Recall (baseline)
+    # Model used for compaction and query-time answer synthesis.
+    model: azure:gpt-5.4-mini
+    # Identity threaded into compaction/synthesis prompts.
+    identityName: Jordan
+    identity: |
+      Jordan is an AI executive assistant for the CFO of a mid-cap technology
+      company. Trusted operator: anticipatory, discreet, calm under pressure,
+      protective of the principal's time and confidentiality. Drafts but does
+      not send sensitive (HR, legal, board, customer-escalation)
+      communications without principal review.
+    # Number of search results to retrieve per query.
+    searchK: 10
+    # Max chars of memory excerpts assembled into the synthesis prompt.
+    contextBudget: 9000
+    # Run compaction (daily → weekly → monthly) at each checkpoint.
+    enableCompaction: true
+    # Dreaming OFF — this is the pre-wiki-synthesis baseline. Turning this
+    # on switches us to the "with wiki" condition and produces a different
+    # set of scores to compare against.
+    enableDreaming: false
+
+run:
+  # 30 checkpoints every 6 days from day 6 through day 180 — matches the
+  # cadence used for the OpenClaw and Vector baselines so heatmaps are
+  # directly comparable.
+  ranges:
+    start: 6
+    end: 180
+    step: 6
+  seed: 42
+  timeout: 60000
+  parallelism: 1
+  # Always evaluate every question that first becomes eligible at this
+  # checkpoint; cap older ("historical") questions at this count.
+  sample: 50
+  # ±1 day window of source memory the judge sees as grounding context.
+  # Eliminates the "elaboration ≠ hallucination" measurement artifact.
+  judgeMemoryWindow: 1
+  # Group-aware categories (group-session-attribution, information-boundary).
+  # Recall has no per-session ACLs in this baseline; leaving off avoids
+  # adding noise. Will flip to true once the silo lattice lands.
+  groupsEnabled: false

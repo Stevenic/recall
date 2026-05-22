@@ -1,0 +1,49 @@
+# Run the executive-assistant 500-day persona against the OpenClaw harness.
+#
+# Mirrors `ea-180d-vector.yaml` — same models, sample, judge config — adjusted
+# for the longer corpus and the personal/work boundary scenarios baked into
+# arcs-500d.yaml. Groups stay disabled (no memory system supports per-session
+# ACLs yet); the new personal-arc forbiddenSessions are scored only when
+# `groupsEnabled: true` is flipped in a future run.
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-500d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  judge: azure:gpt-5.4-mini
+  appellateJudge: azure:gpt-5.4
+  generation: azure:gpt-5.4-mini
+
+harness:
+  adapter: C:/source/openclaw/recall-bench-openclaw/dist/index.js
+  factory: createOpenClawAdapter
+  config:
+    embeddingProvider: openai
+    embeddingModel: text-embedding-3-small
+    synthesisModel: gpt-5.4-mini
+    maxSearchResults: 15
+    minScore: 0.1
+    answerMode: agent
+    agentMaxIterations: 6
+    synthesisProvider: azure
+
+run:
+  # 50 checkpoints every 10 days from day 10 through day 500. Finer-grained
+  # than the 180d run (step 6 → 30 ckpts there) — gives a higher-resolution
+  # heatmap on the longer corpus at the cost of a ~7-8h wall-clock estimate.
+  ranges:
+    start: 10
+    end: 500
+    step: 10
+  seed: 42
+  timeout: 60000
+  parallelism: 1
+  # Stratified by category as of the bench update — same 50/checkpoint cap.
+  sample: 50
+  judgeMemoryWindow: 1
+  groupsEnabled: false

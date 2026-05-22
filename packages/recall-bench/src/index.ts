@@ -11,7 +11,7 @@ export type {
     QAPair,
     Category,
     Difficulty,
-    TimeRangeKey,
+    TimeRange,
     HarnessConfig,
     QuestionResult,
     CategoryScore,
@@ -21,7 +21,7 @@ export type {
     BenchmarkResult,
 } from './types.js';
 
-export { TIME_RANGES, CATEGORIES } from './types.js';
+export { DEFAULT_RANGES, CATEGORIES, parseTimeRange, expandRangeSeries } from './types.js';
 
 // Harness
 export { BenchmarkHarness } from './harness.js';
@@ -98,6 +98,39 @@ export {
     OPENAI_DEFAULT_MODEL,
 } from './openai-generator-model.js';
 export type { OpenAiGeneratorModelConfig, OpenAiClientLike } from './openai-generator-model.js';
+
+// Anthropic Generator Model (Messages API)
+export {
+    AnthropicGeneratorModel,
+    ANTHROPIC_DEFAULT_MODEL,
+} from './anthropic-generator-model.js';
+export type {
+    AnthropicGeneratorModelConfig,
+    AnthropicClientLike,
+} from './anthropic-generator-model.js';
+
+// Azure OpenAI Generator Model
+export { AzureOpenAiGeneratorModel } from './azure-openai-generator-model.js';
+export type {
+    AzureOpenAiGeneratorModelConfig,
+    AzureOpenAiClientLike,
+} from './azure-openai-generator-model.js';
+
+// Provider-agnostic model spec & factory
+export { parseModelSpec, isModelSpec, createModelFromSpec } from './model-spec.js';
+export type { ModelSpec, ModelProvider, CreateModelOptions } from './model-spec.js';
+
+// Profile loading
+export { loadProfile, applyProfileEnv, resolveProfilePath } from './profile.js';
+export type {
+    Profile,
+    ProfilePersona,
+    ProfileEnv,
+    ProfileModels,
+    ProfileHarness,
+    ProfileRun,
+    ProfileGenerate,
+} from './profile.js';
 
 // LLM Judge (wraps any GeneratorModel into a JudgeModel for harness `run`)
 export {

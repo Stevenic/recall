@@ -17,6 +17,7 @@
     "vectra": "^0.14.0"
   },
   "devDependencies": {
-    "canvas": "^3.2.3"
+    "canvas": "^3.2.3",
+    "pptxgenjs": "^4.0.1"
   }
 }
