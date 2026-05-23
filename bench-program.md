@@ -192,6 +192,8 @@ Boundary mode is only meaningful for personas with isolated sessions (Litigation
 
 ## Workflow: run the benchmark
 
+Before invoking the CLI: open the profile, read its `harness.adapter:` value, and if it resolves into `bench-harnesses/<system>/`, open that package's `harness-program.md` and follow it through to the "point the profile at the dist" step. Skip this only for harnesses with no such file (e.g., `bench-harnesses/recall/`, which builds in place).
+
 The minimum:
 
 ```bash
@@ -273,7 +275,9 @@ bench-results/
 
 **Promotion is `git mv`** — when a draft is good enough to publish, move the folder into the system's published directory and commit. There is no `recall-bench publish` subcommand; the file path is the promotion.
 
-**Adapter packages** live under `bench-harnesses/` at the repo root (in-house adapters) or in sibling repos (external systems like OpenClaw or Loki). The profile's `harness.adapter:` path resolves the connection.
+**Adapter packages** live under `bench-harnesses/` at the repo root (in-house adapters) or in sibling repos (external systems like Loki). The profile's `harness.adapter:` path resolves the connection.
+
+**Before running any profile whose `harness.adapter:` points at a `bench-harnesses/<system>/` package, check that directory for a `harness-program.md` and follow it first.** Not every harness builds and runs in place — some (notably OpenClaw) vendor their source here but must be copied into a sibling repo to compile against that system's workspace links. The harness-specific playbook is the source of truth for build steps, adapter dist paths, and env vars; this document is the source of truth for everything from the bench profile outward. If no `harness-program.md` exists, the harness builds and runs from this repo via its own `package.json` (e.g., `bench-harnesses/recall/`).
 
 ---
 
@@ -383,6 +387,7 @@ After each pass, do the cheap check before moving on:
 | Tool-call generator + Loki adapter | `specs/recall-bench-loki.md` |
 | Heatmap renderer | `packages/recall-bench/scripts/generate-heatmap.mjs` (resolved automatically by `--json-out`) |
 | Existing profiles | `packages/recall-bench/profiles/` |
+| Per-harness build/run playbooks | `bench-harnesses/<system>/harness-program.md` (when present) |
 | Hand-authored exemplars | `packages/recall-bench/personas/executive-assistant/tools-180d/day-0001.yaml` |
 
 When this playbook and a spec disagree, the spec wins — it's the design source of truth, this is the operator's view.

@@ -1,0 +1,376 @@
+/**
+ * Tool-calling agent loop. Replaces the single-shot synthesis pass with a
+ * mini agent that:
+ *
+ *   1. Sees OpenClaw's recommended memory-recall system prompt verbatim
+ *      (the same one OpenClaw injects when memory tools are available)
+ *   2. Has `memory_search` and `memory_get` exposed as OpenAI tools backed by
+ *      our adapter's manager/workspace
+ *   3. Decides for itself whether and how to retrieve before answering
+ *
+ * This is a closer simulation of how OpenClaw's actual agents use memory: the
+ * LLM owns the query/retrieve/read/answer loop. The bench still measures the
+ * *system* (memory backend + the agent's use of it) end-to-end, but no longer
+ * conflates "the LLM didn't extract a fact from a pre-stuffed chunk dump" with
+ * "the memory system can't find it."
+ */
+
+import type { MemorySearchManager, MemorySearchResult } from "@openclaw/memory-core/runtime-api.js";
+import { readFile } from "node:fs/promises";
+import { join, isAbsolute } from "node:path";
+
+/**
+ * Detect Azure OpenAI content-filter rejections (400 with code=content_filter
+ * or innererror.code=ResponsibleAIPolicyViolation). The openai SDK throws
+ * these as BadRequestError instances with a structured `error` payload.
+ */
+function isContentFilterError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as {
+    status?: number;
+    code?: string;
+    error?: { code?: string; innererror?: { code?: string } };
+  };
+  if (e.code === "content_filter") return true;
+  if (e.status === 400 && e.error?.code === "content_filter") return true;
+  if (e.error?.innererror?.code === "ResponsibleAIPolicyViolation") return true;
+  return false;
+}
+
+/**
+ * OpenClaw's recommended memory-recall prompt, mirrored from
+ * `extensions/memory-core/src/prompt-section.ts`. Kept verbatim here so the
+ * bench measures OpenClaw's intended behavior, not our paraphrase.
+ */
+export const AGENT_SYSTEM_PROMPT =
+  "## Memory Recall\n" +
+  "Before answering anything about prior work, decisions, dates, people, " +
+  "preferences, or todos: run memory_search on MEMORY.md + memory/*.md + " +
+  "indexed session transcripts; then use memory_get to pull only the needed " +
+  "lines. If low confidence after search, say you checked.\n" +
+  "Citations: include `(Source: YYYY-MM-DD)` referencing the date of the " +
+  "memory excerpt that supports the fact. Do not cite file paths.\n\n" +
+  "Be concise. Extract specific facts, names, dates, and numbers verbatim " +
+  "from memory when they appear. Never invent details that aren't in memory.";
+
+/** OpenAI tool definitions for the agent. */
+export const AGENT_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "memory_search",
+      description:
+        "Search the agent's long-term memory for content relevant to a query. " +
+        "Returns ranked memory snippets, each tagged with its source path. " +
+        "Use this before answering questions about prior work, decisions, " +
+        "dates, people, preferences, or todos.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query — natural language; not just keywords.",
+          },
+          limit: {
+            type: "integer",
+            description: "Max results to return. Default 8.",
+          },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "memory_get",
+      description:
+        "Read the full content of a specific memory file by path. Use after " +
+        "memory_search when you need more context than the search snippet " +
+        "provides.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Path returned by memory_search (e.g. memory/2026-03-15.md).",
+          },
+        },
+        required: ["path"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
+export interface AgentLoopDeps {
+  /** OpenAI-compatible client (the same `openai` SDK instance the adapter already uses). */
+  openai: {
+    chat: {
+      completions: {
+        create: (params: unknown) => Promise<unknown>;
+      };
+    };
+  };
+  /** Model id for the agent's chat completions (e.g., 'gpt-5.4-mini'). */
+  model: string;
+  /** OpenClaw memory manager — backs `memory_search` and `memory_get`. */
+  manager: MemorySearchManager;
+  /** Absolute path to the workspace's memory dir, used to resolve `memory_get` paths. */
+  workspaceDir: string;
+  /** Adapter's max-results setting; applied as a ceiling on `memory_search.limit`. */
+  maxSearchResults: number;
+  /** Adapter's min-score setting; applied to `memory_search` calls. */
+  minScore: number;
+  /** Optional cap on tool-loop iterations to prevent runaway. Default 6. */
+  maxIterations?: number;
+}
+
+export interface AgentLoopResult {
+  /** The agent's final assistant message (what the judge scores). */
+  answer: string;
+  /**
+   * Union of all chunks the agent surfaced via `memory_search`. Returned so
+   * the harness's failure log can show the agent's actual search trajectory,
+   * not just the chunks a non-agent synthesis would have seen.
+   */
+  retrieval: Array<{ path: string; score: number; snippet: string }>;
+  /** Tool-call trace for diagnostics. */
+  trace: Array<{ tool: string; args: Record<string, unknown>; resultPreview: string }>;
+  /** Number of completion calls (one per turn). */
+  iterations: number;
+}
+
+/**
+ * Drive a tool-calling chat completion until the agent stops calling tools
+ * (or we hit the iteration cap). The agent's final assistant text becomes
+ * the system answer.
+ */
+export async function runAgentLoop(
+  question: string,
+  deps: AgentLoopDeps,
+): Promise<AgentLoopResult> {
+  const maxIterations = deps.maxIterations ?? 6;
+
+  // Conversation history. We seed with the OpenClaw-aligned system prompt and
+  // the user's question, then let the model drive tool calls.
+  const messages: ChatMessage[] = [
+    { role: "system", content: AGENT_SYSTEM_PROMPT },
+    { role: "user", content: question },
+  ];
+
+  const retrieval: Array<{ path: string; score: number; snippet: string }> = [];
+  const trace: AgentLoopResult["trace"] = [];
+
+  for (let i = 0; i < maxIterations; i++) {
+    let response: ChatCompletion;
+    try {
+      response = (await deps.openai.chat.completions.create({
+        model: deps.model,
+        messages,
+        tools: AGENT_TOOLS,
+        tool_choice: "auto",
+        temperature: 0,
+        max_completion_tokens: 800,
+      })) as ChatCompletion;
+    } catch (err) {
+      // Azure RAI may flag corpus content (parent-care, home incidents, etc.).
+      // Treat content_filter as a model refusal — return a sentinel the judge
+      // can score appropriately, instead of crashing the run.
+      if (isContentFilterError(err)) {
+        return {
+          answer: "(refused: Azure content filter triggered on this question)",
+          retrieval,
+          trace,
+          iterations: i + 1,
+        };
+      }
+      throw err;
+    }
+
+    const choice = response.choices?.[0];
+    const msg = choice?.message;
+    if (!msg) {
+      return { answer: "(agent returned no message)", retrieval, trace, iterations: i + 1 };
+    }
+
+    // Push the assistant turn into history (with any tool_calls preserved so
+    // the next turn's tool messages are valid).
+    messages.push({
+      role: "assistant",
+      content: msg.content ?? null,
+      tool_calls: msg.tool_calls,
+    });
+
+    // No tool calls → assistant produced the final answer.
+    if (!msg.tool_calls || msg.tool_calls.length === 0) {
+      return {
+        answer: (msg.content ?? "").trim(),
+        retrieval,
+        trace,
+        iterations: i + 1,
+      };
+    }
+
+    // Execute each tool call and append a `tool` message per call.
+    for (const call of msg.tool_calls) {
+      const name = call.function?.name;
+      let args: Record<string, unknown> = {};
+      try {
+        args = call.function?.arguments ? JSON.parse(call.function.arguments) : {};
+      } catch {
+        args = { _parseError: call.function?.arguments };
+      }
+
+      let resultText: string;
+      try {
+        if (name === "memory_search") {
+          const out = await executeMemorySearch(deps, args);
+          for (const r of out.results) retrieval.push(r);
+          resultText = out.text;
+          trace.push({ tool: name, args, resultPreview: resultText.slice(0, 200) });
+        } else if (name === "memory_get") {
+          const out = await executeMemoryGet(deps, args);
+          resultText = out;
+          trace.push({ tool: name, args, resultPreview: resultText.slice(0, 200) });
+        } else {
+          resultText = `Unknown tool: ${name}`;
+          trace.push({ tool: name ?? "(unknown)", args, resultPreview: resultText });
+        }
+      } catch (err) {
+        resultText = `Tool error: ${err instanceof Error ? err.message : String(err)}`;
+        trace.push({ tool: name ?? "(unknown)", args, resultPreview: resultText });
+      }
+
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        content: resultText,
+      });
+    }
+  }
+
+  // Hit iteration cap without a clean answer — emit a final synthesis call
+  // forcing no tools, so we always return SOMETHING the judge can score.
+  let final: ChatCompletion;
+  try {
+    final = (await deps.openai.chat.completions.create({
+      model: deps.model,
+      messages: [
+        ...messages,
+        {
+          role: "user",
+          content:
+            "You've hit the tool-call cap. Provide your best final answer now " +
+            "from the information you've gathered. Do not invent details.",
+        },
+      ],
+      temperature: 0,
+      max_completion_tokens: 600,
+    })) as ChatCompletion;
+  } catch (err) {
+    if (isContentFilterError(err)) {
+      return {
+        answer: "(refused: Azure content filter triggered on this question)",
+        retrieval,
+        trace,
+        iterations: maxIterations,
+      };
+    }
+    throw err;
+  }
+  const finalText = (final.choices?.[0]?.message?.content ?? "").trim();
+  return {
+    answer: finalText || "(agent did not produce an answer within the tool-call cap)",
+    retrieval,
+    trace,
+    iterations: maxIterations,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tool implementations
+// ---------------------------------------------------------------------------
+
+async function executeMemorySearch(
+  deps: AgentLoopDeps,
+  args: Record<string, unknown>,
+): Promise<{ text: string; results: Array<{ path: string; score: number; snippet: string }> }> {
+  const query = typeof args.query === "string" ? args.query : "";
+  if (!query.trim()) return { text: "memory_search: missing 'query' argument.", results: [] };
+  const requestedLimit = typeof args.limit === "number" ? args.limit : 8;
+  const limit = Math.min(Math.max(1, Math.floor(requestedLimit)), deps.maxSearchResults);
+
+  const hits = await deps.manager.search(query, {
+    maxResults: limit,
+    minScore: deps.minScore,
+    sources: ["memory"],
+  });
+
+  if (hits.length === 0) {
+    return { text: `memory_search("${query}") → no results.`, results: [] };
+  }
+
+  const results = hits.map((h: MemorySearchResult) => ({
+    path: h.path,
+    score: h.score,
+    snippet: h.snippet,
+  }));
+  const formatted = hits
+    .map((h: MemorySearchResult, idx) =>
+      `[${idx + 1}] ${h.path} (score: ${h.score.toFixed(2)})\n${h.snippet.trim()}`,
+    )
+    .join("\n\n");
+  return { text: formatted, results };
+}
+
+async function executeMemoryGet(
+  deps: AgentLoopDeps,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const path = typeof args.path === "string" ? args.path : "";
+  if (!path.trim()) return "memory_get: missing 'path' argument.";
+
+  // Path is expected to be relative to the workspace (e.g. memory/2026-01-15.md).
+  const resolved = isAbsolute(path) ? path : join(deps.workspaceDir, path);
+  // Refuse path traversal that escapes the workspace.
+  if (!resolved.startsWith(deps.workspaceDir)) {
+    return `memory_get: path "${path}" resolves outside the workspace.`;
+  }
+
+  try {
+    const content = await readFile(resolved, "utf-8");
+    return content;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `memory_get: failed to read "${path}": ${msg}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Minimal types — kept local so this file doesn't take a hard dependency on
+// the openai SDK's exported types (which the adapter already imports lazily).
+// ---------------------------------------------------------------------------
+
+interface ChatToolCall {
+  id: string;
+  type?: "function";
+  function?: { name?: string; arguments?: string };
+}
+
+interface ChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content?: string | null;
+  tool_calls?: ChatToolCall[];
+  tool_call_id?: string;
+}
+
+interface ChatCompletion {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+      tool_calls?: ChatToolCall[];
+    };
+  }>;
+}

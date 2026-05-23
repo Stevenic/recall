@@ -1,0 +1,35 @@
+{
+  "name": "@openclaw/recall-bench-openclaw",
+  "version": "0.0.0-private",
+  "private": true,
+  "description": "recall-bench harness that runs OpenClaw's built-in memory backend in-process",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "build": "tsc -p tsconfig.build.json --noCheck",
+    "clean": "rimraf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "openai": "^4.73.0",
+    "sqlite-vec": "0.1.9",
+    "yaml": "^2.4.0"
+  },
+  "devDependencies": {
+    "@openclaw/memory-core": "link:../dist-runtime/extensions/memory-core",
+    "@openclaw/openai-provider": "link:../dist-runtime/extensions/openai",
+    "@openclaw/plugin-sdk": "file:../packages/plugin-sdk",
+    "openclaw": "file:..",
+    "rimraf": "^6.0.0"
+  }
+}
