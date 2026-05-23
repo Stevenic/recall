@@ -1,0 +1,64 @@
+# Run the executive-assistant 180-day persona against Loki.
+#
+# The Loki adapter lives in the Asgard repo at
+#   tools/recall-bench/Microsoft.Loki.RecallBench.Adapter
+# and must be running before this profile is used. The wrapper script
+#   Asgard/tools/recall-bench/run.ps1
+# starts the adapter on grpc://127.0.0.1:50053 and then invokes recall-bench.
+#
+# Prerequisites (see Asgard README.md for the recall-bench adapter):
+#   - DAT running on http://localhost:3334 (the developer auth tool)
+#   - AZURE_OPENAI_* env vars or appsettings.json populated
+#   - Recall:PersonasDir in adapter config points at this repo's
+#     packages/recall-bench/personas directory
+#   - The dev-mode X-Bench-User middleware applied to Loki (see the
+#     adapter README for the small Heimdall change required); without it,
+#     bench isolation degrades to "DAT user's real partition, deleteAll
+#     on setup".
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  # Primary ("trial court") judge — sees every evaluation. Azure deployment
+  # name; endpoint/api-key/api-version from AZURE_OPENAI_* env vars.
+  judge: azure:gpt-5.4-mini
+  # Appellate judge — invoked only when the primary's verdict qualifies as a
+  # failure (composite < 4/6 OR hallucination=0 OR correctness=0). Appellate
+  # verdict is final; both scores are preserved on the QuestionResult.
+  appellateJudge: azure:gpt-5.4
+  # Display label only; the actual synthesis model is configured in the
+  # adapter's appsettings.json (Synthesis:Deployment).
+  generation: azure:gpt-5.4-mini
+
+harness:
+  # Connect to the adapter binary that the wrapper script has already
+  # started. The adapter spawns Microsoft.Loki.Service itself, on
+  # whatever loopback ports it finds free.
+  adapter: grpc://127.0.0.1:50053
+
+run:
+  # 30 checkpoints every 6 days from day 6 through day 180 — full heatmap of
+  # how Loki recall evolves across the 180-day corpus.
+  ranges:
+    start: 6
+    end: 180
+    step: 6
+  seed: 42
+  timeout: 60000
+  parallelism: 1
+  # Cap historical-question sampling per checkpoint (new questions are always
+  # evaluated). Matches the convention used by the other ea-180d profiles.
+  sample: 50
+  # Judge sees ±1 day of grounding context for each Q&A pair — eliminates the
+  # "elaboration ≠ hallucination" measurement artifact.
+  judgeMemoryWindow: 1
+  # Loki has no per-session ACL in v0.1, so the boundary-aware categories
+  # would only add noise. Keep these off until the adapter wires session
+  # scoping into the GraphQL calls.
+  groupsEnabled: false
