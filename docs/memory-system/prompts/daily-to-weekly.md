@@ -1,3 +1,11 @@
+---
+title: Daily → Weekly
+layout: default
+parent: Prompts
+grand_parent: Recall Memory System
+nav_order: 2
+---
+
 # Daily → Weekly Compaction Prompt
 
 **Spec reference:** §5.2 (Daily → Weekly), §5.3 (Typed Memory Extraction)  

@@ -1,3 +1,11 @@
+---
+title: Compaction defaults
+layout: default
+parent: Prompts
+grand_parent: Recall Memory System
+nav_order: 1
+---
+
 # Compaction Prompt Defaults — Final
 
 **Status:** Final — ready to wire into `CompactionConfig`  

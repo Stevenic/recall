@@ -1,3 +1,11 @@
+---
+title: Weekly → Monthly
+layout: default
+parent: Prompts
+grand_parent: Recall Memory System
+nav_order: 3
+---
+
 # Weekly → Monthly Compaction Prompt
 
 **Spec reference:** §5.2 (Weekly → Monthly)  

@@ -1,3 +1,11 @@
+---
+title: Typed memory extraction
+layout: default
+parent: Prompts
+grand_parent: Recall Memory System
+nav_order: 5
+---
+
 # Typed Memory Extraction Prompt
 
 **Spec reference:** §5.3 (Typed Memory Extraction)  

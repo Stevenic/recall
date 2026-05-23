@@ -1,3 +1,10 @@
+---
+title: Architecture
+layout: default
+parent: Recall Memory System
+nav_order: 1
+---
+
 # Recall — Memory Architecture Overview
 
 Local-first agent memory service that manages the full lifecycle of AI agent memories — from raw daily logs through compacted summaries to distilled wisdom — with semantic search over all of it.

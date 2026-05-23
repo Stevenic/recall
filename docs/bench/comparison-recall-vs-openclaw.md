@@ -1,3 +1,10 @@
+---
+title: Recall vs. OpenClaw
+layout: default
+parent: Recall Bench
+nav_order: 2
+---
+
 # Memory System Comparison: Recall vs OpenClaw
 
 A detailed comparison of the **Recall** agent memory service and **OpenClaw's memory-core** plugin system — their architectures, storage models, search pipelines, compaction strategies, and design trade-offs.

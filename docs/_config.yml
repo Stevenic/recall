@@ -1,0 +1,52 @@
+title: Recall
+description: Local-first agent memory, plus Recall Bench for evaluating agent memory systems.
+url: ""
+baseurl: ""
+
+# just-the-docs as a Bundler-managed gem (see ./Gemfile). The .github/workflows/pages.yml
+# workflow builds with bundler and deploys via actions/deploy-pages.
+theme: just-the-docs
+
+plugins:
+  - jekyll-seo-tag
+
+# just-the-docs configuration
+color_scheme: light
+search_enabled: true
+search:
+  heading_level: 3
+  previews: 3
+  preview_words_before: 5
+  preview_words_after: 10
+  tokenizer_separator: /[\s\-/]+/
+  rel_url: true
+  button: false
+
+heading_anchors: true
+
+# Aux nav: tucked top-right
+aux_links:
+  "GitHub":
+    - "https://github.com/Stevenic/recall"
+
+aux_links_new_tab: true
+
+# Footer
+footer_content: "Recall is open source under the MIT License. Source: <a href=\"https://github.com/Stevenic/recall\">github.com/Stevenic/recall</a>."
+
+# Exclude things from the site that shouldn't ship
+exclude:
+  - "TYPESCRIPT-MONOREPO-PLAYBOOK.md"
+  - "Enterprise User Perceptions of Agent Memory - Presentation DRAFT.pdf"
+  - "Gemfile"
+  - "Gemfile.lock"
+  - "vendor/"
+
+# Build settings
+markdown: kramdown
+kramdown:
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: "highlight"
+    block:
+      line_numbers: false

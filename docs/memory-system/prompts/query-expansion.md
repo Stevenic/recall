@@ -1,3 +1,11 @@
+---
+title: Multi-query fusion
+layout: default
+parent: Prompts
+grand_parent: Recall Memory System
+nav_order: 6
+---
+
 # Multi-Query Fusion Prompt
 
 **Spec reference:** §6.2 (Multi-Query Fusion)  

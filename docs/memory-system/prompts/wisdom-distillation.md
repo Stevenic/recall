@@ -1,3 +1,11 @@
+---
+title: Wisdom distillation
+layout: default
+parent: Prompts
+grand_parent: Recall Memory System
+nav_order: 4
+---
+
 # Wisdom Distillation Prompt
 
 **Spec reference:** §5.2 (Wisdom Distillation)  
