@@ -283,6 +283,7 @@ export class MemoryService {
                 this._storage,
                 logger,
                 this._config.dreaming,
+                { wiki: this._wiki.enabled ? this._wiki : undefined },
             );
         }
         return this._dreamEngine;

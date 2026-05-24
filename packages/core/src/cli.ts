@@ -340,11 +340,13 @@ const dreamCmd = program
     .option("--phase <phase>", "Only run a specific phase (gather | analyze | write)")
     .option("--max-candidates <n>", "Max candidates to analyze", "20")
     .option("--agent <name>", "CLI agent for synthesis", "claude")
+    .option("--no-wiki", "Disable wiki page writes for this session (legacy outputs only)")
     .action(async (cmdOpts: Record<string, string | boolean>) => {
         const globalOpts = program.opts();
         const svc = getService({
             dir: globalOpts.dir,
             agent: typeof cmdOpts.agent === "string" ? cmdOpts.agent : "claude",
+            enableWiki: cmdOpts.wiki !== false,
         });
 
         const phases = typeof cmdOpts.phase === "string"
@@ -355,6 +357,7 @@ const dreamCmd = program
             dryRun: "dryRun" in cmdOpts,
             maxCandidates: parseInt(cmdOpts.maxCandidates as string) || 20,
             phases,
+            skipWiki: cmdOpts.wiki === false,
         });
 
         if (globalOpts.json) {
@@ -366,6 +369,7 @@ const dreamCmd = program
             console.log(`  Promotions: ${result.promotions.length}`);
             console.log(`  Contradictions: ${result.contradictions.length}`);
             console.log(`  Gaps: ${result.gaps.length}`);
+            console.log(`  Wiki updates: ${result.wikiUpdates.length}`);
             console.log(`  LLM calls: ${result.modelCalls}`);
 
             if (result.insights.length > 0) {
@@ -390,6 +394,13 @@ const dreamCmd = program
                 console.log(`\nGaps:`);
                 for (const g of result.gaps) {
                     console.log(`  - "${g.query}" (${g.frequency} queries)`);
+                }
+            }
+            if (result.wikiUpdates.length > 0) {
+                console.log(`\nWiki updates:`);
+                for (const u of result.wikiUpdates) {
+                    const prefix = u.ok ? "  ✓" : "  ✗";
+                    console.log(`${prefix} [[${u.slug}]] ${u.op}: ${u.detail}`);
                 }
             }
         }
@@ -843,6 +854,29 @@ wikiCmd
                 : `Rebuilt "${slug}" (${page.sources.length} source${page.sources.length === 1 ? "" : "s"}, confidence: ${page.confidence ?? "unset"}).`,
             globalOpts.json,
         );
+    });
+
+wikiCmd
+    .command("migrate-insights")
+    .description("Convert legacy memory/dreams/insights/*.md into wiki pages (idempotent, non-destructive)")
+    .action(async () => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const report = await svc.wiki.migrateInsights();
+        if (globalOpts.json) {
+            output(report, true);
+            return;
+        }
+        console.log(`Created ${report.created.length} wiki page(s); skipped ${report.skipped.length}.`);
+        if (report.created.length > 0) {
+            console.log("\nCreated:");
+            for (const slug of report.created) console.log(`  ${slug}`);
+        }
+        if (report.skipped.length > 0) {
+            console.log("\nSkipped:");
+            for (const s of report.skipped) console.log(`  ${s.file}: ${s.reason}`);
+        }
     });
 
 wikiCmd

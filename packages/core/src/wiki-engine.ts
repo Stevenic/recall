@@ -636,6 +636,93 @@ export class WikiEngine {
     }
 
     /**
+     * Convert legacy dreaming insight files (`memory/dreams/insights/*.md`)
+     * into wiki pages. Idempotent: re-running skips pages that already exist
+     * with the same slug. Non-destructive: original insight files are left
+     * in place; the migration is opt-in cleanup.
+     *
+     * Each insight becomes a `category: theme` wiki page (theme pages are
+     * synthesis-only, which is exactly what insights are). The page slug is
+     * derived from the insight's frontmatter `theme` field, the filename
+     * (after stripping date prefix), or a fallback hash.
+     */
+    async migrateInsights(): Promise<{
+        created: string[];
+        skipped: { file: string; reason: string }[];
+    }> {
+        this._assertWritable("private");
+        const created: string[] = [];
+        const skipped: { file: string; reason: string }[] = [];
+        const insightsDir = path.join(
+            this._privateRoot,
+            "memory",
+            "dreams",
+            "insights",
+        );
+        if (!(await this._storage.pathExists(insightsDir))) {
+            return { created, skipped };
+        }
+        const files = await this._storage.listFiles(insightsDir, "files");
+        for (const f of files) {
+            if (!f.name.endsWith(".md")) continue;
+            const filePath = path.join(insightsDir, f.name);
+            try {
+                const buf = await this._storage.readFile(filePath);
+                const parsed = matter(buf.toString("utf-8"));
+                const data = parsed.data as Record<string, unknown>;
+                const themeRaw =
+                    typeof data.theme === "string" && data.theme.length > 0
+                        ? data.theme
+                        : f.name.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.md$/, "");
+                const slug = slugify(themeRaw);
+                if (!slug) {
+                    skipped.push({ file: f.name, reason: "could not derive a slug" });
+                    continue;
+                }
+                if (await this.read(slug, "private")) {
+                    skipped.push({
+                        file: f.name,
+                        reason: `wiki page "${slug}" already exists`,
+                    });
+                    continue;
+                }
+                const sources = Array.isArray(data.sources)
+                    ? (data.sources as string[]).filter(
+                          (s) => typeof s === "string" && s.length > 0,
+                      )
+                    : [];
+                const created_at =
+                    typeof data.date === "string" ? data.date : todayIso();
+                const page: WikiPage = {
+                    slug,
+                    name: themeRaw,
+                    description: `Synthesized insight from ${sources.length || "unknown"} source(s) (migrated from ${f.name})`,
+                    category: "theme",
+                    created: created_at,
+                    updated: todayIso(),
+                    sources: sources.length > 0 ? sources : [`memory/dreams/insights/${f.name}`],
+                    related: [],
+                    confidence:
+                        data.confidence === "high" ||
+                        data.confidence === "medium" ||
+                        data.confidence === "low"
+                            ? (data.confidence as "high" | "medium" | "low")
+                            : "medium",
+                    body: parsed.content.trim() + "\n",
+                };
+                await this.write(page, "private");
+                created.push(slug);
+            } catch (err) {
+                skipped.push({
+                    file: f.name,
+                    reason: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+        return { created, skipped };
+    }
+
+    /**
      * Rebuild every page in `target` from its sources. Skips redirects and
      * single-source stubs (the rebuild prompt assumes synthesis is meaningful;
      * a 1-source page is just the source). Returns a structured report.
@@ -949,6 +1036,20 @@ function ensureTrailingNewline(s: string): string {
 
 function todayIso(): string {
     return new Date().toISOString().split("T")[0];
+}
+
+/**
+ * Convert a free-form string into a valid wiki slug (lowercase ASCII,
+ * hyphen-separated). Returns the empty string when nothing maps.
+ */
+function slugify(input: string): string {
+    return input
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[̀-ͯ]/g, "") // strip diacritics
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .replace(/-{2,}/g, "-");
 }
 
 function splitKey(key: string): [WikiTarget, string] {

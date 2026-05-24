@@ -16,6 +16,7 @@ import type { MemoryModel } from "./interfaces/model.js";
 import type { FileStorage } from "./interfaces/storage.js";
 import { SearchLogger } from "./search-logger.js";
 import { collectSignals } from "./signal-collector.js";
+import type { WikiEngine } from "./wiki-engine.js";
 import type {
     DreamingConfig,
     DreamCandidate,
@@ -24,12 +25,20 @@ import type {
     DreamStatus,
     AnalysisResult,
     AnalysisTemplates,
+    DreamWikiOp,
+    DreamWikiUpdate,
 } from "./dreaming-config.js";
 import {
     DEFAULT_MAX_CANDIDATES,
     DEFAULT_SIGNAL_WINDOW_DAYS,
     DEFAULT_STALENESS_THRESHOLD_DAYS,
 } from "./dreaming-config.js";
+
+export interface DreamEngineDeps {
+    /** Optional wiki engine. When provided and config.writeToWiki is true
+     * (default), analysis results are applied as wiki page operations. */
+    wiki?: WikiEngine;
+}
 
 export class DreamEngine {
     private readonly _files: MemoryFiles;
@@ -38,6 +47,7 @@ export class DreamEngine {
     private readonly _storage: FileStorage;
     private readonly _logger: SearchLogger;
     private readonly _config: DreamingConfig;
+    private readonly _wiki: WikiEngine | undefined;
 
     constructor(
         files: MemoryFiles,
@@ -46,6 +56,7 @@ export class DreamEngine {
         storage: FileStorage,
         logger: SearchLogger,
         config?: DreamingConfig,
+        deps?: DreamEngineDeps,
     ) {
         this._files = files;
         this._index = index;
@@ -53,6 +64,15 @@ export class DreamEngine {
         this._storage = storage;
         this._logger = logger;
         this._config = config ?? {};
+        this._wiki = deps?.wiki;
+    }
+
+    /** True when the engine should route output through the wiki layer. */
+    private _wikiActive(skipWiki?: boolean): boolean {
+        if (skipWiki) return false;
+        if (!this._wiki?.enabled) return false;
+        // Default to writing to wiki when a wiki engine is wired and enabled.
+        return this._config.writeToWiki !== false;
     }
 
     // ─── Full Session ────────────────────────────────────
@@ -91,6 +111,7 @@ export class DreamEngine {
                     frequency: 0,
                     lastQueried: "",
                 })),
+                wikiUpdates: [],
                 candidatesExamined: 0,
                 candidatesTotal: toAnalyze.length,
                 modelCalls: 0,
@@ -107,7 +128,11 @@ export class DreamEngine {
         // Phase 3: Write
         let result: DreamResult;
         if (phases.includes("write")) {
-            result = await this.writeResults(analysisResults, toAnalyze.length);
+            result = await this.writeResults(
+                analysisResults,
+                toAnalyze.length,
+                { skipWiki: options?.skipWiki === true },
+            );
         } else {
             result = aggregateResults(analysisResults, toAnalyze.length);
         }
@@ -154,6 +179,7 @@ export class DreamEngine {
                     promotions: [],
                     contradictions: [],
                     gaps: [],
+                    wikiOps: [],
                     modelCalls: 0,
                     inputTokens: 0,
                     outputTokens: 0,
@@ -169,12 +195,27 @@ export class DreamEngine {
     async writeResults(
         analysisResults: AnalysisResult[],
         totalCandidates: number,
+        opts?: { skipWiki?: boolean },
     ): Promise<DreamResult> {
         const result = aggregateResults(analysisResults, totalCandidates);
         const today = new Date().toISOString().split("T")[0];
+        const wikiActive = this._wikiActive(opts?.skipWiki);
 
         // Ensure output directories exist
         await this._ensureOutputDirs();
+
+        // Phase D: apply wiki ops first so subsequent legacy writes can be
+        // skipped when the wiki absorbs the same content.
+        if (wikiActive && this._wiki) {
+            const allOps: DreamWikiOp[] = [];
+            for (const ar of analysisResults) {
+                for (const op of ar.wikiOps) allOps.push(op);
+            }
+            for (const op of allOps) {
+                const update = await this._applyWikiOp(op);
+                result.wikiUpdates.push(update);
+            }
+        }
 
         // Write insight files
         for (const insight of result.insights) {
@@ -299,6 +340,7 @@ export class DreamEngine {
             promotions: [],
             contradictions: [],
             gaps: [],
+            wikiOps: [],
             modelCalls: 0,
             inputTokens: 0,
             outputTokens: 0,
@@ -457,6 +499,17 @@ export class DreamEngine {
                 }
             }
 
+            // Phase D: harvest wiki_ops if the model produced any. Tolerate
+            // missing/malformed entries; the per-op validation happens in
+            // _applyWikiOp where rejection is part of the report.
+            const wikiOps = parsed.wiki_ops ?? parsed.wikiOps;
+            if (Array.isArray(wikiOps)) {
+                for (const raw of wikiOps) {
+                    const op = coerceWikiOp(raw, candidate);
+                    if (op) result.wikiOps.push(op);
+                }
+            }
+
             return;
         } catch {
             // Not JSON — treat as a freeform insight
@@ -531,6 +584,21 @@ export class DreamEngine {
             entry.push("");
         }
 
+        if (result.wikiUpdates.length > 0) {
+            const succeeded = result.wikiUpdates.filter((u) => u.ok);
+            const failed = result.wikiUpdates.filter((u) => !u.ok);
+            entry.push(
+                `### Wiki Updates (${succeeded.length}${failed.length > 0 ? `, ${failed.length} failed` : ""})`,
+            );
+            for (const u of succeeded) {
+                entry.push(`- [[${u.slug}]] — ${u.op}: ${u.detail}`);
+            }
+            for (const u of failed) {
+                entry.push(`- ⚠️ [[${u.slug}]] — ${u.op} failed: ${u.detail}`);
+            }
+            entry.push("");
+        }
+
         entry.push("---", "");
 
         const entryText = entry.join("\n");
@@ -557,6 +625,131 @@ export class DreamEngine {
             themeSynthesis: this._config.analysisTemplates?.themeSynthesis ?? THEME_SYNTHESIS_TEMPLATE,
         };
     }
+
+    /**
+     * Apply a single wiki op against the bound WikiEngine. Errors are caught
+     * and surfaced in the returned `DreamWikiUpdate` so a malformed model
+     * response can't fail the whole session.
+     */
+    private async _applyWikiOp(op: DreamWikiOp): Promise<DreamWikiUpdate> {
+        if (!this._wiki) {
+            return {
+                op: op.op,
+                slug: op.slug,
+                ok: false,
+                detail: "no wiki engine wired",
+            };
+        }
+        try {
+            if (op.op === "create") {
+                const existing = await this._wiki.read(op.slug, "private");
+                if (existing) {
+                    // Treat create-on-existing as an append rather than a hard
+                    // failure — dreaming often re-proposes seeds.
+                    const updated = await this._wiki.append(
+                        op.slug,
+                        op.sources[0] ?? `dream:${todayIso()}`,
+                        op.body,
+                        "private",
+                    );
+                    return {
+                        op: op.op,
+                        slug: op.slug,
+                        ok: true,
+                        detail: `create-on-existing → appended (${updated.sources.length} sources)`,
+                    };
+                }
+                if (op.category === "theme") {
+                    // Theme pages are synthesis-only; emit them as full pages
+                    // since dreaming is itself the synthesis source. Bypass
+                    // the stub() path's category guard by going through write().
+                    await this._wiki.write(
+                        {
+                            slug: op.slug,
+                            name: op.name,
+                            description: op.description,
+                            category: op.category,
+                            created: todayIso(),
+                            updated: todayIso(),
+                            sources: op.sources,
+                            related: op.related ?? [],
+                            confidence: op.confidence ?? "medium",
+                            body: ensureTrailingNewline(op.body),
+                        },
+                        "private",
+                    );
+                } else {
+                    await this._wiki.stub({
+                        slug: op.slug,
+                        name: op.name,
+                        description: op.description,
+                        category: op.category,
+                        source: op.sources[0] ?? `dream:${todayIso()}`,
+                        body: op.body,
+                        related: op.related ?? [],
+                    });
+                    // If the model proposed >1 source on create, fold the rest in.
+                    for (const extra of op.sources.slice(1)) {
+                        await this._wiki.append(op.slug, extra, "", "private");
+                    }
+                }
+                return {
+                    op: op.op,
+                    slug: op.slug,
+                    ok: true,
+                    detail: `created (${op.sources.length} source${op.sources.length === 1 ? "" : "s"})`,
+                };
+            }
+            if (op.op === "update") {
+                await this._wiki.append(
+                    op.slug,
+                    op.source,
+                    op.appendBody,
+                    "private",
+                );
+                return {
+                    op: op.op,
+                    slug: op.slug,
+                    ok: true,
+                    detail: `appended ${op.source}`,
+                };
+            }
+            // op === "contradict"
+            const existing = await this._wiki.read(op.slug, "private");
+            if (!existing) {
+                return {
+                    op: op.op,
+                    slug: op.slug,
+                    ok: false,
+                    detail: `no such page`,
+                };
+            }
+            const next = unionStrings(existing.contradicts ?? [], op.contradicts);
+            await this._wiki.write(
+                {
+                    ...existing,
+                    contradicts: next,
+                    updated: todayIso(),
+                },
+                "private",
+            );
+            return {
+                op: op.op,
+                slug: op.slug,
+                ok: true,
+                detail: op.note
+                    ? `marked contradicting [${op.contradicts.join(", ")}] — ${op.note}`
+                    : `marked contradicting [${op.contradicts.join(", ")}]`,
+            };
+        } catch (err) {
+            return {
+                op: op.op,
+                slug: op.slug,
+                ok: false,
+                detail: err instanceof Error ? err.message : String(err),
+            };
+        }
+    }
 }
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -570,6 +763,7 @@ function aggregateResults(
         promotions: [],
         contradictions: [],
         gaps: [],
+        wikiUpdates: [],
         candidatesExamined: analysisResults.length,
         candidatesTotal: totalCandidates,
         modelCalls: 0,
@@ -590,6 +784,115 @@ function aggregateResults(
     return result;
 }
 
+function ensureTrailingNewline(s: string): string {
+    return s.endsWith("\n") ? s : s + "\n";
+}
+
+function todayIso(): string {
+    return new Date().toISOString().split("T")[0];
+}
+
+function unionStrings(a: string[], b: string[]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of [...a, ...b]) {
+        if (!seen.has(v)) {
+            seen.add(v);
+            out.push(v);
+        }
+    }
+    return out;
+}
+
+const VALID_WIKI_CATEGORIES = new Set([
+    "entity",
+    "concept",
+    "project",
+    "reference",
+    "theme",
+]);
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Validate a model-supplied wiki op into a typed `DreamWikiOp`, or return
+ * null if it's missing required fields or has an unrecognized shape. The
+ * candidate's URIs are used as a fallback source list when `create` lacks
+ * explicit sources.
+ */
+function coerceWikiOp(
+    raw: unknown,
+    candidate: DreamCandidate,
+): DreamWikiOp | null {
+    if (!raw || typeof raw !== "object") return null;
+    const r = raw as Record<string, unknown>;
+    const op = r.op;
+    const slug = typeof r.slug === "string" ? r.slug.trim() : "";
+    if (!slug || !SLUG_RE.test(slug)) return null;
+
+    if (op === "create") {
+        const category = r.category as string;
+        if (!VALID_WIKI_CATEGORIES.has(category)) return null;
+        const body = typeof r.body === "string" ? r.body : "";
+        if (!body.trim()) return null;
+        const sourcesIn = Array.isArray(r.sources)
+            ? (r.sources as string[]).filter(
+                  (s) => typeof s === "string" && s.length > 0,
+              )
+            : [];
+        const sources = sourcesIn.length > 0 ? sourcesIn : candidate.uris;
+        if (sources.length === 0) return null;
+        return {
+            op: "create",
+            slug,
+            category: category as DreamWikiOp extends { op: "create"; category: infer C }
+                ? C
+                : never,
+            name: typeof r.name === "string" && r.name.length > 0 ? r.name : slug,
+            description:
+                typeof r.description === "string" ? r.description : "",
+            body,
+            sources,
+            related: Array.isArray(r.related)
+                ? (r.related as string[]).filter(
+                      (s) => typeof s === "string" && SLUG_RE.test(s),
+                  )
+                : undefined,
+            confidence:
+                r.confidence === "high" ||
+                r.confidence === "medium" ||
+                r.confidence === "low"
+                    ? r.confidence
+                    : undefined,
+        };
+    }
+    if (op === "update") {
+        const appendBody =
+            typeof r.appendBody === "string"
+                ? r.appendBody
+                : typeof r.append_body === "string"
+                  ? r.append_body
+                  : "";
+        const source = typeof r.source === "string" ? r.source : "";
+        if (!source || !appendBody.trim()) return null;
+        return { op: "update", slug, appendBody, source };
+    }
+    if (op === "contradict") {
+        const contradicts = Array.isArray(r.contradicts)
+            ? (r.contradicts as string[]).filter(
+                  (s) => typeof s === "string" && SLUG_RE.test(s),
+              )
+            : [];
+        if (contradicts.length === 0) return null;
+        return {
+            op: "contradict",
+            slug,
+            contradicts,
+            note: typeof r.note === "string" ? r.note : undefined,
+        };
+    }
+    return null;
+}
+
 // ─── Analysis Prompt Templates ───────────────────────────
 
 const CROSS_REFERENCE_TEMPLATE = `You are an analytical memory engine examining cross-cutting patterns across agent memories.
@@ -599,7 +902,7 @@ Examine the provided memories and identify:
 1. Patterns that span multiple time periods
 2. Evolution of decisions, approaches, or understanding over time
 3. Recurring themes or entities that suggest deeper connections
-4. Decisions or facts that should be extracted as typed memories
+4. Wiki pages worth creating or updating to compound this knowledge
 
 <OUTPUT_FORMAT>
 Respond with a JSON object:
@@ -612,21 +915,46 @@ Respond with a JSON object:
       "confidence": "high" | "medium" | "low"
     }
   ],
-  "promotions": [
-    {
-      "filename": "type_topic.md",
-      "content": "---\\nname: ...\\ndescription: ...\\ntype: feedback|project|user|reference\\n---\\n\\nBody..."
-    }
-  ],
+  "promotions": [],
   "contradictions": [],
-  "gaps": []
+  "gaps": [],
+  "wiki_ops": [
+    {
+      "op": "create",
+      "slug": "kebab-case-slug",
+      "category": "entity" | "concept" | "project" | "reference" | "theme",
+      "name": "Human-readable title",
+      "description": "One-line description for the wiki index",
+      "body": "Markdown body (use ## headings; no frontmatter, no H1)",
+      "sources": ["memory/YYYY-MM-DD.md", ...],
+      "related": ["other-slug", ...],
+      "confidence": "high" | "medium" | "low"
+    },
+    {
+      "op": "update",
+      "slug": "existing-slug",
+      "appendBody": "Markdown fragment to append under a new ## heading",
+      "source": "memory/YYYY-MM-DD.md"
+    },
+    {
+      "op": "contradict",
+      "slug": "page-with-newer-claim",
+      "contradicts": ["page-with-older-claim"],
+      "note": "Brief explanation for the diary"
+    }
+  ]
 }
 
 <RULES>
-- Only report insights with clear evidence in the provided text
-- Confidence: high = 3+ supporting memories, medium = 2, low = 1 with strong signal
-- Promotions must follow the typed memory format with frontmatter
-- Do not fabricate connections — report what is actually present`;
+- Only emit wiki_ops when the pattern is reusable, named knowledge — not just a daily-log highlight.
+- Concept and project pages SHOULD lead with a rule/fact followed by **Why:** and **How to apply:** lines.
+- Entity pages capture stable facts about a person, system, or organization.
+- Theme pages synthesize a recurring topic across many sources.
+- Reference pages catalog external URLs, dashboards, or runbooks.
+- Slugs are lowercase ASCII, hyphen-separated (e.g. "auth-middleware", "postgres-migration").
+- Sources must be URIs from the provided memories — do not invent.
+- Confidence: high = 3+ supporting memories, medium = 2, low = 1 with strong signal.
+- Do not fabricate connections — report what is actually present.`;
 
 const GAP_ANALYSIS_TEMPLATE = `You are an analytical memory engine identifying knowledge gaps.
 

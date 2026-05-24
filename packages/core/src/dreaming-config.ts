@@ -30,6 +30,57 @@ export interface DreamingConfig {
 
     /** Analysis templates (override defaults) */
     analysisTemplates?: Partial<AnalysisTemplates>;
+
+    /**
+     * Write analysis output to wiki pages instead of (or in addition to)
+     * the legacy `memory/dreams/insights/` + `memory/dreams/contradictions/`
+     * files. Requires a WikiEngine wired into the DreamEngine. Default: true
+     * when the wiki layer is enabled at the service level.
+     */
+    writeToWiki?: boolean;
+}
+
+/**
+ * A wiki page operation emitted by the dreaming analyzer. The DreamEngine
+ * applies each op to its bound WikiEngine in writeResults().
+ */
+export type DreamWikiOp =
+    | {
+          op: "create";
+          slug: string;
+          category: "entity" | "concept" | "project" | "reference" | "theme";
+          name: string;
+          description: string;
+          body: string;
+          sources: string[];
+          related?: string[];
+          confidence?: "high" | "medium" | "low";
+      }
+    | {
+          op: "update";
+          slug: string;
+          /** Body fragment to append. Existing body is preserved. */
+          appendBody: string;
+          /** Source URI to add (deduped against existing sources). */
+          source: string;
+      }
+    | {
+          op: "contradict";
+          /** The page that holds the new claim. */
+          slug: string;
+          /** Slugs of pages this page's claim contradicts. */
+          contradicts: string[];
+          /** Optional description of the contradiction for the DREAMS.md diary. */
+          note?: string;
+      };
+
+export interface DreamWikiUpdate {
+    op: DreamWikiOp["op"];
+    slug: string;
+    /** Whether the op succeeded; failures are surfaced in the report rather than thrown. */
+    ok: boolean;
+    /** Human-readable detail for the diary or CLI output. */
+    detail: string;
 }
 
 export interface DreamScoringWeights {
@@ -85,6 +136,11 @@ export interface DreamOptions {
     dryRun?: boolean;
     /** Only run specific phases */
     phases?: ("gather" | "analyze" | "write")[];
+    /**
+     * Force-disable wiki writes for this session even when `writeToWiki` is
+     * true in config. Useful for `recall dream --no-wiki`.
+     */
+    skipWiki?: boolean;
 }
 
 export interface DreamResult {
@@ -96,6 +152,8 @@ export interface DreamResult {
     contradictions: ContradictionRecord[];
     /** Gaps identified (queries with no good results) */
     gaps: GapRecord[];
+    /** Wiki page operations applied (Phase D — empty when wiki disabled) */
+    wikiUpdates: DreamWikiUpdate[];
     /** Candidates examined vs total */
     candidatesExamined: number;
     candidatesTotal: number;
@@ -132,6 +190,8 @@ export interface AnalysisResult {
     promotions: Array<{ filename: string; content: string }>;
     contradictions: ContradictionRecord[];
     gaps: GapRecord[];
+    /** Wiki operations the model emitted — applied during writeResults */
+    wikiOps: DreamWikiOp[];
     modelCalls: number;
     inputTokens: number;
     outputTokens: number;
