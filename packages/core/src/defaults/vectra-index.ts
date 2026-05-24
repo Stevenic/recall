@@ -112,11 +112,18 @@ export class VectraIndex implements MemoryIndex {
         const maxResults = options?.maxResults ?? 10;
         const maxChunks = options?.maxChunks ?? 3;
         const maxTokens = options?.maxTokens ?? 500;
+        // Default to hybrid (semantic + BM25). Vectra appends BM25-only hits
+        // to the semantic results and tags each chunk with `isBm25`, so the
+        // returned `score` is already a hybrid signal — callers should treat
+        // it as such rather than blending another BM25 weight on top.
+        // Pass `enableBM25: false` to opt out for pure-vector experiments.
+        const isBm25 = options?.enableBM25 !== false;
 
         const results = await this._index.queryDocuments(text, {
             maxDocuments: maxResults,
             maxChunks: maxChunks * maxResults, // Give Vectra enough chunk budget
             filter: options?.filter,
+            isBm25,
         });
 
         const searchResults: SearchResult[] = [];

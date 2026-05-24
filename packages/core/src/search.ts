@@ -389,24 +389,29 @@ export class SearchService {
         const enableTemporal =
             this._config.temporalAffinity !== false && temporalRef !== null;
 
-        const wEmbed = weights.embedding ?? 0.5;
-        const wBm25 = weights.bm25 ?? 0.3;
+        // `embedding` and `parent` weights are what actually drive ranking.
+        // `bm25` stays in the type for backward compatibility and is folded
+        // into the embedding signal at search time: `_index.query` runs in
+        // Vectra's hybrid mode by default (semantic + BM25 merged) so the
+        // returned score already encodes both signals. We add `wBm25` into
+        // the embedding weight rather than zeroing it out, so existing
+        // `ScoringWeights` overrides keep behaving roughly as before.
+        const wEmbed = (weights.embedding ?? 0.5) + (weights.bm25 ?? 0.3);
         const wParent = weights.parent ?? 0.2;
 
         // Score each candidate
         const scored = candidates.map((c) => {
-            const embedScore = c.score; // Already from vector search
-            const bm25Score = 0; // BM25 scoring handled by Vectra in query
+            // Hybrid score from Vectra (semantic + BM25 already merged).
+            const hybridScore = c.score;
             const pScore =
                 c.parentUri ? (parentScores.get(c.parentUri) ?? 0) : 0;
 
-            let finalScore =
-                wEmbed * embedScore + wBm25 * bm25Score + wParent * pScore;
+            let finalScore = wEmbed * hybridScore + wParent * pScore;
 
             // Wiki boost is applied as a soft multiplier on the final score —
             // wiki pages out-rank loosely matching raw logs but a strong raw
             // hit (e.g., a date-specific daily) can still win on temporal
-            // affinity. The default (1.3×) is set in service config.
+            // affinity.
             if (c.metadata?.contentType === "wiki" && opts.wikiBoost !== 1.0) {
                 finalScore *= opts.wikiBoost;
             }
@@ -423,8 +428,8 @@ export class SearchService {
                 ...c,
                 score: finalScore,
                 scoreBreakdown: {
-                    embedding: embedScore,
-                    bm25: bm25Score,
+                    embedding: hybridScore,
+                    bm25: 0, // Reserved — Vectra returns one merged score
                     parent: pScore,
                 },
             };
