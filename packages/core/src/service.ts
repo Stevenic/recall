@@ -504,7 +504,7 @@ export class MemoryService {
             if (content) {
                 await this._index.upsertDocument(
                     `memory/${date}.md`,
-                    content,
+                    withTemporalTag(content, date),
                     { contentType: "daily", period: date },
                 );
             }
@@ -514,9 +514,10 @@ export class MemoryService {
         for (const week of manifest.weeklies) {
             const content = await this._files.readWeekly(week);
             if (content) {
+                const thursday = isoWeekToThursday(week);
                 await this._index.upsertDocument(
                     `memory/weekly/${week}.md`,
-                    content,
+                    withTemporalTag(content, thursday),
                     { contentType: "weekly", period: week },
                 );
             }
@@ -526,15 +527,18 @@ export class MemoryService {
         for (const month of manifest.monthlies) {
             const content = await this._files.readMonthly(month);
             if (content) {
+                const midMonth = monthToMidpoint(month);
                 await this._index.upsertDocument(
                     `memory/monthly/${month}.md`,
-                    content,
+                    withTemporalTag(content, midMonth),
                     { contentType: "monthly", period: month },
                 );
             }
         }
 
-        // Index typed memories
+        // Index typed memories. Legacy format has no canonical date; skip
+        // the temporal tag — they'll embed as-is. After Phase E migration
+        // these end up as wiki pages with proper `updated` dates.
         for (const filename of manifest.typedMemories) {
             const content = await this._files.readTypedMemory(filename);
             if (content) {
@@ -546,7 +550,8 @@ export class MemoryService {
             }
         }
 
-        // Index wisdom
+        // Index wisdom. WISDOM.md is continuously edited; no canonical
+        // "as of" date. Skip the tag — embed as-is.
         if (manifest.hasWisdom) {
             const content = await this._files.readWisdom();
             if (content) {
@@ -558,31 +563,35 @@ export class MemoryService {
             }
         }
 
-        // Index dream insights
+        // Index dream insights — filename carries the YYYY-MM-DD prefix.
         const insights = await this._files.listInsights();
         for (const filename of insights) {
             const content = await this._files.readDreamFile(
                 `memory/dreams/insights/${filename}`,
             );
             if (content) {
+                const date = extractDateFromFilename(filename);
+                const tagged = date ? withTemporalTag(content, date) : content;
                 await this._index.upsertDocument(
                     `memory/dreams/insights/${filename}`,
-                    content,
+                    tagged,
                     { contentType: "insight" },
                 );
             }
         }
 
-        // Index dream contradictions
+        // Index dream contradictions — filename is YYYY-MM-DD.md
         const contradictions = await this._files.listContradictions();
         for (const filename of contradictions) {
             const content = await this._files.readDreamFile(
                 `memory/dreams/contradictions/${filename}`,
             );
             if (content) {
+                const date = extractDateFromFilename(filename);
+                const tagged = date ? withTemporalTag(content, date) : content;
                 await this._index.upsertDocument(
                     `memory/dreams/contradictions/${filename}`,
-                    content,
+                    tagged,
                     { contentType: "contradiction" },
                 );
             }
@@ -605,14 +614,19 @@ export class MemoryService {
             // Compose embedded text so the page's "what is this?" signal is
             // captured alongside the body. Frontmatter doesn't get embedded
             // when we pass just `page.body`, so prepend the name/description.
-            const embeddedText = [
-                `# ${page.name}`,
-                page.description,
-                "",
-                page.body.trim(),
-            ]
-                .filter((line) => line.length > 0 || line === "")
-                .join("\n");
+            // The temporal tag uses `updated`, since the wiki page represents
+            // current state of record as of that date.
+            const embeddedText = withTemporalTag(
+                [
+                    `# ${page.name}`,
+                    page.description,
+                    "",
+                    page.body.trim(),
+                ]
+                    .filter((line) => line.length > 0 || line === "")
+                    .join("\n"),
+                page.updated,
+            );
             await this._index.upsertDocument(
                 `memory/wiki/${slug}.md`,
                 embeddedText,
@@ -627,4 +641,74 @@ export class MemoryService {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Temporal embedding helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Prepend an `[as of YYYY-MM-DD]` tag to indexed content. This makes the
+ * memory's date a first-class signal in the embedding — queries about
+ * "current X" naturally weight toward later dates because the tag carries
+ * temporal semantics into the vector space. Cheap (one extra short line
+ * per chunk) but possibly the highest-leverage indexing change for
+ * temporal-reasoning and contradiction-resolution categories.
+ *
+ * `date` accepts an ISO date string (YYYY-MM-DD) directly. Other inputs
+ * are coerced via Date; if the result is invalid the content is returned
+ * untagged so we never corrupt a doc with a junk header.
+ */
+export function withTemporalTag(content: string, date: string | Date): string {
+    const iso =
+        typeof date === "string"
+            ? /^\d{4}-\d{2}-\d{2}$/.test(date)
+                ? date
+                : tryIsoFromString(date)
+            : tryIsoFromDate(date);
+    if (!iso) return content;
+    return `[as of ${iso}]\n\n${content}`;
+}
+
+function tryIsoFromString(s: string): string | null {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+}
+
+function tryIsoFromDate(d: Date): string | null {
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+}
+
+/** Pull YYYY-MM-DD from filenames like `2026-04-15.md` or `2026-04-15-slug.md`. */
+function extractDateFromFilename(filename: string): string | null {
+    const m = filename.match(/(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : null;
+}
+
+/**
+ * Convert an ISO week (e.g. "2026-W15") to the Thursday of that week.
+ * Thursday is the conventional "representative day" for an ISO week — it's
+ * always in the same calendar month as the week itself.
+ */
+function isoWeekToThursday(isoWeek: string): string {
+    const m = isoWeek.match(/^(\d{4})-W(\d{2})$/);
+    if (!m) return isoWeek;
+    const year = parseInt(m[1], 10);
+    const weekNum = parseInt(m[2], 10);
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7;
+    const monday = new Date(jan4);
+    monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1 + (weekNum - 1) * 7);
+    const thursday = new Date(monday);
+    thursday.setUTCDate(monday.getUTCDate() + 3);
+    return thursday.toISOString().slice(0, 10);
+}
+
+/** Convert "YYYY-MM" to the 15th of that month. */
+function monthToMidpoint(yearMonth: string): string {
+    const m = yearMonth.match(/^(\d{4})-(\d{2})$/);
+    if (!m) return yearMonth;
+    return `${m[1]}-${m[2]}-15`;
 }
