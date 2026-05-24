@@ -1,10 +1,19 @@
 /**
  * Splits markdown documents into semantic chunks for index ingestion.
  * Chunks on heading boundaries, keeping each chunk under a token budget.
+ *
+ * NOTE: The hot-path chunking that runs when documents are upserted into
+ * Vectra is handled by Vectra's own `TextSplitter` (token-aware, supports
+ * overlap — see `defaults/vectra-index.ts` for the configured defaults).
+ * This module is a public-API utility for external callers that want
+ * heading-aware chunking without going through Vectra; the `overlap`
+ * option is currently a no-op (chunks emit non-overlapping for the
+ * heading-based path). Use Vectra's splitter via `VectraIndex` for
+ * production indexing.
  */
 export interface ChunkOptions {
     maxTokens?: number; // default: 512
-    overlap?: number; // default: 0
+    overlap?: number; // default: 0 (no-op in this implementation; see note above)
 }
 
 export interface Chunk {
@@ -15,9 +24,39 @@ export interface Chunk {
 
 const DEFAULT_MAX_TOKENS = 512;
 
-// Rough token estimate: ~4 chars per token for English text
+// Lazy-cached gpt-tokenizer encoder. Falls back to chars/4 if the package
+// isn't available at runtime (e.g., during a teardown path or a build that
+// excluded it). This matches salience.ts's countTokens approach.
+let encoder: ((text: string) => number[]) | null = null;
+let encoderLoaded = false;
+
 function estimateTokens(text: string): number {
+    if (encoderLoaded && encoder) {
+        try {
+            return encoder(text).length;
+        } catch {
+            // Fall through to the heuristic below
+        }
+    }
     return Math.ceil(text.length / 4);
+}
+
+/**
+ * One-time async warm-up for the gpt-tokenizer-backed token counter.
+ * Calling this is optional — `chunkMarkdown` will use the chars/4 fallback
+ * until/unless the encoder is loaded. The vast majority of consumers are
+ * happy with the fallback for prose, but code-heavy or list-heavy text
+ * benefits from the real tokenizer.
+ */
+export async function loadTokenEncoder(): Promise<void> {
+    if (encoderLoaded) return;
+    try {
+        const { encode } = await import("gpt-tokenizer");
+        encoder = encode;
+    } catch {
+        encoder = null;
+    }
+    encoderLoaded = true;
 }
 
 /**

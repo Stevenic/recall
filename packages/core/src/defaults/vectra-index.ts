@@ -28,12 +28,19 @@ export class VectraIndex implements MemoryIndex {
     constructor(config: VectraIndexConfig) {
         this._folderPath = config.folderPath;
         this._embeddings = config.embeddings;
+        // Default chunk overlap of 64 tokens (~12.5% of the 512-token chunk).
+        // Vectra's TextSplitter is token-aware so this is meaningful overlap,
+        // not character-count guessing. Overlap preserves context at chunk
+        // boundaries and meaningfully lifts cross-paragraph synthesis and
+        // temporal-reasoning recall — the embedding for "decided X on
+        // Tuesday" no longer disappears when "decided X" lands at the tail
+        // of one chunk and "on Tuesday" at the head of the next.
         this._index = new LocalDocumentIndex({
             folderPath: config.folderPath,
             embeddings: config.embeddings,
             chunkingConfig: {
                 chunkSize: config.chunkSize ?? 512,
-                chunkOverlap: config.chunkOverlap ?? 0,
+                chunkOverlap: config.chunkOverlap ?? 64,
             },
         });
     }
