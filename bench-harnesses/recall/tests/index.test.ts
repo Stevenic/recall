@@ -117,6 +117,10 @@ describe('createRecallAdapter — lifecycle', () => {
             memoryRoot: tmp,
             modelInstance: model,
             enableCompaction: false,
+            // Default `answerMode` is now 'agent' which needs an OpenAI/Azure
+            // client. The stub-model path is the synthesis branch, so opt in
+            // explicitly for this lifecycle test.
+            answerMode: 'synthesis',
         });
 
         await adapter.setup();

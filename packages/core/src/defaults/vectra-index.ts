@@ -126,12 +126,33 @@ export class VectraIndex implements MemoryIndex {
         // Pass `enableBM25: false` to opt out for pure-vector experiments.
         const isBm25 = options?.enableBM25 !== false;
 
-        const results = await this._index.queryDocuments(text, {
-            maxDocuments: maxResults,
-            maxChunks: maxChunks * maxResults, // Give Vectra enough chunk budget
-            filter: options?.filter,
-            isBm25,
-        });
+        let results;
+        try {
+            results = await this._index.queryDocuments(text, {
+                maxDocuments: maxResults,
+                maxChunks: maxChunks * maxResults, // Give Vectra enough chunk budget
+                filter: options?.filter,
+                isBm25,
+            });
+        } catch (err) {
+            // wink-bm25 refuses to consolidate when the document collection
+            // is too small (typically <3 docs), throwing
+            // "document collection is too small for consolidation". Tiny
+            // corpora are common at the start of a session and in tests;
+            // gracefully fall back to pure-vector for the query. Other
+            // errors propagate normally.
+            const msg = err instanceof Error ? err.message : String(err);
+            if (isBm25 && /too small for consolidation/i.test(msg)) {
+                results = await this._index.queryDocuments(text, {
+                    maxDocuments: maxResults,
+                    maxChunks: maxChunks * maxResults,
+                    filter: options?.filter,
+                    isBm25: false,
+                });
+            } else {
+                throw err;
+            }
+        }
 
         const searchResults: SearchResult[] = [];
         for (const result of results) {

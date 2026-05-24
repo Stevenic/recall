@@ -76,4 +76,54 @@ describe("VectraIndex hybrid retrieval (BM25)", () => {
         expect(opts?.filter).toEqual({ contentType: "wiki" });
         expect(opts?.isBm25).toBe(true);
     });
+
+    it("falls back to pure vector when wink-bm25 rejects a too-small collection", async () => {
+        // wink-bm25 throws this exact message when fewer than ~3 docs are
+        // indexed. Simulate the first call throwing, second call (without
+        // isBm25) succeeding.
+        const index = new VectraIndex({
+            folderPath: "/tmp/never-touched",
+            embeddings: {} as EmbeddingsModel,
+        });
+        let calls = 0;
+        const recorded: Array<Record<string, unknown> | undefined> = [];
+        (index as unknown as {
+            _index: {
+                queryDocuments: (q: string, o: unknown) => Promise<unknown[]>;
+            };
+        })._index = {
+            async queryDocuments(_query, opts) {
+                calls++;
+                recorded.push(opts as Record<string, unknown> | undefined);
+                if (calls === 1) {
+                    throw new Error(
+                        "winkBM25S: document collection is too small for consolidation; add more docs!",
+                    );
+                }
+                return [];
+            },
+        };
+
+        await index.query("anything");
+        expect(calls).toBe(2);
+        expect(recorded[0]?.isBm25).toBe(true);
+        expect(recorded[1]?.isBm25).toBe(false);
+    });
+
+    it("does NOT swallow unrelated errors", async () => {
+        const index = new VectraIndex({
+            folderPath: "/tmp/never-touched",
+            embeddings: {} as EmbeddingsModel,
+        });
+        (index as unknown as {
+            _index: {
+                queryDocuments: (q: string, o: unknown) => Promise<unknown[]>;
+            };
+        })._index = {
+            async queryDocuments() {
+                throw new Error("disk on fire");
+            },
+        };
+        await expect(index.query("anything")).rejects.toThrow(/disk on fire/);
+    });
 });

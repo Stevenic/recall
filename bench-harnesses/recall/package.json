@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@recall/bench": "*",
+    "openai": "^6.33.0",
     "recall": "*"
   },
   "devDependencies": {
