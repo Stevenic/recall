@@ -142,7 +142,10 @@ export class WikiEngine {
 
     /**
      * Write or overwrite a wiki page. Refuses on `reader` role. Validates that
-     * `slug` matches the file basename and that frontmatter fields are well-formed.
+     * `slug` matches the file basename and that frontmatter fields are
+     * well-formed. Creates the wiki directory on demand so callers who haven't
+     * gone through `initialize()` (typically programmatic use) still succeed
+     * on backends that don't auto-create parent dirs (e.g. LocalFileStorage).
      */
     async write(
         page: WikiPage,
@@ -151,6 +154,8 @@ export class WikiEngine {
         this._assertWritable(target);
         validateSlug(page.slug);
         validatePage(page);
+        const resolved = this._resolveOne(target);
+        await this._storage.createFolder(resolved.wikiDir);
         const filePath = this._pagePath(page.slug, target);
         const content = serializeWikiPage(page);
         await this._storage.upsertFile(filePath, content);

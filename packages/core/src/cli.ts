@@ -23,11 +23,17 @@ function getService(opts: {
     const model = opts.agent
         ? new CliAgentModel({ agent: opts.agent })
         : undefined;
+    // Wiki layer defaults to ON across the CLI. It's a no-op when there are
+    // no wiki pages, but it lets `recall compact` produce wiki promotions,
+    // `recall index/sync` ingest wiki pages, and the structured wisdom
+    // distillation path activate without an explicit opt-in. Pass
+    // `enableWiki: false` to disable (currently only `recall dream
+    // --no-wiki` does so).
     return new MemoryService({
         memoryRoot,
         model,
         dreaming: { enabled: true, logSearches: true },
-        wiki: opts.enableWiki ? { enabled: true } : undefined,
+        wiki: opts.enableWiki === false ? undefined : { enabled: true },
     });
 }
 
