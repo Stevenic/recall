@@ -1,0 +1,66 @@
+# Tuned variant of ea-180d-mempalace.yaml — searchK 10→25, contextBudget 9k→15k.
+#
+# Hypothesis (from the 30d smoke failure analysis):
+#   - 4 of 6 failures were "chunk miss": the relevant day was in top-10 but the
+#     specific answer-bearing chunk was outside the window.
+#   - 2 of 6 were "day miss": the embedder ranked admin/narrative chunks above
+#     the answer bullets.
+#   Top-25 should pull the bullet chunks into the synthesis context.
+#
+# If this profile substantially reduces Condor-related failures, the issue was
+# pure top-K coverage. If 4+ failures remain, the embedder is fundamentally
+# weak on this corpus and we need BM25-union (mempalace patch) or a reranker.
+#
+# Token cost: ~2.5x synthesis input per query vs. the baseline profile.
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  judge: azure:gpt-5.4-mini
+  appellateJudge: azure:gpt-5.4
+  generation: azure:gpt-5.4-mini
+
+harness:
+  adapter: ../../../bench-harnesses/mempalace/dist/index.js
+  factory: createMempalaceAdapter
+  config:
+    name: MemPalace (k25)
+    mempalaceCommand:
+      - C:/source/mempalace/.venv/Scripts/mempalace-mcp.exe
+    requestTimeoutMs: 120000
+    synthesisProvider: azure
+    synthesisModel: gpt-5.4-mini
+    identityName: Jordan
+    identity: |
+      Jordan is an AI executive assistant for the CFO of a mid-cap technology
+      company. Trusted operator: anticipatory, discreet, calm under pressure,
+      protective of the principal's time and confidentiality. Drafts but does
+      not send sensitive (HR, legal, board, customer-escalation)
+      communications without principal review.
+    # Tuned: 10 → 25. Each Condor-related question pulls many similar narrative
+    # chunks; the bullet chunks containing the actual numbers ($28M, 3.2x, etc.)
+    # need a wider window to surface.
+    searchK: 25
+    # Tuned: 9000 → 15000. Bumped proportionally so the larger searchK actually
+    # makes it into the synthesis prompt rather than being clipped.
+    contextBudget: 15000
+    env:
+      MEMPALACE_MCP_IDLE_HOURS: "0"
+
+run:
+  ranges:
+    start: 6
+    end: 180
+    step: 6
+  seed: 42
+  timeout: 60000
+  parallelism: 1
+  sample: 50
+  judgeMemoryWindow: 1
+  groupsEnabled: false

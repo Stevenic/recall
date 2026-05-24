@@ -1,0 +1,92 @@
+# Run the executive-assistant 180-day persona against the MemPalace harness.
+#
+# MemPalace is a local-first, append-only memory system. We spawn its
+# `mempalace-mcp` server as a child process and talk MCP JSON-RPC over stdio.
+# Each day file becomes a drawer filed in wing=executive-assistant,
+# room=<ISO-date>. Query-time answers are synthesized from `mempalace_search`
+# hits by an Azure-deployed gpt-5.4-mini.
+#
+# To run:
+#   recall-bench run --profile packages/recall-bench/profiles/ea-180d-mempalace.yaml \
+#                    --json-out bench-results/drafts/mempalace-ea-180d-<id>/result.json
+#
+# Before running:
+#   - `uv sync --extra dev` in the MemPalace checkout so `mempalace-mcp` exists.
+#   - `npm run build --workspace=bench-harnesses/mempalace` so dist/index.js exists.
+#   - Adjust `mempalaceCommand[0]` if your MemPalace checkout is not at
+#     C:/source/mempalace.
+#
+# Reads OPENAI_API_KEY / AZURE_OPENAI_* env vars from the .env loaded via env.file.
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  # Primary ("trial court") judge — sees every evaluation.
+  judge: azure:gpt-5.4-mini
+  # Appellate ("supreme court") judge — invoked only on primary failures.
+  appellateJudge: azure:gpt-5.4
+  # Display label only; synthesis model is configured in harness.config.
+  generation: azure:gpt-5.4-mini
+
+harness:
+  # Compiled adapter from bench-harnesses/mempalace/src/index.ts.
+  adapter: ../../../bench-harnesses/mempalace/dist/index.js
+  factory: createMempalaceAdapter
+  config:
+    name: MemPalace
+    # Spawned subprocess for the MCP server. The harness appends
+    # `--palace <temp>` automatically. Use the absolute venv path so we don't
+    # depend on `mempalace-mcp` being on PATH.
+    mempalaceCommand:
+      - C:/source/mempalace/.venv/Scripts/mempalace-mcp.exe
+    # Per-MCP-call timeout. Cold start (embedder load) is ~15s on first query;
+    # leave headroom.
+    requestTimeoutMs: 120000
+    # Synthesis-side LLM. Same Azure deployment as the judge.
+    synthesisProvider: azure
+    synthesisModel: gpt-5.4-mini
+    # Identity threaded into the synthesis system prompt — matches the EA
+    # persona's voice.
+    identityName: Jordan
+    identity: |
+      Jordan is an AI executive assistant for the CFO of a mid-cap technology
+      company. Trusted operator: anticipatory, discreet, calm under pressure,
+      protective of the principal's time and confidentiality. Drafts but does
+      not send sensitive (HR, legal, board, customer-escalation)
+      communications without principal review.
+    # Results retrieved per query.
+    searchK: 10
+    # Max chars of memory excerpts assembled into the synthesis prompt.
+    contextBudget: 9000
+    # Disable mempalace's MCP idle auto-exit — a 180-day bench can sit
+    # quietly between checkpoints longer than the 8h default.
+    env:
+      MEMPALACE_MCP_IDLE_HOURS: "0"
+
+run:
+  # 30 checkpoints every 6 days from day 6 through day 180 — matches the
+  # cadence used by the Recall, OpenClaw, and Vector profiles so heatmaps
+  # are directly comparable.
+  ranges:
+    start: 6
+    end: 180
+    step: 6
+  seed: 42
+  # Per-question timeout. MemPalace search is fast but the synthesis LLM
+  # can be slow under quota pressure — give it room.
+  timeout: 60000
+  parallelism: 1
+  # Always evaluate every newly-eligible question; cap older historicals.
+  sample: 50
+  # ±1 day window of source memory the judge sees as grounding context.
+  judgeMemoryWindow: 1
+  # MemPalace does not enforce per-session ACLs in this baseline. Group-
+  # aware categories would always fail attribution; leave off until the
+  # adapter advertises session-level support.
+  groupsEnabled: false
