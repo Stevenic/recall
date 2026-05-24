@@ -15,6 +15,7 @@ import {
     type WikiPageStubInput,
     type WikiRebuildReport,
     type WikiTarget,
+    type WikiTypedMigrationReport,
 } from "./wiki-types.js";
 import { isStubbable } from "./wiki-templates.js";
 
@@ -636,6 +637,164 @@ export class WikiEngine {
     }
 
     /**
+     * Convert legacy typed memories (`memory/<type>_<topic>.md`) into wiki
+     * pages, mapped per §10.4: `user_*` → entity, `feedback_*` → concept,
+     * `project_*` → project, `reference_*` → reference. Idempotent
+     * (skips files already moved to the archive). Non-destructive: original
+     * typed memories are moved to `memory/.archive/typed-memories/`, not
+     * deleted. Slug collisions are resolved by appending `-<category>`.
+     */
+    async migrateTypedMemories(): Promise<WikiTypedMigrationReport> {
+        this._assertWritable("private");
+        const memDir = path.join(this._privateRoot, "memory");
+        const archiveDir = path.join(memDir, ".archive", "typed-memories");
+        const report: WikiTypedMigrationReport = {
+            migrated: {},
+            renamedOnCollision: {},
+            alreadyMigrated: [],
+            failed: [],
+            archivePath: archiveDir,
+        };
+        // Listing files in memory/ excludes subdirectories. The typed-memory
+        // pattern is `<type>_<topic>.md` where type is one of the four legacy
+        // categories. Anything else (daily logs, MEMORY.md, etc.) is filtered.
+        // We don't gate on `pathExists(memDir)` — VirtualFileStorage only
+        // registers folders that were explicitly createFolder'd, but
+        // listFiles iterates over file entries by parent and works either way.
+        const files = await this._storage.listFiles(memDir, "files");
+        const candidates = files
+            .map((f) => f.name)
+            .filter(
+                (name) =>
+                    /^(user|feedback|project|reference)_[^.]+\.md$/.test(name),
+            )
+            .sort();
+
+        for (const filename of candidates) {
+            const filePath = path.join(memDir, filename);
+            const archivePath = path.join(archiveDir, filename);
+            try {
+                if (await this._storage.pathExists(archivePath)) {
+                    report.alreadyMigrated.push(filename);
+                    continue;
+                }
+                const buf = await this._storage.readFile(filePath);
+                const parsed = matter(buf.toString("utf-8"));
+                const data = parsed.data as Record<string, unknown>;
+                const typedPrefix = filename.split("_")[0];
+                const category = TYPED_TO_CATEGORY[typedPrefix];
+                if (!category) {
+                    report.failed.push({
+                        path: filename,
+                        reason: `unrecognized typed prefix "${typedPrefix}"`,
+                    });
+                    continue;
+                }
+                const topic = filename
+                    .replace(/^(user|feedback|project|reference)_/, "")
+                    .replace(/\.md$/, "");
+                const slugBase = slugify(topic);
+                if (!slugBase) {
+                    report.failed.push({
+                        path: filename,
+                        reason: "could not derive a slug from filename",
+                    });
+                    continue;
+                }
+                let slug = slugBase;
+                if (await this.read(slug, "private")) {
+                    // Collision with an existing wiki page — try the
+                    // category-suffixed slug. If THAT also collides, fail.
+                    const collisionSlug = `${slugBase}-${category}`;
+                    if (await this.read(collisionSlug, "private")) {
+                        report.failed.push({
+                            path: filename,
+                            reason: `slug "${slugBase}" and fallback "${collisionSlug}" both already exist`,
+                        });
+                        continue;
+                    }
+                    slug = collisionSlug;
+                    report.renamedOnCollision[slugBase] = collisionSlug;
+                }
+                const sources = inferSourcesFromBody(parsed.content);
+                if (sources.length === 0) {
+                    sources.push(`migration:${todayIso()}:${filename}`);
+                }
+                const page: WikiPage = {
+                    slug,
+                    name:
+                        typeof data.name === "string" && data.name.length > 0
+                            ? data.name
+                            : topic.replace(/-/g, " "),
+                    description:
+                        typeof data.description === "string"
+                            ? data.description
+                            : "",
+                    category,
+                    created: todayIso(),
+                    updated: todayIso(),
+                    sources,
+                    related: [],
+                    confidence: "medium",
+                    body: ensureTrailingNewline(parsed.content.trim()),
+                };
+                await this.write(page, "private");
+
+                // Move the original to the archive (non-destructive). We use
+                // upsertFile + deleteFile because most FileStorage impls don't
+                // expose a rename primitive.
+                await this._storage.upsertFile(archivePath, buf);
+                await this._storage.deleteFile(filePath);
+                report.migrated[filename] = slug;
+            } catch (err) {
+                report.failed.push({
+                    path: filename,
+                    reason: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+        return report;
+    }
+
+    /**
+     * Regenerate the "Knowledge Map" section of WISDOM.md as a per-category
+     * listing of wiki pages. Idempotent: replaces any existing
+     * `## Knowledge Map` section in place; otherwise appends a new one.
+     * Pure data op — no LLM involved.
+     */
+    async rebuildKnowledgeMap(): Promise<{ updated: boolean; pages: number }> {
+        const slugs = await this.list("private");
+        if (slugs.length === 0) {
+            return { updated: false, pages: 0 };
+        }
+        const pages: WikiPage[] = [];
+        for (const slug of slugs) {
+            const page = await this.read(slug, "private");
+            if (page && !page.redirectTo) pages.push(page);
+        }
+        const wisdomPath = path.join(this._privateRoot, "WISDOM.md");
+        const block = renderKnowledgeMap(pages);
+
+        let content = "";
+        if (await this._storage.pathExists(wisdomPath)) {
+            content = (await this._storage.readFile(wisdomPath)).toString(
+                "utf-8",
+            );
+        }
+
+        const headingRe = /(^|\n)## Knowledge Map[\s\S]*?(?=\n## |\n# |$)/;
+        let next: string;
+        if (headingRe.test(content)) {
+            next = content.replace(headingRe, "\n" + block);
+        } else {
+            const prefix = content.length > 0 ? content.trimEnd() + "\n\n" : "";
+            next = prefix + block + "\n";
+        }
+        await this._storage.upsertFile(wisdomPath, next);
+        return { updated: true, pages: pages.length };
+    }
+
+    /**
      * Convert legacy dreaming insight files (`memory/dreams/insights/*.md`)
      * into wiki pages. Idempotent: re-running skips pages that already exist
      * with the same slug. Non-destructive: original insight files are left
@@ -1036,6 +1195,73 @@ function ensureTrailingNewline(s: string): string {
 
 function todayIso(): string {
     return new Date().toISOString().split("T")[0];
+}
+
+/**
+ * Maps legacy typed-memory prefixes to wiki categories per spec §10.4.
+ */
+const TYPED_TO_CATEGORY: Record<string, WikiCategory | undefined> = {
+    user: "entity",
+    feedback: "concept",
+    project: "project",
+    reference: "reference",
+};
+
+/**
+ * Best-effort extraction of `memory/YYYY-MM-DD.md` source URIs from a typed
+ * memory body. The legacy typed-memory format didn't track sources
+ * explicitly, but bodies often contain date references like "2026-04-08"
+ * inline. Returns an empty array when nothing parseable is found — caller
+ * falls back to a synthetic `migration:<date>:<file>` source.
+ */
+function inferSourcesFromBody(body: string): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const dateRe = /\b(\d{4}-\d{2}-\d{2})\b/g;
+    let m: RegExpExecArray | null;
+    while ((m = dateRe.exec(body)) !== null) {
+        const date = m[1];
+        const uri = `memory/${date}.md`;
+        if (!seen.has(uri)) {
+            seen.add(uri);
+            out.push(uri);
+        }
+    }
+    return out;
+}
+
+/**
+ * Render the Knowledge Map markdown block. Categories listed in the order
+ * the spec sketches (§12.3). Empty categories are skipped.
+ */
+function renderKnowledgeMap(pages: WikiPage[]): string {
+    const order: { cat: WikiCategory; label: string }[] = [
+        { cat: "project", label: "Active Projects" },
+        { cat: "concept", label: "Core Concepts" },
+        { cat: "entity", label: "Entities" },
+        { cat: "reference", label: "References" },
+        { cat: "theme", label: "Themes" },
+    ];
+    const grouped: Record<WikiCategory, WikiPage[]> = {
+        entity: [],
+        concept: [],
+        project: [],
+        reference: [],
+        theme: [],
+    };
+    for (const p of pages) grouped[p.category].push(p);
+    const lines: string[] = ["## Knowledge Map", ""];
+    for (const { cat, label } of order) {
+        const items = grouped[cat].sort((a, b) => a.slug.localeCompare(b.slug));
+        if (items.length === 0) continue;
+        lines.push(`### ${label} (${items.length})`);
+        for (const p of items) {
+            const stubMark = isStub(p) ? " (stub)" : "";
+            lines.push(`- [[${p.slug}]] — ${p.description}${stubMark}`);
+        }
+        lines.push("");
+    }
+    return lines.join("\n").trimEnd() + "\n";
 }
 
 /**

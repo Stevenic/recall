@@ -880,6 +880,62 @@ wikiCmd
     });
 
 wikiCmd
+    .command("migrate-typed-memories")
+    .description("Convert legacy memory/<type>_<topic>.md into wiki pages (idempotent, originals archived)")
+    .action(async () => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const report = await svc.wiki.migrateTypedMemories();
+        await svc.wiki.rebuildIndex("private");
+        if (globalOpts.json) {
+            output(report, true);
+            return;
+        }
+        const migratedCount = Object.keys(report.migrated).length;
+        const collisionCount = Object.keys(report.renamedOnCollision).length;
+        console.log(
+            `Migrated ${migratedCount} typed memor${migratedCount === 1 ? "y" : "ies"}; ` +
+                `${report.alreadyMigrated.length} already migrated; ${report.failed.length} failed.`,
+        );
+        if (migratedCount > 0) {
+            console.log("\nMigrated:");
+            for (const [file, slug] of Object.entries(report.migrated)) {
+                console.log(`  ${file}  →  wiki/${slug}.md`);
+            }
+        }
+        if (collisionCount > 0) {
+            console.log("\nSlug collisions (renamed):");
+            for (const [base, renamed] of Object.entries(report.renamedOnCollision)) {
+                console.log(`  ${base}  →  ${renamed}`);
+            }
+        }
+        if (report.failed.length > 0) {
+            console.log("\nFailed:");
+            for (const f of report.failed) console.log(`  ${f.path}: ${f.reason}`);
+        }
+        console.log(`\nOriginals archived under: ${report.archivePath}`);
+    });
+
+wikiCmd
+    .command("knowledge-map")
+    .description("Regenerate the Knowledge Map section of WISDOM.md from wiki pages")
+    .action(async () => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const result = await svc.wiki.rebuildKnowledgeMap();
+        output(
+            globalOpts.json
+                ? result
+                : result.updated
+                  ? `Updated Knowledge Map in WISDOM.md (${result.pages} page${result.pages === 1 ? "" : "s"}).`
+                  : "No wiki pages — Knowledge Map not written.",
+            globalOpts.json,
+        );
+    });
+
+wikiCmd
     .command("status")
     .description("Per-target page counts and identity summary")
     .action(async () => {
