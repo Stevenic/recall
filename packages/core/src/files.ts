@@ -262,10 +262,23 @@ export class MemoryFiles {
     /**
      * Parse YAML frontmatter from a memory file's content.
      * Returns the frontmatter data and the body text (without frontmatter).
+     *
+     * Defensive: when YAML parsing fails (typically because an LLM-generated
+     * value contains an unquoted colon mid-sentence), this returns
+     * `{ data: {}, body: content }` instead of throwing. Callers that need
+     * the data treat a missing field as a missing signal — a single corrupt
+     * file should never bring down a downstream pass (signal collection,
+     * dreaming, search). The actual write path in `_extractTypedMemories`
+     * sanitizes new files going forward, so this fallback is for legacy
+     * content and other LLM-emitted shapes that may slip through.
      */
     parseFrontmatter(content: string): { data: Record<string, any>; body: string } {
-        const parsed = matter(content);
-        return { data: parsed.data, body: parsed.content };
+        try {
+            const parsed = matter(content);
+            return { data: parsed.data, body: parsed.content };
+        } catch {
+            return { data: {}, body: content };
+        }
     }
 
     /**

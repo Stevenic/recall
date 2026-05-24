@@ -1,3 +1,4 @@
+import matter from "gray-matter";
 import type { MemoryModel } from "./interfaces/model.js";
 import type { MemoryIndex } from "./interfaces/index.js";
 import type { MemoryFiles } from "./files.js";
@@ -609,9 +610,11 @@ export class Compactor {
             const filenames: string[] = [];
             for (const item of extracted) {
                 if (item.filename && item.content) {
+                    const normalized = sanitizeFrontmatter(item.content);
+                    if (!normalized) continue; // skipped with stderr warning
                     await this._files.writeTypedMemory(
                         item.filename,
-                        item.content,
+                        normalized,
                     );
                     filenames.push(item.filename);
                 }
@@ -622,6 +625,77 @@ export class Compactor {
             return [];
         }
     }
+}
+
+/**
+ * Round-trip LLM-emitted markdown-with-frontmatter through gray-matter so
+ * any unquoted colons in string values get properly quoted on write.
+ *
+ * The dominant failure case: an LLM emits
+ *   description: authorization should expand in stages: read-only ...
+ * with the inner colon unquoted. js-yaml rejects this on parse, so
+ * gray-matter throws. To recover, we pre-process the frontmatter block:
+ * any line that looks like `key: <unquoted value containing a colon>`
+ * gets its value wrapped in double quotes. Then matter() parses cleanly,
+ * and we re-stringify through matter to get fully-normalized output.
+ *
+ * If even pre-processing can't make it parse (truly malformed YAML),
+ * logs a stderr warning and returns null so the caller drops the entry.
+ * General-purpose: works on any LLM output, no dataset specifics.
+ */
+export function sanitizeFrontmatter(content: string): string | null {
+    // First try parsing as-is. If gray-matter succeeds, we just need to
+    // re-stringify to ensure idempotent output.
+    try {
+        const parsed = matter(content);
+        return matter.stringify(parsed.content, parsed.data);
+    } catch {
+        // Fall through to pre-processing.
+    }
+
+    // Pre-process: quote unquoted colon-containing values in the
+    // frontmatter block. We only touch the section between the opening
+    // `---` and the next `---`, leaving the markdown body untouched.
+    const fmDelim = /^---\s*\n([\s\S]*?)\n---\s*\n?/;
+    const m = content.match(fmDelim);
+    if (!m) return null;  // No frontmatter; nothing to fix.
+
+    const fmLines = m[1].split("\n");
+    const quoted = fmLines.map(quoteRiskyYamlLine).join("\n");
+    const repaired = content.replace(fmDelim, `---\n${quoted}\n---\n`);
+
+    try {
+        const parsed = matter(repaired);
+        return matter.stringify(parsed.content, parsed.data);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(
+            `[compactor] dropping entry with irrecoverable frontmatter: ${msg}\n`,
+        );
+        return null;
+    }
+}
+
+/**
+ * Quote a YAML scalar value that contains a `: ` mid-line. Heuristic:
+ * line matches `^(\s*)([A-Za-z_][\w-]*):\s(.+)$` (a top-level mapping
+ * key), and the value contains `:` somewhere after the key — quote it
+ * with double quotes, escaping internal double quotes. Already-quoted
+ * values (start with `"`, `'`, `|`, `>`, `[`, `{`) are left alone, as
+ * are list items and indented continuations.
+ */
+function quoteRiskyYamlLine(line: string): string {
+    const m = line.match(/^([A-Za-z_][\w-]*):\s(.+)$/);
+    if (!m) return line;
+    const [, key, rawValue] = m;
+    const v = rawValue.trim();
+    // Already quoted / block-scalar / flow-style — leave alone.
+    if (/^["'|>[{]/.test(v)) return line;
+    // No internal colon → no risk.
+    if (!/:\s/.test(v)) return line;
+    // Quote it. Escape any embedded double quotes.
+    const escaped = v.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `${key}: "${escaped}"`;
 }
 
 // --- Prompts ---
