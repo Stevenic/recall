@@ -73,13 +73,37 @@ export const AGENT_SYSTEM_PROMPT =
     "**memory_timeline** to get matching memories in chronological order. " +
     "Reason about the order to find the latest decision; do NOT trust " +
     "first-mention ordering from a relevance search.\n" +
-    "- Use memory_get when you need more context than a search snippet " +
-    "provides.\n\n" +
+    "- Use memory_get to read the full content of a specific file.\n\n" +
+    "### memory_get is NOT optional — read before refusing\n" +
+    "Search snippets are excerpts, not the whole file. A fact you're " +
+    "looking for can be in a chunk of the file that didn't match the " +
+    "query strongly. Whenever any of these is true, you MUST call " +
+    "memory_get before saying you can't find the answer:\n" +
+    "- A returned URI's date or topic matches the question's subject, " +
+    "and the snippet doesn't directly confirm the answer.\n" +
+    "- The top 3 search hits all look topically relevant but none of " +
+    "their snippets contain the specific fact asked for.\n" +
+    "- You're tempted to say \"I couldn't find\" or \"the closest match " +
+    "is\" — read the closest match in full first.\n\n" +
+    "Do NOT refuse until you have read (memory_get) the top 3 most " +
+    "topically relevant URIs in full and they genuinely don't contain " +
+    "the answer.\n\n" +
     "### Answering\n" +
     "Be concise. Extract specific facts, names, dates, and numbers " +
     "verbatim from memory when they appear. Never invent details that " +
-    "aren't in memory. If you can't find the answer with confidence after " +
-    "searching, say you checked memory and didn't find it.\n\n" +
+    "aren't in memory. If after reading the relevant files in full you " +
+    "still don't have a confident answer, say you checked memory and " +
+    "didn't find it — but do NOT also volunteer guesses, speculation, " +
+    "or alternative \"closest matches\" that you haven't verified.\n\n" +
+    "### Empty search results are NOT tool errors\n" +
+    "When memory_search returns \"no results.\" or memory_get returns an " +
+    "empty file, the tool worked correctly — it just found nothing. Do " +
+    "NOT claim or imply a tool failed unless the tool's response " +
+    "literally starts with \"Tool error:\". Phrases to avoid when the " +
+    "tool simply returned empty: \"tool error,\" \"the system erred,\" " +
+    "\"the search failed,\" \"couldn't retrieve due to an error,\" \"the " +
+    "tool timed out.\" The honest framing is \"I searched memory for X " +
+    "and didn't find it.\"\n\n" +
     "Citations: include `(Source: YYYY-MM-DD)` referencing the date of " +
     "the memory excerpt that supports the fact. Do not cite file paths.";
 
@@ -392,6 +416,17 @@ export async function runAgentLoop(
 // Tool implementations
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-hit snippet budget for memory_search results. Previously 600 chars,
+ * which is roughly one short paragraph of an EA daily log — too small to
+ * confirm whether a file contains the answer. 1500 chars is ~3 paragraphs
+ * and surfaces enough context that the agent can decide whether a memory_get
+ * follow-up is needed. Tuned after the first 60d run's q005 failure:
+ * retrieval returned the right file but the 600-char snippet didn't show
+ * the buried fact, so the agent refused (and hallucinated thread names).
+ */
+const SEARCH_SNIPPET_CHARS = 1500;
+
 async function executeMemorySearch(
     deps: AgentLoopDeps,
     args: Record<string, unknown>,
@@ -421,14 +456,14 @@ async function executeMemorySearch(
     const results = hits.map((h) => ({
         path: h.uri,
         score: h.score,
-        snippet: (h.text ?? "").slice(0, 600),
+        snippet: (h.text ?? "").slice(0, SEARCH_SNIPPET_CHARS),
     }));
     const formatted = hits
         .map(
             (h, idx) =>
                 `[${idx + 1}] ${h.uri} (score: ${h.score.toFixed(2)})\n${(h.text ?? "")
                     .trim()
-                    .slice(0, 600)}`,
+                    .slice(0, SEARCH_SNIPPET_CHARS)}`,
         )
         .join("\n\n");
     return { text: formatted, results };
@@ -490,7 +525,7 @@ async function executeMemoryTimeline(
     const results = limited.map((h) => ({
         path: h.uri,
         score: h.score,
-        snippet: (h.text ?? "").slice(0, 600),
+        snippet: (h.text ?? "").slice(0, SEARCH_SNIPPET_CHARS),
     }));
     const blocks = limited.map((h, idx) => {
         const dateLabel = h._date
@@ -502,7 +537,10 @@ async function executeMemoryTimeline(
                 : idx === limited.length - 1
                   ? "[latest mention]"
                   : "";
-        return `${dateLabel} ${ordinal} ${h.uri}\n${(h.text ?? "").trim().slice(0, 500)}`;
+        // Tighter snippet than memory_search since memory_timeline returns
+        // many entries (up to `limit`, default 12). 800 chars per entry
+        // keeps the full tool response under ~10kb in the common case.
+        return `${dateLabel} ${ordinal} ${h.uri}\n${(h.text ?? "").trim().slice(0, 800)}`;
     });
     const text =
         `Timeline for "${topic}" (${limited.length} entries, oldest → newest):\n\n` +

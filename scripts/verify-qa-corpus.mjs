@@ -62,8 +62,10 @@ if (!azureEndpoint || !azureApiKey || !azureApiVersion) {
     process.exit(2);
 }
 
-const concurrency = Number(process.env.VERIFIER_CONCURRENCY || 6);
+const concurrency = Number(process.env.VERIFIER_CONCURRENCY || 2);
 const onlyId = process.env.ONLY_ID; // optional: verify just one Q&A pair
+const resume = process.env.RESUME !== "false"; // skip ids already in verification.jsonl
+const maxBackoffMs = Number(process.env.VERIFIER_MAX_BACKOFF_MS || 60_000);
 
 // --- Helpers ---------------------------------------------------------
 
@@ -131,6 +133,33 @@ function buildUserPrompt(qa, dailies) {
     return lines.join("\n");
 }
 
+/**
+ * Wrap the chat completion in an outer exponential-backoff loop so 429s
+ * (Azure TPM windows) wait rather than fail. The openai SDK's built-in
+ * maxRetries burns through fast on bursty workloads; this gives us a
+ * dedicated 429-handler that retries up to ~60s of backoff.
+ */
+async function completeWithBackoff(messages, maxAttempts = 6) {
+    let delay = 2_000;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await client.chat.completions.create({
+                model: deployment,
+                messages,
+                temperature: 0,
+                response_format: { type: "json_object" },
+                max_completion_tokens: 600,
+            });
+        } catch (err) {
+            const status = err?.status ?? err?.response?.status;
+            if (status !== 429 || attempt >= maxAttempts) throw err;
+            await new Promise((r) => setTimeout(r, Math.min(delay, maxBackoffMs)));
+            delay *= 2;
+        }
+    }
+    throw new Error("Exhausted retries");
+}
+
 async function verifyOne(qa) {
     const dailies = qa.relevant_days
         .map((day) => ({ day, content: loadDailyContent(day) }))
@@ -152,16 +181,10 @@ async function verifyOne(qa) {
     const user = buildUserPrompt(qa, dailies);
     let parsed;
     try {
-        const resp = await client.chat.completions.create({
-            model: deployment,
-            messages: [
-                { role: "system", content: SYSTEM_PROMPT },
-                { role: "user", content: user },
-            ],
-            temperature: 0,
-            response_format: { type: "json_object" },
-            max_completion_tokens: 600,
-        });
+        const resp = await completeWithBackoff([
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: user },
+        ]);
         const text = resp.choices[0]?.message?.content ?? "{}";
         parsed = JSON.parse(text);
     } catch (err) {
@@ -210,13 +233,38 @@ if (onlyId) {
     }
 }
 
+// Resume: read existing report, skip ids that are already verified
+// (unless they errored, in which case we re-try). When RESUME=false (or
+// onlyId is set), start fresh.
+let alreadyDone = new Set();
+if (resume && !onlyId && existsSync(reportPath)) {
+    const existing = readFileSync(reportPath, "utf-8")
+        .split("\n")
+        .filter((l) => l.trim().length > 0);
+    for (const line of existing) {
+        try {
+            const rec = JSON.parse(line);
+            // Keep error records eligible for retry; mark only success records as done.
+            if (rec.id && !rec.error) alreadyDone.add(rec.id);
+        } catch {
+            // skip malformed line
+        }
+    }
+}
+if (alreadyDone.size > 0) {
+    console.log(`Resume: skipping ${alreadyDone.size} already-verified pair(s)`);
+    pairs = pairs.filter((p) => !alreadyDone.has(p.id));
+}
+
 console.log(`Verifying ${pairs.length} Q&A pair(s) using azure:${deployment}`);
 console.log(`Memories dir: ${memoriesDir}`);
 console.log(`Report:       ${reportPath}`);
 console.log(`Concurrency:  ${concurrency}\n`);
 
-// Truncate report
-writeFileSync(reportPath, "", "utf-8");
+// In fresh runs, truncate; in resume runs, append.
+if (!resume || onlyId || alreadyDone.size === 0) {
+    writeFileSync(reportPath, "", "utf-8");
+}
 
 let supported = 0;
 let unsupported = 0;

@@ -361,7 +361,11 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
             for (const p of wikiPrior) {
                 if (!seen.has(p.path)) result.retrieval.push(p);
             }
-            return { answer: result.answer, retrieval: result.retrieval };
+            return {
+                answer: result.answer,
+                retrieval: result.retrieval,
+                toolCalls: result.trace,
+            };
         }
 
         // Legacy single-shot synthesis path.

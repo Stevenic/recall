@@ -223,6 +223,24 @@ export interface QueryDetail {
     answer: string;
     /** Memory chunks the system retrieved before synthesizing the answer. */
     retrieval?: RetrievalEntry[];
+    /**
+     * Tool-call trace (agent-loop systems only). One entry per tool call
+     * the agent made while answering, in order. Surfaced via the
+     * per-question log (questions.jsonl) so auditors can see whether the
+     * agent used memory_get vs memory_search vs memory_timeline as the
+     * system prompt instructs. Optional — systems that don't use a
+     * tool-loop pipeline (e.g. single-shot synthesis adapters) omit it.
+     */
+    toolCalls?: ToolCallTraceEntry[];
+}
+
+export interface ToolCallTraceEntry {
+    /** Tool name (e.g. "memory_search", "memory_get", "memory_timeline"). */
+    tool: string;
+    /** Arguments passed to the tool. */
+    args: Record<string, unknown>;
+    /** Short preview of the tool's response (first ~200 chars). */
+    resultPreview: string;
 }
 
 export interface MemorySystemAdapter {
@@ -566,6 +584,19 @@ export interface HarnessConfig {
      */
     progressJsonlPath?: string;
     /**
+     * Per-question streaming sink. When set, the harness writes ONE JSON
+     * line per question evaluated — regardless of score — containing the
+     * full QA pair, system answer, final judge score, retrieval, and
+     * latency. Lets operators inspect any non-perfect answer mid-run
+     * without lowering the appellate threshold (which would multiply
+     * judge cost). Distinct from `failureLogPath` (which is appellate-
+     * gated and adds both primary and appellate scores). When both are
+     * configured, the failure log is the richer record for the subset
+     * that hit appellate, and the question log is the complete record
+     * for every question. Default: <dir-of-json-out>/questions.jsonl.
+     */
+    questionLogPath?: string;
+    /**
      * If set, the harness reads checkpoint records from this JSONL file at
      * the start of the run and treats any range whose label matches a
      * previously-completed `checkpoint` record as already done. The cached
@@ -581,6 +612,15 @@ export interface HarnessConfig {
      * (and failure log) as normal.
      */
     resumeFromJsonlPath?: string;
+    /**
+     * When true, stop after the first checkpoint of the first persona —
+     * a dry-run mode for catching startup / wiring errors without paying
+     * for the full sweep. Useful as a quick sanity check after harness or
+     * profile changes. The partial result is still written normally
+     * (one checkpoint of data instead of N), and downstream artifacts
+     * (heatmap, summary) reflect just that one slice.
+     */
+    dryRun?: boolean;
     /**
      * Display labels for the models used in this run. Surfaced in the text
      * report and the JSON output's `metadata` block so visualizations can

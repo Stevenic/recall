@@ -42,7 +42,7 @@ const DEFAULT_TIMEOUT = 30_000;
 const DEFAULT_ARCS_FILE = 'arcs-1000d.yaml';
 
 export class BenchmarkHarness {
-    private config: Required<Omit<HarnessConfig, 'modelLabels' | 'sample' | 'judgeMemoryWindow' | 'appellateJudge' | 'failureLogPath' | 'progressJsonlPath' | 'resumeFromJsonlPath'>> & Pick<HarnessConfig, 'modelLabels' | 'sample' | 'judgeMemoryWindow' | 'appellateJudge' | 'failureLogPath' | 'progressJsonlPath' | 'resumeFromJsonlPath'>;
+    private config: Required<Omit<HarnessConfig, 'modelLabels' | 'sample' | 'judgeMemoryWindow' | 'appellateJudge' | 'failureLogPath' | 'questionLogPath' | 'progressJsonlPath' | 'resumeFromJsonlPath' | 'dryRun'>> & Pick<HarnessConfig, 'modelLabels' | 'sample' | 'judgeMemoryWindow' | 'appellateJudge' | 'failureLogPath' | 'questionLogPath' | 'progressJsonlPath' | 'resumeFromJsonlPath' | 'dryRun'>;
     private static readonly GROUP_GATED_CATEGORIES: ReadonlySet<Category> = new Set([
         'group-session-attribution',
         'information-boundary',
@@ -68,6 +68,8 @@ export class BenchmarkHarness {
             groupsEnabled: config.groupsEnabled ?? false,
             appellateJudge: config.appellateJudge,
             failureLogPath: config.failureLogPath,
+            questionLogPath: config.questionLogPath,
+            dryRun: config.dryRun,
             progressJsonlPath: config.progressJsonlPath,
             resumeFromJsonlPath: config.resumeFromJsonlPath,
             modelLabels: config.modelLabels,
@@ -309,6 +311,16 @@ export class BenchmarkHarness {
                     historicalEvaluated: sampledHistorical.length,
                     historicalAvailable: historicalPairs.length,
                 });
+
+                // Dry-run mode: bail after the first checkpoint completes.
+                // Catches misconfigured profiles, broken adapters, broken
+                // prompts, or env issues without paying for the full sweep.
+                if (this.config.dryRun) {
+                    process.stderr.write(
+                        `[bench] --dry-run: stopping after checkpoint 1/${totalCheckpoints}\n`,
+                    );
+                    break;
+                }
             }
         } finally {
             await this.adapter.teardown();
@@ -482,6 +494,7 @@ export class BenchmarkHarness {
 
         let systemAnswer: string;
         let retrieval: RetrievalEntry[] | undefined;
+        let toolCalls: import('./types.js').ToolCallTraceEntry[] | undefined;
         try {
             // Prefer queryDetail when the adapter provides it — surfaces the
             // retrieval result alongside the answer so we can log it on failure.
@@ -491,6 +504,7 @@ export class BenchmarkHarness {
             ]);
             systemAnswer = queried.answer;
             retrieval = queried.retrieval;
+            toolCalls = queried.toolCalls;
         } catch {
             systemAnswer = '[TIMEOUT]';
         }
@@ -536,14 +550,41 @@ export class BenchmarkHarness {
             });
         }
 
+        // Per-question log: one record per evaluated question, regardless
+        // of score. Lets operators inspect any non-perfect answer mid-run.
+        // Cheaper than lowering the appellate threshold (no extra LLM call).
+        if (this.config.questionLogPath) {
+            await this.logQuestion({
+                qa,
+                systemAnswer,
+                primaryScore,
+                finalScore,
+                usedAppellate,
+                compositeScore,
+                retrieval,
+                toolCalls,
+                judgeContext: context,
+                latencyMs,
+            });
+        }
+
         return result;
     }
 
-    private async runQuery(question: string): Promise<{ answer: string; retrieval?: RetrievalEntry[] }> {
+    private async runQuery(question: string): Promise<{
+        answer: string;
+        retrieval?: RetrievalEntry[];
+        toolCalls?: import('./types.js').ToolCallTraceEntry[];
+    }> {
         if (this.adapter.queryDetail) {
             const detail = await this.adapter.queryDetail(question);
-            const out: { answer: string; retrieval?: RetrievalEntry[] } = { answer: detail.answer };
+            const out: {
+                answer: string;
+                retrieval?: RetrievalEntry[];
+                toolCalls?: import('./types.js').ToolCallTraceEntry[];
+            } = { answer: detail.answer };
             if (detail.retrieval) out.retrieval = detail.retrieval;
+            if (detail.toolCalls) out.toolCalls = detail.toolCalls;
             return out;
         }
         const answer = await this.adapter.query(question);
@@ -650,6 +691,57 @@ export class BenchmarkHarness {
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             process.stderr.write(`[bench] progress-log write failed: ${msg}\n`);
+        }
+    }
+
+    private async logQuestion(entry: {
+        qa: QAPair;
+        systemAnswer: string;
+        primaryScore: JudgeScore;
+        finalScore: JudgeScore;
+        usedAppellate: boolean;
+        compositeScore: number;
+        retrieval?: RetrievalEntry[];
+        toolCalls?: import('./types.js').ToolCallTraceEntry[];
+        judgeContext?: JudgeContext;
+        latencyMs: number;
+    }): Promise<void> {
+        const path = this.config.questionLogPath;
+        if (!path) return;
+        const record: Record<string, unknown> = {
+            timestamp: new Date().toISOString(),
+            personaId: this.currentDataset?.personaId,
+            qa: {
+                id: entry.qa.id,
+                question: entry.qa.question,
+                referenceAnswer: entry.qa.answer,
+                category: entry.qa.category,
+                difficulty: entry.qa.difficulty,
+                relevantDays: entry.qa.relevantDays,
+                expectedDisclosure: entry.qa.expectedDisclosure,
+                querySession: entry.qa.querySession,
+                forbiddenSessions: entry.qa.forbiddenSessions,
+            },
+            systemAnswer: entry.systemAnswer,
+            score: entry.finalScore,
+            composite: entry.compositeScore,
+            usedAppellate: entry.usedAppellate,
+            retrieval: entry.retrieval,
+            memoryContextProvided: !!entry.judgeContext?.memoryExcerpts,
+            latencyMs: entry.latencyMs,
+        };
+        if (entry.toolCalls && entry.toolCalls.length > 0) {
+            record.toolCalls = entry.toolCalls;
+        }
+        if (entry.usedAppellate) {
+            record.primaryScore = entry.primaryScore;
+        }
+        try {
+            await mkdir(dirname(path), { recursive: true });
+            await appendFile(path, JSON.stringify(record) + '\n', 'utf-8');
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            process.stderr.write(`[bench] question-log write failed: ${msg}\n`);
         }
     }
 

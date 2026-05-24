@@ -48,6 +48,8 @@ program
     .option('--judge <spec>', `Judge selector: a CLI agent name (${CLI_AGENT_NAMES.join(', ')}), a model spec (provider:model;endpoint where provider is openai/anthropic/azure), an OpenAI shorthand ('openai' or 'openai:<model-id>'), or a path to a JS module exporting a JudgeModel. Default: stub judge that returns zeros.`)
     .option('--appellate-judge <spec>', 'Optional second judge invoked only for primary-judge failures (the "supreme court"). Accepts the same spec syntax as --judge. The appellate verdict is final; both scores are recorded.')
     .option('--failure-log <path>', 'Write one JSONL record per appellate-reviewed failure to this path (Q, ref, system answer, both scores, retrieval). Default: <dir-of-json-out>/failures.jsonl.')
+    .option('--question-log <path>', 'Write one JSONL record per evaluated question (regardless of score) to this path. Captures Q, ref, system answer, final score, retrieval, and latency for every question — lets operators inspect any non-perfect answer mid-run without adding judge cost. Default: <dir-of-json-out>/questions.jsonl.')
+    .option('--no-question-log', 'Disable per-question logging entirely.')
     .option('--progress-jsonl <path>', 'Stream per-checkpoint progress (header + one record per checkpoint + summary) as JSON lines. Lets the heatmap script render an in-flight view. Default: <dir-of-json-out>/progress.jsonl.')
     .option('--resume <path>', 'Resume a previously-interrupted run by reading checkpoint records from this JSONL file. Cached ranges skip their eval phase; the adapter still re-ingests the corpus up to the cached cutoff so subsequent uncached ranges see the right state. Typically the same path as --progress-jsonl from the prior run.')
     .option('--personas <ids...>', 'Persona IDs to benchmark (default: all)')
@@ -65,6 +67,8 @@ program
     .option('--json-out <path>', 'Write the full JSON BenchmarkResult to this file. Convention: pass a per-run directory path like bench-results/drafts/<run-id>/result.json — the bench writes canonical siblings heatmap.png, progress.jsonl, failures.jsonl into the same directory. (Set --no-heatmap-png to skip the PNG.)')
     .option('--no-heatmap-png', 'Disable the automatic heatmap PNG render that accompanies --json-out.')
     .option('--heatmap-script <path>', 'Override the path to generate-heatmap.mjs. Default: resolved relative to the recall-bench dist.')
+    .option('--dry-run', 'Stop after the first checkpoint of the first persona. Catches startup/config errors in ~5 minutes instead of waiting for the full sweep.')
+    .option('--skip-preflight', 'Skip pre-flight validation (profile + persona files + env vars + Q&A loads cleanly). Use only when iterating fast on the run loop and you know the setup is good.')
     .action(async (opts) => {
         const profile = opts.profile ? await loadProfile(opts.profile) : null;
         if (profile) applyProfileEnv(profile);
@@ -79,6 +83,34 @@ program
         const dataDir = resolveDataDir(opts.data, profile);
         if (!dataDir) {
             throw new Error('Missing data dir — provide --data or set persona.dir in the profile.');
+        }
+
+        // Pre-flight validation: catch wiring problems in seconds instead
+        // of paying for setup + first-checkpoint ingest before crashing.
+        // Skippable with --skip-preflight when iterating fast.
+        if (!opts.skipPreflight) {
+            // dataDir is the personas-root parent; resolve the persona
+            // subdir for the persona we're benchmarking.
+            const personaIds =
+                opts.personas ?? (profile?.persona ? [profile.persona.id] : []);
+            const personaDir =
+                personaIds.length > 0
+                    ? join(dataDir, personaIds[0])
+                    : dataDir;
+            await runPreflight({
+                profile,
+                adapterSpec,
+                personaDir,
+                arcs: opts.arcs ?? profile?.persona?.arcs ?? 'arcs-1000d.yaml',
+                requireAzure:
+                    /azure:/i.test(opts.judge ?? profile?.models?.judge ?? '') ||
+                    /azure:/i.test(opts.appellateJudge ?? profile?.models?.appellateJudge ?? '') ||
+                    profile?.harness?.config?.synthesisProvider === 'azure',
+                requireOpenAi:
+                    /^openai/i.test(opts.judge ?? profile?.models?.judge ?? '') ||
+                    /^openai/i.test(opts.appellateJudge ?? profile?.models?.appellateJudge ?? '') ||
+                    profile?.harness?.config?.synthesisProvider === 'openai',
+            });
         }
 
         const judgeSpec = opts.judge ?? profile?.models?.judge;
@@ -115,6 +147,7 @@ program
             parallelism: opts.parallelism ?? profile?.run?.parallelism ?? 1,
             arcsFile: opts.arcs ?? profile?.persona?.arcs ?? 'arcs-1000d.yaml',
         };
+        if (opts.dryRun) config.dryRun = true;
         const sampleSetting = opts.sample ?? profile?.run?.sample;
         if (sampleSetting !== undefined) config.sample = sampleSetting;
         const judgeMemoryWindowSetting = opts.judgeMemoryWindow ?? profile?.run?.judgeMemoryWindow;
@@ -137,6 +170,14 @@ program
             opts.failureLog ??
             (opts.jsonOut ? join(dirname(resolve(opts.jsonOut)), 'failures.jsonl') : undefined);
         if (failureLog && appellateJudge) config.failureLogPath = failureLog;
+
+        // Derive per-question log path from --json-out unless --no-question-log.
+        if (opts.questionLog !== false) {
+            const questionLog =
+                (typeof opts.questionLog === 'string' ? opts.questionLog : undefined) ??
+                (opts.jsonOut ? join(dirname(resolve(opts.jsonOut)), 'questions.jsonl') : undefined);
+            if (questionLog) config.questionLogPath = questionLog;
+        }
 
         // Derive progress JSONL path from --json-out when not explicitly set.
         const progressJsonl =
@@ -656,6 +697,107 @@ program.parse();
 
 function parseRanges(value: string): TimeRange[] {
     return value.split(',').map(s => parseTimeRange(s.trim()));
+}
+
+/**
+ * Validate that the bench can actually start. Catches the cheap mistakes
+ * (typo'd path, missing env var, broken YAML) in seconds, before the
+ * harness spins up an adapter or burns LLM calls. Errors here exit with
+ * a non-zero code and a focused message; the caller hasn't paid anything
+ * yet. Skippable via --skip-preflight when iterating fast on the run loop.
+ */
+async function runPreflight(opts: {
+    profile: Profile | null;
+    adapterSpec: string;
+    personaDir: string;
+    arcs: string;
+    requireAzure: boolean;
+    requireOpenAi: boolean;
+}): Promise<void> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const { existsSync, readFileSync, statSync } = await import('node:fs');
+
+    // 1. Persona dir + persona files exist.
+    if (!existsSync(opts.personaDir)) {
+        errors.push(`Persona dir does not exist: ${opts.personaDir}`);
+    } else {
+        const personaYaml = resolve(opts.personaDir, 'persona.yaml');
+        if (!existsSync(personaYaml)) {
+            errors.push(`Missing persona.yaml: ${personaYaml}`);
+        }
+        const arcsPath = resolve(opts.personaDir, opts.arcs);
+        if (!existsSync(arcsPath)) {
+            errors.push(`Missing arcs file: ${arcsPath} (set --arcs or persona.arcs in profile)`);
+        }
+
+        // 2. Q&A loads cleanly. Derive the qa-Nd subdir from the arcs name.
+        const m = opts.arcs.match(/arcs-(\d+)d\.yaml/i);
+        if (m) {
+            const qaPath = resolve(opts.personaDir, `qa-${m[1]}d`, 'questions.yaml');
+            const memDir = resolve(opts.personaDir, `memories-${m[1]}d`);
+            if (!existsSync(qaPath)) {
+                errors.push(`Missing Q&A file: ${qaPath}`);
+            } else {
+                try {
+                    const yaml = await import('yaml');
+                    const parsed = yaml.parse(readFileSync(qaPath, 'utf-8'));
+                    if (!Array.isArray(parsed) || parsed.length === 0) {
+                        errors.push(`Q&A file has no pairs: ${qaPath}`);
+                    }
+                } catch (err) {
+                    errors.push(
+                        `Q&A YAML failed to parse: ${qaPath} — ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                }
+            }
+            if (!existsSync(memDir)) {
+                errors.push(`Missing memories dir: ${memDir}`);
+            } else {
+                try {
+                    const entries = statSync(memDir);
+                    if (!entries.isDirectory()) {
+                        errors.push(`memories path is not a directory: ${memDir}`);
+                    }
+                } catch (err) {
+                    errors.push(
+                        `Could not stat memories dir: ${memDir} — ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                }
+            }
+        }
+    }
+
+    // 3. Adapter resolves (path adapters only; gRPC adapters validated by their own connect).
+    if (!opts.adapterSpec.startsWith('grpc://')) {
+        const adapterPath = resolve(opts.adapterSpec);
+        if (!existsSync(adapterPath)) {
+            errors.push(`Adapter module not found: ${adapterPath}`);
+        }
+    }
+
+    // 4. Env vars present for the configured model providers.
+    if (opts.requireAzure) {
+        for (const k of ['AZURE_OPENAI_API_KEY', 'AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_VERSION']) {
+            if (!process.env[k]) errors.push(`Azure provider configured but ${k} is not set in environment.`);
+        }
+    }
+    if (opts.requireOpenAi) {
+        if (!process.env.OPENAI_API_KEY) {
+            errors.push(`OpenAI provider configured but OPENAI_API_KEY is not set in environment.`);
+        }
+    }
+
+    if (warnings.length > 0) {
+        for (const w of warnings) process.stderr.write(`[bench preflight] WARN: ${w}\n`);
+    }
+    if (errors.length > 0) {
+        process.stderr.write('\n[bench preflight] FAILED:\n');
+        for (const e of errors) process.stderr.write(`  ✗ ${e}\n`);
+        process.stderr.write('\nRe-run with --skip-preflight to bypass these checks.\n');
+        process.exit(2);
+    }
+    process.stderr.write('[bench preflight] OK\n');
 }
 
 async function loadModule<T>(modulePath: string): Promise<T> {
