@@ -1,0 +1,96 @@
+# Run the executive-assistant 60-day window against the Recall harness
+# WITH dreaming enabled. Uses the 180-day corpus but stops at day 60.
+#
+# Purpose: validate the full temporal-contradiction stack — including
+# supersession tracking, which only fires when dreaming runs. The 180d
+# baseline runs without dreaming; this profile runs WITH it so we can
+# see whether:
+#
+#   - Wiki pages actually populate over a 60-day window
+#   - Supersession signals fire when dailies contain decision markers
+#   - The wiki-first pre-pass starts returning hits at later checkpoints
+#   - memory_timeline gets used by the agent for trajectory questions
+#   - Contradiction-resolution moves vs the dreaming-off baseline
+#
+# Cost note: dreaming runs at every finalizeIngestion call (= every
+# checkpoint), making this materially more expensive than the baseline.
+# Budget accordingly. 10 checkpoints × 1 dream session × ~20 candidates ≈
+# ~200 dreaming LLM calls on top of compaction and per-question agent
+# loops.
+#
+# To run:
+#   recall-bench run --profile packages/recall-bench/profiles/ea-60d-recall-dreaming.yaml \
+#                    --json-out bench-results/drafts/ea-60d-recall-dreaming/result.json
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  # Primary ("trial court") judge — sees every evaluation. Azure deployment.
+  judge: azure:gpt-5.4-mini
+  # Appellate judge — invoked only on primary failures.
+  appellateJudge: azure:gpt-5.4
+  # Display label only — synthesis model is configured in harness.config.
+  generation: azure:gpt-5.4-mini
+
+harness:
+  # Compiled adapter from bench-harnesses/recall/src/index.ts
+  adapter: ../../../bench-harnesses/recall/dist/index.js
+  factory: createRecallAdapter
+  config:
+    name: Recall (dreaming)
+    # Model used for compaction, dreaming, and query-time agent loops.
+    model: azure:gpt-5.4-mini
+    # Identity threaded into compaction/synthesis prompts.
+    identityName: Jordan
+    identity: |
+      Jordan is an AI executive assistant for the CFO of a mid-cap technology
+      company. Trusted operator: anticipatory, discreet, calm under pressure,
+      protective of the principal's time and confidentiality. Drafts but does
+      not send sensitive (HR, legal, board, customer-escalation)
+      communications without principal review.
+    # Number of search results to retrieve per agent tool call.
+    searchK: 10
+    # Max chars of memory excerpts assembled into the synthesis prompt
+    # (legacy synthesis path only; agent mode uses tool calls).
+    contextBudget: 9000
+    # Compaction (daily → weekly → monthly → wisdom) runs at each
+    # checkpoint. Wisdom distillation emits wiki_promotions per the new
+    # structured prompt; those land as wiki pages.
+    enableCompaction: true
+    # Dreaming ON — the whole point of this profile. Runs at every
+    # finalizeIngestion. Produces wiki ops (create/update/contradict)
+    # AND, on supersession_signal candidates, supersedes-bearing updates
+    # that record what the wiki page used to say.
+    enableDreaming: true
+    # Default answer pipeline. Agent drives memory_search /
+    # memory_get / memory_timeline tool calls over multiple turns.
+    answerMode: agent
+    agentMaxIterations: 6
+    # Synthesis-side LLM via Azure (matches OpenClaw 180d baseline).
+    synthesisProvider: azure
+
+run:
+  # 10 checkpoints every 6 days from day 6 through day 60. Same step as
+  # the 180d baselines so per-checkpoint scores are directly comparable
+  # for the first 10 checkpoints. Beyond day 60 we don't measure here —
+  # this is the short-window stress test for dreaming.
+  ranges:
+    start: 6
+    end: 60
+    step: 6
+  seed: 42
+  timeout: 120000           # Dreaming pushes per-checkpoint time; +60s headroom.
+  parallelism: 1
+  # Always evaluate every question that first becomes eligible at this
+  # checkpoint; cap older ("historical") questions at this count.
+  sample: 50
+  # ±1 day window of source memory the judge sees as grounding context.
+  judgeMemoryWindow: 1
+  # Group-aware categories disabled — Recall has no per-session ACLs.
+  groupsEnabled: false
