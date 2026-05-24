@@ -35,12 +35,36 @@ export interface SearchOptions {
     includeSummaries?: boolean;
     /** Override temporal reference date */
     temporalReference?: Date;
+    /**
+     * Multiplier applied to wiki page scores. Defaults to the
+     * service-configured `wiki.scoreBoost` (1.3 when unset). Set to 1.0 to
+     * disable boost for this query without disabling wiki indexing.
+     */
+    wikiBoost?: number;
+    /**
+     * When true, restrict results to wiki pages only. Useful for "show me
+     * the synthesized view" queries — bypasses the raw/parent retrieval
+     * branches entirely.
+     */
+    wikiOnly?: boolean;
+    /**
+     * When false, skip wiki pages entirely (raw + parents only). Default true.
+     */
+    includeWiki?: boolean;
 }
 
 export interface MultiSearchOptions extends SearchOptions {
     additionalQueries?: string[];
     catalogMatches?: SearchResult[];
 }
+
+/** Search-time view of wiki config — just the score-boost knob today. */
+export interface SearchWikiConfig {
+    /** Default multiplier applied to wiki page scores during ranking. */
+    scoreBoost?: number;
+}
+
+const DEFAULT_WIKI_SCORE_BOOST = 1.3;
 
 /**
  * Two-phase hierarchical search:
@@ -54,16 +78,19 @@ export class SearchService {
     private readonly _index: MemoryIndex;
     private readonly _files: MemoryFiles;
     private readonly _config: HierarchicalMemoryConfig;
+    private readonly _wikiConfig: SearchWikiConfig;
     private _searchLogger: SearchLogger | null = null;
 
     constructor(
         index: MemoryIndex,
         files: MemoryFiles,
         config?: HierarchicalMemoryConfig,
+        wikiConfig?: SearchWikiConfig,
     ) {
         this._index = index;
         this._files = files;
         this._config = config ?? {};
+        this._wikiConfig = wikiConfig ?? {};
     }
 
     /**
@@ -89,6 +116,27 @@ export class SearchService {
         const includeSummaries = options?.includeSummaries ?? true;
 
         const isHierarchical = this._config.enabled !== false;
+        const wikiBoost =
+            options?.wikiBoost ??
+            this._wikiConfig.scoreBoost ??
+            DEFAULT_WIKI_SCORE_BOOST;
+        const includeWiki = options?.includeWiki !== false;
+        const wikiOnly = options?.wikiOnly === true;
+
+        // Wiki-only mode short-circuits — no catalog, no parent, no recency.
+        if (wikiOnly) {
+            const wikiResults = await this._wikiSearch(query, {
+                maxResults,
+                maxChunks,
+                maxTokens,
+                wikiBoost,
+            });
+            const sliced = wikiResults
+                .sort((a, b) => b.score - a.score)
+                .slice(0, maxResults);
+            await this._logSearchResults(query, sliced, maxResults);
+            return sliced;
+        }
 
         // Pass 1: Catalog matching (frontmatter keyword overlap)
         const catalogResults = await this._catalogSearch(query, maxResults);
@@ -102,6 +150,8 @@ export class SearchService {
                 typedMemoryBoost,
                 includeSummaries,
                 catalogResults,
+                wikiBoost,
+                includeWiki,
                 ...options,
             });
             await this._logSearchResults(query, results, maxResults);
@@ -117,6 +167,16 @@ export class SearchService {
             semanticResults,
             typedMemoryBoost,
         );
+
+        if (includeWiki) {
+            const wikiResults = await this._wikiSearch(query, {
+                maxResults,
+                maxChunks,
+                maxTokens,
+                wikiBoost,
+            });
+            merged = this._mergeResults(merged, wikiResults, 1.0);
+        }
 
         if (recencyDepth > 0) {
             const recentWeeklies = await this._getRecentWeeklies(recencyDepth);
@@ -189,6 +249,8 @@ export class SearchService {
             typedMemoryBoost: number;
             includeSummaries: boolean;
             catalogResults: SearchResult[];
+            wikiBoost: number;
+            includeWiki: boolean;
             parentCandidates?: number;
             rawCandidates?: number;
             enableBM25?: boolean;
@@ -211,7 +273,7 @@ export class SearchService {
             };
 
         // ── Phase 1a: Parallel candidate retrieval ──
-        const [parentResults, rawResults] = await Promise.all([
+        const [parentResults, rawResults, wikiResults] = await Promise.all([
             // Parent vector search (both #agg and #summary entries)
             this._index.query(query, {
                 maxResults: parentK,
@@ -230,6 +292,15 @@ export class SearchService {
                     contentType: { $in: ["daily", "typed_memory", "wisdom"] },
                 },
             }),
+            // Wiki page search (parallel; boost is applied during the rerank)
+            opts.includeWiki
+                ? this._wikiSearch(query, {
+                      maxResults: rawK,
+                      maxChunks: opts.maxChunks,
+                      maxTokens: opts.maxTokens,
+                      wikiBoost: 1.0,
+                  })
+                : Promise.resolve<SearchResult[]>([]),
         ]);
 
         // ── Phase 1b: Expand parent pointers ──
@@ -241,6 +312,17 @@ export class SearchService {
                 ...r,
                 resultType: ResultType.RAW,
             });
+        }
+
+        // Add wiki hits (unboosted; the rerank applies opts.wikiBoost).
+        for (const r of wikiResults) {
+            const existing = expandedCandidates.get(r.uri);
+            if (!existing || r.score > existing.score) {
+                expandedCandidates.set(r.uri, {
+                    ...r,
+                    resultType: ResultType.RAW,
+                });
+            }
         }
 
         // Add catalog matches
@@ -320,6 +402,14 @@ export class SearchService {
 
             let finalScore =
                 wEmbed * embedScore + wBm25 * bm25Score + wParent * pScore;
+
+            // Wiki boost is applied as a soft multiplier on the final score —
+            // wiki pages out-rank loosely matching raw logs but a strong raw
+            // hit (e.g., a date-specific daily) can still win on temporal
+            // affinity. The default (1.3×) is set in service config.
+            if (c.metadata?.contentType === "wiki" && opts.wikiBoost !== 1.0) {
+                finalScore *= opts.wikiBoost;
+            }
 
             // Apply temporal affinity if active
             if (enableTemporal && temporalRef) {
@@ -428,6 +518,31 @@ export class SearchService {
     }
 
     // ─── Legacy helpers (also used by hierarchical) ───────────────
+
+    /**
+     * Retrieve wiki pages matching `query`. Returns raw vector-similarity
+     * scores from the index; the caller decides whether to apply a boost.
+     * Pass `wikiBoost` to pre-multiply (legacy-path callers do this; the
+     * hierarchical reranker applies the boost itself).
+     */
+    private async _wikiSearch(
+        query: string,
+        opts: {
+            maxResults: number;
+            maxChunks: number;
+            maxTokens: number;
+            wikiBoost: number;
+        },
+    ): Promise<SearchResult[]> {
+        const results = await this._index.query(query, {
+            maxResults: opts.maxResults,
+            maxChunks: opts.maxChunks,
+            maxTokens: opts.maxTokens,
+            filter: { contentType: "wiki" },
+        });
+        if (opts.wikiBoost === 1.0) return results;
+        return results.map((r) => ({ ...r, score: r.score * opts.wikiBoost }));
+    }
 
     /**
      * Match typed memories by frontmatter keywords.

@@ -97,12 +97,6 @@ export class MemoryService {
             });
 
         this._files = new MemoryFiles(config.memoryRoot, this._storage);
-        this._search = new SearchService(
-            this._index,
-            this._files,
-            config.hierarchical,
-        );
-
         this._identity = new IdentityLoader(
             config.memoryRoot,
             this._storage,
@@ -112,6 +106,14 @@ export class MemoryService {
             config.memoryRoot,
             this._storage,
             config.wiki,
+        );
+        this._search = new SearchService(
+            this._index,
+            this._files,
+            config.hierarchical,
+            this._wiki.enabled
+                ? { scoreBoost: this._wiki.config.scoreBoost }
+                : undefined,
         );
 
         // Wire up search logging if dreaming is enabled
@@ -580,6 +582,45 @@ export class MemoryService {
                     { contentType: "contradiction" },
                 );
             }
+        }
+
+        // Index wiki pages (when the wiki layer is enabled). Only the private
+        // wiki for now — shared wiki indexing lands in Phase F. The page body
+        // is indexed alongside its frontmatter name/description so the topical
+        // signal is visible to the embedder.
+        if (this._wiki.enabled) {
+            await this._indexWikiPages();
+        }
+    }
+
+    private async _indexWikiPages(): Promise<void> {
+        const slugs = await this._wiki.list("private");
+        for (const slug of slugs) {
+            const page = await this._wiki.read(slug, "private");
+            if (!page) continue;
+            // Compose embedded text so the page's "what is this?" signal is
+            // captured alongside the body. Frontmatter doesn't get embedded
+            // when we pass just `page.body`, so prepend the name/description.
+            const embeddedText = [
+                `# ${page.name}`,
+                page.description,
+                "",
+                page.body.trim(),
+            ]
+                .filter((line) => line.length > 0 || line === "")
+                .join("\n");
+            await this._index.upsertDocument(
+                `memory/wiki/${slug}.md`,
+                embeddedText,
+                {
+                    contentType: "wiki",
+                    period: page.updated,
+                    wikiCategory: page.category,
+                    wikiSlug: page.slug,
+                    wikiTarget: "private",
+                    wikiSources: page.sources.length,
+                },
+            );
         }
     }
 }

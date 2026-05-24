@@ -3,11 +3,18 @@ import type { MetadataFilter, MetadataTypes } from "vectra";
 export type { MetadataFilter, MetadataTypes };
 
 export interface DocumentMetadata {
-    contentType?: string; // "daily" | "weekly" | "monthly" | "wisdom" | "typed_memory"
+    contentType?: string; // "daily" | "weekly" | "monthly" | "wisdom" | "typed_memory" | "wiki" | "insight" | "contradiction"
     teammate?: string;
     period?: string; // ISO date, week, or month
     /** For parent nodes: "agg" or "summary" */
     embeddingType?: "agg" | "summary";
+    /** For wiki pages: category and slug for filtering / display */
+    wikiCategory?: string;
+    wikiSlug?: string;
+    /** Logical wiki target (`"private"` or a shared wiki name) */
+    wikiTarget?: string;
+    /** Source count at index time — distinguishes stubs (1) from synthesized pages (3+) */
+    wikiSources?: number;
     [key: string]: MetadataTypes | undefined;
 }
 

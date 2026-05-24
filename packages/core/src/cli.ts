@@ -51,17 +51,37 @@ program
     .option("--recency-depth <n>", "Recent weekly summaries to include", "2")
     .option("--typed-memory-boost <n>", "Boost for typed memories", "1.2")
     .option("--no-sync", "Skip auto-sync before searching")
+    .option(
+        "--wiki-boost <n>",
+        "Wiki page score multiplier (defaults to config; 1.0 disables)",
+    )
+    .option("--no-wiki-boost", "Disable wiki score boost (sets multiplier to 1.0)")
+    .option("--wiki-only", "Return only wiki pages")
+    .option("--no-wiki", "Exclude wiki pages from results")
     .action(async (query: string, cmdOpts: any) => {
         const globalOpts = program.opts();
-        const svc = getService({ dir: globalOpts.dir });
-        const results = await svc.search(query, {
+        // The CLI always enables the wiki path so --wiki-only / --wiki-boost
+        // have something to act on. Indexing of wiki pages is gated by the
+        // wiki layer being enabled in service config.
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        const opts: any = {
             maxResults: parseInt(cmdOpts.results),
             maxChunks: parseInt(cmdOpts.maxChunks),
             maxTokens: parseInt(cmdOpts.maxTokens),
             recencyDepth: parseInt(cmdOpts.recencyDepth),
             typedMemoryBoost: parseFloat(cmdOpts.typedMemoryBoost),
             skipSync: cmdOpts.sync === false,
-        });
+        };
+        // commander turns `--no-wiki-boost` into `wikiBoost: false`. If the
+        // user passed an explicit numeric `--wiki-boost <n>` it's a string.
+        if (typeof cmdOpts.wikiBoost === "string") {
+            opts.wikiBoost = parseFloat(cmdOpts.wikiBoost);
+        } else if (cmdOpts.wikiBoost === false) {
+            opts.wikiBoost = 1.0;
+        }
+        if (cmdOpts.wikiOnly) opts.wikiOnly = true;
+        if (cmdOpts.wiki === false) opts.includeWiki = false;
+        const results = await svc.search(query, opts);
         output(
             globalOpts.json
                 ? results
