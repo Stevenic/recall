@@ -301,6 +301,7 @@ export class MemoryService {
                 index: this._index,
                 aggregationStrategy:
                     this._config.hierarchical?.aggregationStrategy ?? "salience",
+                wiki: this._wiki.enabled ? this._wiki : undefined,
                 ...this._config.compaction,
             });
         }

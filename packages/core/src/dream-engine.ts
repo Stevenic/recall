@@ -991,13 +991,14 @@ Respond with a JSON object:
 - Distinguish between intentional silence (nothing happened) and missing coverage
 - Suggest what kind of information would fill each gap`;
 
-const CONTRADICTION_TEMPLATE = `You are an analytical memory engine detecting contradictions between stated principles and observed behavior.
+const CONTRADICTION_TEMPLATE = `You are an analytical memory engine detecting contradictions between stated principles and observed behavior, and detecting wisdom entries that have drifted toward topical (per spec §12.4).
 
 <TASK>
-Compare the WISDOM.md entries against the provided recent memories. For each wisdom entry:
-1. Does recent behavior support this principle?
-2. Does recent behavior contradict it?
-3. Has the principle evolved in ways not reflected in WISDOM.md?
+Compare the WISDOM.md entries against the provided recent memories. For each wisdom entry, choose exactly one outcome:
+
+1. UPDATE — the principle is right but needs sharper wording given new evidence. → emit a "contradictions" entry with the recommendation.
+2. CONTRADICT — the principle is no longer accurate; newer evidence overrides it. → emit a "contradictions" entry recommending removal or rewrite.
+3. PROMOTE_TO_WIKI — the entry is topical (about a specific person, project, system, or recurring theme) rather than a cross-topic principle. → emit a "wiki_ops" create op that captures the topical knowledge as a wiki page. WISDOM.md should retain only the underlying principle (if any).
 
 <OUTPUT_FORMAT>
 Respond with a JSON object:
@@ -1011,13 +1012,27 @@ Respond with a JSON object:
       "recommendation": "How WISDOM.md should be updated"
     }
   ],
-  "gaps": []
+  "gaps": [],
+  "wiki_ops": [
+    {
+      "op": "create",
+      "slug": "kebab-case-slug",
+      "category": "entity" | "concept" | "project" | "reference" | "theme",
+      "name": "Human-readable title",
+      "description": "One-line description",
+      "body": "Markdown body. Concept/project pages SHOULD lead with a rule/fact followed by **Why:** and **How to apply:**.",
+      "sources": ["memory/YYYY-MM-DD.md", ...]
+    }
+  ]
 }
 
 <RULES>
 - Only flag genuine contradictions with clear evidence
-- Evolution is not contradiction — if a principle was refined, recommend an update, not a removal
-- Be specific about which memories contain the contradicting evidence`;
+- Evolution is not contradiction — if a principle was refined, recommend an update (outcome 1)
+- Promote to wiki when the entry describes a *thing* rather than a *rule*:
+  - "Use Postgres for the ledger" — topical → promote (project: ledger-storage)
+  - "Prefer additive migrations" — principle → keep in WISDOM.md
+- Slugs are lowercase ASCII, hyphen-separated. Sources must be URIs from the provided memories.`;
 
 const TYPED_MEMORY_TEMPLATE = `You are an analytical memory engine extracting durable knowledge that was missed during compaction.
 

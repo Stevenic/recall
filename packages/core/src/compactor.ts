@@ -1,6 +1,8 @@
 import type { MemoryModel } from "./interfaces/model.js";
 import type { MemoryIndex } from "./interfaces/index.js";
 import type { MemoryFiles } from "./files.js";
+import type { WikiEngine } from "./wiki-engine.js";
+import type { WikiCategory } from "./wiki-types.js";
 import { computeSalienceWeights, type SalienceWeights } from "./salience.js";
 
 export interface CompactionConfig {
@@ -15,6 +17,15 @@ export interface CompactionConfig {
     /** Aggregation weighting strategy for parent embeddings (default: "salience") */
     aggregationStrategy?: "uniform" | "recency" | "salience";
     wisdom?: WisdomConfig;
+    /**
+     * Optional WikiEngine. When wired AND `enabled`, distillWisdom switches
+     * to a structured prompt that (a) reads wiki pages as source material and
+     * (b) emits topical promotions as wiki ops in addition to the principles
+     * markdown. Knowledge Map regeneration also happens at the end of the
+     * wisdom pass. When absent, distillWisdom keeps the legacy behavior
+     * verbatim — typed memories + monthly summary → WISDOM.md text.
+     */
+    wiki?: WikiEngine;
 }
 
 export interface WisdomConfig {
@@ -23,6 +34,28 @@ export interface WisdomConfig {
     minMonthliesForDistill?: number; // default: 1
     categories?: string[];
     systemPrompt?: string;
+}
+
+/**
+ * A wiki promotion proposed by the wisdom distiller for a topical item that
+ * shouldn't live in WISDOM.md. Mirrors the create-shape of `DreamWikiOp` but
+ * lives here so the compactor doesn't take a runtime dep on dream-engine.
+ */
+export interface WisdomWikiPromotion {
+    slug: string;
+    category: WikiCategory;
+    name: string;
+    description: string;
+    body: string;
+    sources: string[];
+    related?: string[];
+}
+
+export interface WisdomDistillResult {
+    /** WISDOM.md content the model produced (principles + optional categories). */
+    wisdom: string;
+    /** Topical items the model elected to push into the wiki instead. */
+    wiki_promotions: WisdomWikiPromotion[];
 }
 
 export interface CompactOptions {
@@ -294,12 +327,20 @@ export class Compactor {
     }
 
     /**
-     * Distill wisdom from typed memories and monthly summaries.
+     * Distill wisdom from typed memories, wiki pages, and monthly summaries.
+     *
+     * When `config.wiki` is enabled, the distiller switches to a structured
+     * JSON prompt that asks the model to (a) keep WISDOM.md principles-only
+     * and (b) push topical content into wiki ops. The Knowledge Map section
+     * is regenerated at the end. Wiki-disabled callers get the legacy
+     * markdown prompt unchanged.
      */
     async distillWisdom(dryRun: boolean = false): Promise<CompactionResult> {
         const result = emptyResult();
         const wisdomConfig = this._config.wisdom ?? {};
         const maxEntries = wisdomConfig.maxEntries ?? 20;
+        const wiki = this._config.wiki;
+        const wikiActive = wiki?.enabled === true;
 
         // Gather inputs
         const currentWisdom = (await this._files.readWisdom()) ?? "";
@@ -311,7 +352,8 @@ export class Compactor {
             ? await this._files.readMonthly(monthlies[monthlies.length - 1])
             : null;
 
-        // Read typed memory contents
+        // Read typed memory contents (still relevant for repos that haven't
+        // migrated yet via `recall wiki migrate-typed-memories`)
         const typedContents: string[] = [];
         for (const filename of typedMemories) {
             const content = await this._files.readTypedMemory(filename);
@@ -321,12 +363,147 @@ export class Compactor {
             }
         }
 
-        if (typedContents.length === 0 && !latestMonthly) return result;
+        // Read wiki pages (when the wiki layer is enabled). Skip redirects
+        // and stubs — they're either pointers (no content to distill) or
+        // single-source observations that haven't compounded yet.
+        const wikiContents: string[] = [];
+        if (wikiActive) {
+            const slugs = await wiki!.list("private");
+            for (const slug of slugs) {
+                const page = await wiki!.read(slug, "private");
+                if (!page || page.redirectTo) continue;
+                wikiContents.push(
+                    `### wiki/${slug}.md (category: ${page.category}, sources: ${page.sources.length})\n\n` +
+                        `**${page.name}** — ${page.description}\n\n${page.body.trim()}`,
+                );
+                result.filesCompacted.push(`memory/wiki/${slug}.md`);
+            }
+        }
+
+        if (
+            typedContents.length === 0 &&
+            wikiContents.length === 0 &&
+            !latestMonthly
+        ) {
+            return result;
+        }
 
         if (!dryRun) {
+            const agentName = this._config.agentName ?? "Agent";
+            const todayDate = new Date().toISOString().split("T")[0];
+
+            if (wikiActive) {
+                // Wiki-aware structured path: model emits JSON with the
+                // updated WISDOM markdown and a list of topical promotions.
+                const prompt = [
+                    "## Current Wisdom\n\n" + (currentWisdom || "(none)"),
+                    typedContents.length > 0
+                        ? "## Typed Memories\n\n" +
+                          typedContents.join("\n\n---\n\n")
+                        : "",
+                    wikiContents.length > 0
+                        ? "## Wiki Pages\n\n" +
+                          wikiContents.join("\n\n---\n\n")
+                        : "",
+                    latestMonthly
+                        ? "## Latest Monthly Summary\n\n" + latestMonthly
+                        : "",
+                ]
+                    .filter(Boolean)
+                    .join("\n\n---\n\n");
+
+                const systemPrompt =
+                    wisdomConfig.systemPrompt ??
+                    wisdomStructuredSystemPrompt(
+                        maxEntries,
+                        agentName,
+                        todayDate,
+                    );
+
+                const completion = await this._config.model.complete(prompt, {
+                    systemPrompt,
+                    temperature: 0.3,
+                });
+                if (completion.error) return result;
+
+                const parsed = parseWisdomDistillResult(completion.text);
+                if (!parsed) {
+                    // Model returned something the structured parser couldn't
+                    // make sense of. Fall back to writing the raw text into
+                    // WISDOM.md so the pass isn't a total loss.
+                    await this._files.writeWisdom(completion.text);
+                    result.filesCreated.push("WISDOM.md");
+                    return result;
+                }
+
+                // Apply wiki promotions. Failures are caught per-op and
+                // surfaced via stderr-style logging — they shouldn't fail
+                // the whole compaction.
+                const promotedSlugs: string[] = [];
+                for (const promo of parsed.wiki_promotions) {
+                    try {
+                        const existing = await wiki!.read(promo.slug, "private");
+                        if (existing) {
+                            await wiki!.append(
+                                promo.slug,
+                                promo.sources[0] ??
+                                    `wisdom-distill:${todayDate}`,
+                                promo.body,
+                                "private",
+                            );
+                        } else {
+                            await wiki!.stub({
+                                slug: promo.slug,
+                                name: promo.name,
+                                description: promo.description,
+                                category: promo.category,
+                                source:
+                                    promo.sources[0] ??
+                                    `wisdom-distill:${todayDate}`,
+                                body: promo.body,
+                                related: promo.related ?? [],
+                            });
+                            for (const extra of promo.sources.slice(1)) {
+                                await wiki!.append(
+                                    promo.slug,
+                                    extra,
+                                    "",
+                                    "private",
+                                );
+                            }
+                        }
+                        promotedSlugs.push(promo.slug);
+                    } catch {
+                        // Skip malformed promotions; the model proposed
+                        // something the wiki rejected. The principles still
+                        // get written below.
+                    }
+                }
+
+                // Write WISDOM.md and regenerate the Knowledge Map. The
+                // rebuildKnowledgeMap call always runs after wisdom is
+                // written so the Map reflects any promotions just applied.
+                await this._files.writeWisdom(parsed.wisdom);
+                result.filesCreated.push("WISDOM.md");
+                if (promotedSlugs.length > 0) {
+                    for (const slug of promotedSlugs) {
+                        result.filesCreated.push(`memory/wiki/${slug}.md`);
+                    }
+                }
+                try {
+                    await wiki!.rebuildKnowledgeMap();
+                } catch {
+                    // Best-effort — a Knowledge Map failure shouldn't fail
+                    // the distillation pass.
+                }
+                return result;
+            }
+
+            // Legacy path: markdown-emitting prompt, behavior unchanged.
             const prompt = [
                 "## Current Wisdom\n\n" + (currentWisdom || "(none)"),
-                "## Typed Memories\n\n" + (typedContents.join("\n\n---\n\n") || "(none)"),
+                "## Typed Memories\n\n" +
+                    (typedContents.join("\n\n---\n\n") || "(none)"),
                 latestMonthly
                     ? "## Latest Monthly Summary\n\n" + latestMonthly
                     : "",
@@ -334,10 +511,9 @@ export class Compactor {
                 .filter(Boolean)
                 .join("\n\n---\n\n");
 
-            const agentName = this._config.agentName ?? "Agent";
-            const todayDate = new Date().toISOString().split("T")[0];
             const systemPrompt =
-                wisdomConfig.systemPrompt ?? wisdomSystemPrompt(maxEntries, agentName, todayDate);
+                wisdomConfig.systemPrompt ??
+                wisdomSystemPrompt(maxEntries, agentName, todayDate);
 
             const completion = await this._config.model.complete(prompt, {
                 systemPrompt,
@@ -518,6 +694,154 @@ DROP week-level detail that does not represent a milestone, decision, or persist
 KEEP decisions that set direction, milestones that mark progress, and blockers that persisted across weeks.
 
 Each bullet must be self-contained — readable without the original weekly summaries.`;
+
+function wisdomStructuredSystemPrompt(
+    maxEntries: number,
+    agentName: string,
+    todayDate: string,
+): string {
+    return `You are a wisdom distillation engine for an agent's long-term memory. Your job is to keep WISDOM.md PRINCIPLES-ONLY while pushing topical knowledge into the wiki.
+
+<TWO_LAYER_RULE>
+WISDOM.md should contain ONLY:
+- Principles — actionable rules that apply across topics ("Plans should reduce ambiguity")
+- Anti-patterns — things to avoid that span topics ("Practice drifts from templates")
+- The Knowledge Map (regenerated automatically — don't include it in your output)
+
+Topical material — anything about a specific person, project, system, or recurring theme — belongs in a wiki page, not WISDOM.md. Push it.
+
+<TASK>
+Examine the inputs (current WISDOM.md, typed memories, wiki pages, latest monthly summary). For each item, decide:
+
+1. PRINCIPLE — actionable rule that applies across topics → keep in WISDOM.md
+2. TOPICAL — concrete subject (person, project, concept, reference) → emit as a wiki promotion
+3. DROP — ephemeral, already covered, or contradicted by newer info
+
+<OUTPUT_FORMAT>
+Respond with a single JSON object:
+
+{
+  "wisdom": "<the complete updated WISDOM.md markdown>",
+  "wiki_promotions": [
+    {
+      "slug": "kebab-case-slug",
+      "category": "entity" | "concept" | "project" | "reference" | "theme",
+      "name": "Human-readable title",
+      "description": "One-line description",
+      "body": "Markdown body (use ## headings; no frontmatter, no H1)",
+      "sources": ["memory/YYYY-MM-DD.md", ...],
+      "related": ["other-slug", ...]
+    }
+  ]
+}
+
+<WISDOM_RULES>
+- Maximum ${maxEntries} entries in WISDOM.md
+- Every entry must be actionable — change future behavior, not just record history
+- Do NOT include the Knowledge Map (regenerated separately)
+- Preserve voice and phrasing of unchanged entries
+- Use this skeleton for the wisdom field:
+
+# ${agentName} - Wisdom
+
+Distilled principles. Read this first every session (after SOUL.md).
+
+Last compacted: ${todayDate}
+
+---
+
+## {Category}
+
+**{Entry title}**
+{1-3 sentence principle. Lead with the actionable rule. If there is a "why", include it in one sentence.}
+
+(repeat for each entry; categories optional)
+
+<WIKI_PROMOTION_RULES>
+- Concept and project bodies SHOULD lead with a rule/fact followed by **Why:** and **How to apply:** lines
+- Entity pages capture stable facts about a person, system, or organization
+- Theme pages synthesize a recurring topic across many sources
+- Reference pages catalog external URLs, dashboards, or runbooks
+- Slugs are lowercase ASCII, hyphen-separated
+- Sources must be URIs from the provided inputs — do not invent
+- If an item already lives in the provided "Wiki Pages" input, propose an UPDATE: same slug, sources include the originating dailies/typed memories that motivated the update
+- Do NOT promote an item to wiki AND keep it in WISDOM.md — pick one`;
+}
+
+/**
+ * Parse the structured wisdom-distillation response. Tolerates a ``` fence
+ * the model often wraps the JSON in, and verifies the required fields.
+ * Returns null when the response is unparseable so the caller can fall back.
+ */
+function parseWisdomDistillResult(text: string): WisdomDistillResult | null {
+    const trimmed = text.trim();
+    // Strip a leading/trailing ```json fence if present.
+    const unwrapped = trimmed
+        .replace(/^```(?:json)?\s*\n/, "")
+        .replace(/\n```\s*$/, "");
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(unwrapped);
+    } catch {
+        return null;
+    }
+    if (!parsed || typeof parsed !== "object") return null;
+    const obj = parsed as Record<string, unknown>;
+    const wisdom = obj.wisdom;
+    if (typeof wisdom !== "string" || wisdom.trim().length === 0) return null;
+    const rawPromotions = obj.wiki_promotions ?? obj.wikiPromotions ?? [];
+    const promotions: WisdomWikiPromotion[] = [];
+    const validCategories: WikiCategory[] = [
+        "entity",
+        "concept",
+        "project",
+        "reference",
+        "theme",
+    ];
+    const slugRe = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    if (Array.isArray(rawPromotions)) {
+        for (const raw of rawPromotions) {
+            if (!raw || typeof raw !== "object") continue;
+            const r = raw as Record<string, unknown>;
+            const slug = typeof r.slug === "string" ? r.slug.trim() : "";
+            if (!slug || !slugRe.test(slug)) continue;
+            const category = r.category;
+            if (
+                typeof category !== "string" ||
+                !validCategories.includes(category as WikiCategory)
+            ) {
+                continue;
+            }
+            const body = typeof r.body === "string" ? r.body : "";
+            if (!body.trim()) continue;
+            const sourcesIn = Array.isArray(r.sources)
+                ? (r.sources as unknown[]).filter(
+                      (s): s is string => typeof s === "string" && s.length > 0,
+                  )
+                : [];
+            if (sourcesIn.length === 0) continue;
+            promotions.push({
+                slug,
+                category: category as WikiCategory,
+                name:
+                    typeof r.name === "string" && r.name.length > 0
+                        ? r.name
+                        : slug,
+                description:
+                    typeof r.description === "string" ? r.description : "",
+                body,
+                sources: sourcesIn,
+                related: Array.isArray(r.related)
+                    ? (r.related as unknown[]).filter(
+                          (s): s is string =>
+                              typeof s === "string" && slugRe.test(s),
+                      )
+                    : undefined,
+            });
+        }
+    }
+    return { wisdom, wiki_promotions: promotions };
+}
 
 function wisdomSystemPrompt(maxEntries: number, agentName: string, todayDate: string): string {
     return `You are a wisdom distillation engine. You maintain a curated set of durable, actionable entries — decisions, invariants, gotchas, and validated patterns — by merging new material into an existing wisdom file.
