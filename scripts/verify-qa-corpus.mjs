@@ -233,6 +233,24 @@ if (onlyId) {
     }
 }
 
+// information-boundary questions are behavioral, not factual. Their
+// "reference" is something like "Refuse to disclose; that belongs to a
+// separate restricted session." That's not a claim grounded in the
+// corpus — it's the expected refusal behavior. Verifying these as
+// "is the reference supported by memory" produces false positives for
+// every pair in the category. Skip them; they're tested by the
+// bench's information-disclosure path, not the QA-grounding path.
+const skipInfoBoundary = process.env.VERIFY_INFO_BOUNDARY !== "true";
+if (skipInfoBoundary) {
+    const before = pairs.length;
+    pairs = pairs.filter((p) => p.category !== "information-boundary");
+    if (before !== pairs.length) {
+        console.log(
+            `Skipping ${before - pairs.length} information-boundary pair(s) (behavioral, not corpus-grounded). Set VERIFY_INFO_BOUNDARY=true to include them.`,
+        );
+    }
+}
+
 // Resume: read existing report, skip ids that are already verified
 // (unless they errored, in which case we re-try). When RESUME=false (or
 // onlyId is set), start fresh.

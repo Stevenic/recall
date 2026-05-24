@@ -8,7 +8,7 @@
   requires_synthesis: false
 - id: executive-assistant-q002
   question: What briefing time was treated as the stable target after the correction, and what was the reason for moving it earlier?
-  answer: 6:30 AM, so it would land before Jamie checked her phone.
+  answer: 6:30 AM, so it would land before Jamie checked her phone and surface early East Coast conflicts.
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
@@ -113,7 +113,7 @@
   requires_synthesis: false
 - id: executive-assistant-q013
   question: What morning briefing time did Jordan treat as the standing rule for Jamie on 2026-01-14?
-  answer: 6:30 AM on weekdays.
+  answer: 6:30 AM on weekdays, before Jamie looks at her phone.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -315,7 +315,7 @@
   requires_synthesis: false
 - id: executive-assistant-q033
   question: What family item was explicitly protected as a hard block on Tuesday evenings?
-  answer: Riley Park — Tuesday evenings for basketball.
+  answer: Riley Park’s basketball.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -443,7 +443,7 @@
   requires_synthesis: false
 - id: executive-assistant-q043
   question: What leverage ceiling did Jordan keep as the working limit for Project Condor financing?
-  answer: 3.2x net debt / EBITDA as the working leverage ceiling.
+  answer: 3.2x net debt / EBITDA pro forma at close.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -981,7 +981,7 @@
   requires_synthesis: false
 - id: executive-assistant-q085
   question: On which day did Jordan note that Yuki’s FP&A team produced the first concrete revenue and opex estimates for the Q1 FY27 close?
-  answer: 2026-02-19.
+  answer: 2026-02-19, 2026-02-19 (Thursday).
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -1073,7 +1073,7 @@
   requires_synthesis: false
 - id: executive-assistant-q093
   question: Which two family calendar blocks did Jordan repeatedly protect as hard blocks during the window?
-  answer: "The corpus does not mention Jordan. It repeatedly says Jamie protected two hard family calendar blocks: Riley Park’s Tuesday evenings for basketball and Tess Park’s Thursday mornings for school drop-off."
+  answer: Riley Park’s Tuesday evenings for basketball and Tess Park’s Thursday mornings for school drop-off.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -1340,7 +1340,7 @@
   requires_synthesis: false
 - id: executive-assistant-q116
   question: What was the latest board timing for the Q1 and Q2 board meetings on 2026-03-11?
-  answer: The corpus does not provide the latest board timing for the Q1 and Q2 board meetings on 2026-03-11. It only mentions Q1 board pre-read distribution activity and a budget board update still targeted to end of May, but no explicit Q1 or Q2 board meeting dates.
+  answer: The Q1 board remained around 2026-03-26, and the Q2 board remained around 2026-06-19.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -1348,7 +1348,7 @@
   requires_synthesis: false
 - id: executive-assistant-q117
   question: Across days 64 through 70, what stayed unchanged about the Project Condor recommendation?
-  answer: It stayed in diligence synthesis; there was no move to negotiation prep.
+  answer: It stayed in diligence synthesis; Jordan did not move to negotiation prep.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -1362,7 +1362,7 @@
   requires_synthesis: true
 - id: executive-assistant-q118
   question: How did the Q1 earnings narrative evolve from 2026-03-05 to 2026-03-11?
-  answer: "From 2026-03-05 through 2026-03-10, the Q1 earnings narrative stayed in internal working-draft mode: below internal forecast, with industrial-controls softness as the working explanation, and a March 21 pivot watch if the quarter stayed below plan. On 2026-03-11, the miss crystallized versus street consensus, and Jamie directed that the story be framed around profitable growth while keeping it internal until the variance bridge was clean."
+  answer: It stayed below forecast and internal-only on days 64–69, then on 2026-03-11 the miss crystallized and Jamie wanted it framed around profitable growth instead of apology.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -1376,7 +1376,7 @@
   requires_synthesis: true
 - id: executive-assistant-q119
   question: What permission level did Jamie have by the end of 2026-03-11?
-  answer: "The corpus does not include a log for 2026-03-11, so it does not establish Jamie’s permission level by the end of that day. In the latest available entries before then, the authorization ladder was unchanged: onboarding read-only access to calendar and inbox, end-of-January send-on-behalf for routine logistics email, end-of-March send-as for inbox triage auto-replies with audit trail, and end-of-May independent expense approval up to $500."
+  answer: "The ladder remained unchanged: read-only on onboarding, send-on-behalf at end of January, send-as for inbox triage auto-replies with audit trail at end of March, and independent expense approval up to $500 at end of May."
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
@@ -1504,7 +1504,7 @@
   requires_synthesis: true
 - id: executive-assistant-q129
   question: Was any new board deck circulated on 2026-03-14 while the board-prep thread stayed quiet?
-  answer: No. The board-prep thread stayed quiet on 2026-03-14, and the log says no new pre-read, memo, or deck was drafted that day. The corpus does note that distribution tracking for the Q1 board pre-read had begun in an executive-team thread, but it does not explicitly say that a new board deck was circulated on 2026-03-14.
+  answer: No new board deck was circulated.
   category: negative-recall
   difficulty: easy
   relevant_days:
@@ -1512,7 +1512,7 @@
   requires_synthesis: false
 - id: executive-assistant-q130
   question: Which family calendar items remained hard blocks throughout the window, and what were the exact times?
-  answer: The hard blocks that remained throughout the window were Riley Park’s Tuesday evenings for basketball and Tess Park’s Thursday mornings for school drop-off. The logs do not give exact clock times.
+  answer: Riley Park’s Tuesday evenings for basketball and Tess Park’s Thursday mornings for school drop-off.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -1679,7 +1679,7 @@
   requires_synthesis: false
 - id: executive-assistant-q143
   question: How did Jordan’s treatment of the Condor valuation evolve across the window?
-  answer: Across the window, Jordan consistently kept the revised Condor view at $465M base case with $40M synergy in place, preserved the older $510M / $50M view as a superseded reference, and kept the recommendation on hold because remaining diligence items were still incomplete.
+  answer: He kept the revised $465M / $40M view in place, but repeatedly held the recommendation and did not move into negotiation prep because the remaining diligence was still incomplete.
   category: synthesis
   difficulty: hard
   relevant_days:
@@ -1731,7 +1731,7 @@
   requires_synthesis: false
 - id: executive-assistant-q148
   question: For the FY27 H1 budget reforecast, what mode was it still in on 2026-03-31, and what had changed about the close bridge?
-  answer: It was still in collection prep, and it was now tied to the now-locked Q1 close bridge.
+  answer: It was still in collection prep, and it was now tied to the locked Q1 close bridge.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -1827,7 +1827,7 @@
   requires_synthesis: false
 - id: executive-assistant-q157
   question: On 2026-04-01, what was Jamie's current permission ladder, and did Jordan change it?
-  answer: "Jamie’s permission ladder was unchanged, and Jordan did not change it. The current ladder remained: onboarding read-only access to calendar and inbox, end-of-January send-on-behalf for routine logistics email, end-of-March send-as for inbox triage auto-replies with audit trail, and end-of-May independent expense approval up to $500."
+  answer: "The ladder stayed the same: read-only access to calendar and inbox at onboarding, send-on-behalf for routine logistics email at the end of January, send-as for inbox triage auto-replies with audit trail at the end of March, and independent expense approval up to $500 at the end of May. Jordan did not change it."
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -1895,7 +1895,7 @@
   requires_synthesis: true
 - id: executive-assistant-q164
   question: What was Jordan's stance on the Sara/Jamie operating-review deconfliction with @aria-ea?
-  answer: The corpus does not mention Jordan, so this question is not answerable as asked. What the logs do show is that in the Sara/Jamie operating-review deconfliction with `@aria-ea`, the more flexible internal item was moved instead of the operating review, the meeting stayed private with a neutral title, and the adjustment stayed within the low-risk reschedule boundary.
+  answer: Jordan moved the more flexible internal item instead of the operating review, kept the meeting private with a neutral title, and stayed within the low-risk reschedule boundary.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -2002,7 +2002,7 @@
   requires_synthesis: false
 - id: executive-assistant-q174
   question: What final investor narrative did Jordan lock for the Q1 earnings path on Tuesday, and what older framing did that replace?
-  answer: The corpus does not mention Jordan. On Tuesday, Jamie’s Q1 investor narrative was locked around profitable growth, replacing the earlier growth-at-all-costs framing.
+  answer: He locked the narrative around profitable growth, replacing the earlier growth-at-all-costs framing.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -2056,7 +2056,7 @@
   requires_synthesis: false
 - id: executive-assistant-q180
   question: How did Jordan’s Condor recommendation evolve from the earlier days in the window through Tuesday, 2026-04-14?
-  answer: From the earlier window through Tuesday, 2026-04-14, Jordan’s Condor view stayed anchored to the revised $465M base case with $40M synergy, while preserving the $650M floor. Across the logs, the remaining diligence still did not justify tightening the floor, and no external sharing or lender process was authorized.
+  answer: "It stayed in hold throughout: Jordan kept the revised $465M / $40M view as the current answer, preserved the $650M floor, and repeatedly said the remaining diligence still did not justify tightening the floor or moving into external process."
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -2285,7 +2285,7 @@
   requires_synthesis: true
 - id: executive-assistant-q200
   question: Which board member preference did Jordan keep reinforcing across the week for board-facing materials, and what was that preference?
-  answer: "The corpus does not mention Jordan. It does repeatedly reinforce Henry Whitfield’s board-material preference: bottom line first, with no slide-heavy treatment for items under $50M, and in board-prep notes Henry is quoted as wanting the ask, the risk, and what changed, with no deck for a small update."
+  answer: "Henry Whitfield's preference: bottom line first, with ask/risk/what-changed framing and no slide-heavy treatment for small updates under $50M."
   category: cross-reference
   difficulty: medium
   relevant_days:
@@ -2299,7 +2299,7 @@
   requires_synthesis: true
 - id: executive-assistant-q201
   question: Across the legal-confidential updates on 2026-04-22 through 2026-04-28, did the board-response draft ever become a public-facing or IR-circulated document?
-  answer: No. Across 2026-04-22 through 2026-04-28, the board-response draft remained internal to the legal-confidential session. The logs repeatedly say the legal analysis stayed segregated from the investor-relations narrative, that nothing was circulated outside the session, and that any sanitized IR narrative was to be prepared only after legal sign-off.
+  answer: No. It stayed internal and IR only received a sanitized version after legal sign-off, which had not yet happened.
   category: negative-recall
   difficulty: hard
   relevant_days:
@@ -2409,7 +2409,7 @@
   requires_synthesis: false
 - id: executive-assistant-q211
   question: How did Jordan’s handling of the Caldwell Group onsite evolve from the day of the visit to the later retro in this window?
-  answer: It evolved from post-visit follow-through—keeping the Caldwell onsite marked complete, with 3 Daniel commitments and 2 Jamie commitments tracked—to moving those commitments into To Do with owners and dates, and then on the later retro to recording that the 12th-floor exclusion was the right call, the boardroom catering timing worked, and international visitor badges needed an extra day of lead time.
+  answer: It moved from confirming the visit was on track and logging 3 Daniel plus 2 Jamie commitments, to transferring those commitments into To Do with owners and dates, and then later to filing a retro that validated the 12th-floor exclusion, the boardroom catering timing, and the need for an extra day of lead time for international badges.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -2499,7 +2499,7 @@
   requires_synthesis: false
 - id: executive-assistant-q218
   question: Which board member’s style did Jordan keep modeling as bottom-line-first with no slide-heavy treatment for items under $50M, and what kind of framing did that imply for board materials?
-  answer: Henry Whitfield; it meant board materials should be bottom line first and not slide-heavy, especially for items under $50M, with the first-page framing kept consistent.
+  answer: Henry Whitfield; it meant board materials should be bottom line first and memo-style, not slide-heavy, especially for smaller items under $50M.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -2543,7 +2543,7 @@
   requires_synthesis: false
 - id: executive-assistant-q222
   question: In the Condor workstream, what was the latest valuation view and what earlier recommendation did Jordan preserve in the decision record as the superseded one?
-  answer: The latest valuation view was $465M base case with $40M synergy, and the superseded recommendation preserved in the decision record was $510M base case with $50M synergy.
+  answer: The latest valuation view was $465M base case with $40M synergy, and the earlier superseded recommendation was $480M with $40M synergy.
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
@@ -2582,7 +2582,7 @@
   requires_synthesis: true
 - id: executive-assistant-q225
   question: How did Jordan’s handling of the activist-investor response evolve from May 6 through May 12?
-  answer: "From May 6 through May 9, Jordan kept the activist-investor response locked to a defensible, process-focused board posture: no commitment to strategic alternatives, no governance-refresh commitment, reserve planning stayed internal and unchanged, and the IR handoff remained blocked pending legal sign-off on a sanitized version. The corpus does not show activist-response updates on May 10–12, so no further evolution is documented for those dates."
+  answer: It stayed consistently locked to a defensible, process-focused board response with no commitment to strategic alternatives, no governance-refresh commitment, and the reserve kept internal and unchanged; Jordan also kept the IR handoff blocked until legal sign-off on a sanitized derivative.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -2948,7 +2948,7 @@
   requires_synthesis: false
 - id: executive-assistant-q256
   question: What was the final status of Project Condor by Friday, 2026-05-29?
-  answer: By Friday, 2026-05-29, Project Condor was recorded as having its definitive agreement signed/executed, with the public announcement set for the morning of 2026-05-30. However, some administrative closeout items still remained pending, including final signature-set confirmation and executed-doc filing confirmation.
+  answer: The definitive agreement was executed; signing was complete and the public announcement was queued for the morning of 2026-05-30.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -3032,7 +3032,7 @@
   requires_synthesis: false
 - id: executive-assistant-q263
   question: How did the Condor workstream evolve from the end of May into the start of June?
-  answer: It moved from execution cleanup with signed status pending at the end of May to signed status by May 29, while the public announcement still remained pending and the approved economics stayed unchanged.
+  answer: It moved from execution cleanup and signed status to a fully executed definitive agreement with the public announcement pending, while the approved economics stayed unchanged.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -3331,7 +3331,7 @@
   requires_synthesis: true
 - id: executive-assistant-q286
   question: What pattern did Jordan follow for `@aria-ea`'s Sara/Jamie collisions throughout the window?
-  answer: Jordan’s pattern was to protect the Sara/Jamie operating review and resolve collisions by moving the more flexible adjacent internal item instead, keeping the change low-risk and avoiding Jamie’s protected blocks.
+  answer: Jordan repeatedly protected the operating review by moving only the more flexible adjacent internal item, keeping the change low-risk and within the protected Friday-block boundary.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -3389,7 +3389,7 @@
   requires_synthesis: false
 - id: executive-assistant-q291
   question: What were the two material points Jamie said the Q2 board meeting would land on on June 18?
-  answer: H1 budget sign-off and the activist-letter response strategy ratification.
+  answer: H1 budget sign-off and the activist-letter response strategy.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -3397,7 +3397,7 @@
   requires_synthesis: false
 - id: executive-assistant-q292
   question: Which board artifact was created on June 18 and what was its file name?
-  answer: The board-prep artifact updated on June 18 was `board-prep/q2_board_cycle_final_readiness_2026-06-18.md`.
+  answer: The final board-prep readiness update; `board-prep/q2_board_cycle_final_readiness_2026-06-18.md`.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -3405,7 +3405,7 @@
   requires_synthesis: false
 - id: executive-assistant-q293
   question: Across the Friday board-day checkpoint, what additional expectation about dissent did Henry Whitfield's preference model include?
-  answer: Henry Whitfield’s preference model included the expectation that dissent be flagged ahead of the meeting.
+  answer: Dissent had to be flagged in writing 48 hours before the meeting.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -3494,7 +3494,7 @@
   requires_synthesis: false
 - id: executive-assistant-q301
   question: On which day did Jamie first explicitly say the Q1/Q2 board cycle should stay in concluding mode unless he reopened it?
-  answer: Jamie first explicitly said this on Monday, 2026-06-22.
+  answer: 2026-06-23, 2026-06-22 (Monday).
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -3551,7 +3551,7 @@
   requires_synthesis: false
 - id: executive-assistant-q306
   question: What two standing family blocks did Jamie repeatedly tell Jordan not to let anything touch?
-  answer: Riley’s basketball and Tess’s Thursday-morning school drop-off.
+  answer: Riley Park’s Tuesday-evening basketball and Tess Park’s Thursday-morning school drop-off.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -3600,7 +3600,7 @@
   requires_synthesis: true
 - id: executive-assistant-q310
   question: What was the recurring outcome of the `@atlas-ea` Daniel/Jamie scheduling lane from Monday through Friday?
-  answer: From Monday through Friday, the recurring outcome was that the Daniel/Jamie meeting stayed on the calendar and the prep buffer stayed in place each time.
+  answer: The meeting stayed on the calendar, the neutral private title was preserved, and the prep buffer stayed in place each time.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -3626,7 +3626,7 @@
   requires_synthesis: true
 - id: executive-assistant-q312
   question: Which earlier arc is explicitly connected in this window by the note to monitor for any Condor-related timing or downstream board follow-through?
-  answer: The note explicitly points back to the Q1/Q2 board-cycle thread (`board-cycle-q1q2`), with a reminder to monitor for any Condor-related timing or downstream board follow-through.
+  answer: Project Condor — the bolt-on acquisition arc.
   category: cross-reference
   difficulty: medium
   relevant_days:
