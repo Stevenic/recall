@@ -1,6 +1,7 @@
 import * as path from "path";
 import matter from "gray-matter";
 import type { FileStorage } from "./interfaces/storage.js";
+import type { MemoryModel } from "./interfaces/model.js";
 import {
     DEFAULT_WIKI_CONFIG,
     isStub,
@@ -9,11 +10,18 @@ import {
     type WikiCategory,
     type WikiConfig,
     type WikiLinkRef,
+    type WikiLintReport,
     type WikiPage,
     type WikiPageStubInput,
+    type WikiRebuildReport,
     type WikiTarget,
 } from "./wiki-types.js";
 import { isStubbable } from "./wiki-templates.js";
+
+export interface WikiEngineDeps {
+    /** LLM model used for `rebuild()` synthesis. Optional; rebuild throws without one. */
+    model?: MemoryModel;
+}
 
 const WIKI_SUBDIR = path.join("memory", "wiki");
 const RESERVED_SLUGS = new Set(["index"]);
@@ -29,6 +37,7 @@ const LINK_PATTERN = /\[\[([^\]\n]+?)\]\]/g;
 export class WikiEngine {
     private readonly _privateRoot: string;
     private readonly _storage: FileStorage;
+    private readonly _model: MemoryModel | undefined;
     private readonly _config: Required<
         Omit<WikiConfig, "shared" | "enabled">
     > & {
@@ -41,9 +50,11 @@ export class WikiEngine {
         memoryRoot: string,
         storage: FileStorage,
         config?: WikiConfig,
+        deps?: WikiEngineDeps,
     ) {
         this._privateRoot = memoryRoot;
         this._storage = storage;
+        this._model = deps?.model;
         this._config = {
             ...DEFAULT_WIKI_CONFIG,
             ...config,
@@ -278,6 +289,395 @@ export class WikiEngine {
         return { target: link.target, slug: link.slug };
     }
 
+    /**
+     * Validate the private wiki (and shared wikis when requested). Detects:
+     * broken `[[links]]`, orphans (no inbound link), stale pages (older than
+     * `stalenessThresholdDays`), pages whose filename slug disagrees with
+     * frontmatter, contradiction loops (A↔B), and `[[name:slug]]` qualified
+     * references to unconfigured wiki targets.
+     */
+    async lint(opts?: { includeShared?: boolean }): Promise<WikiLintReport> {
+        const includeShared = opts?.includeShared === true;
+        const targets: WikiTarget[] = ["private"];
+        if (includeShared) {
+            for (const s of this._config.shared) targets.push(s.name);
+        }
+
+        const report: WikiLintReport = {
+            brokenLinks: [],
+            orphans: [],
+            stalePages: [],
+            missingCategory: [],
+            slugDrift: [],
+            contradictionLoops: [],
+            unknownTargets: [],
+            scanned: {},
+        };
+
+        // Load every page from every target so we can resolve links and
+        // detect cross-page issues. Map keyed by `${target}:${slug}` -> page.
+        const pages = new Map<string, WikiPage>();
+        const inbound = new Map<string, Set<string>>();
+        for (const t of targets) {
+            const resolved = this._resolveOne(t);
+            const slugs = await this.list(t);
+            report.scanned[t] = slugs.length;
+            for (const slug of slugs) {
+                const key = `${t}:${slug}`;
+                // Read via raw file path so we can detect slug drift.
+                const filePath = path.join(resolved.wikiDir, `${slug}.md`);
+                if (!(await this._storage.pathExists(filePath))) continue;
+                const buf = await this._storage.readFile(filePath);
+                const page = parseWikiPage(buf.toString("utf-8"), slug);
+                pages.set(key, page);
+                if (page.slug !== slug) {
+                    report.slugDrift.push({
+                        file: `${t === "private" ? "" : t + ":"}${slug}.md`,
+                        declaredSlug: page.slug,
+                    });
+                }
+                if (!page.category) {
+                    report.missingCategory.push(`${t}:${slug}`);
+                }
+                inbound.set(key, new Set());
+            }
+        }
+
+        // Pass 2: link resolution + inbound tracking.
+        const configuredTargetNames = new Set<WikiTarget>(["private"]);
+        for (const s of this._config.shared) configuredTargetNames.add(s.name);
+
+        for (const [key, page] of pages) {
+            const [sourceTarget, slug] = splitKey(key);
+            const links = parseWikiLinks(page.body);
+            // Frontmatter `related` is also a link source.
+            const relatedRefs: WikiLinkRef[] = page.related.map((s) => ({
+                target: null,
+                slug: s,
+                display: null,
+                start: 0,
+                end: 0,
+            }));
+            for (const ref of [...links, ...relatedRefs]) {
+                let resolvedTarget: WikiTarget;
+                let resolvedSlug = ref.slug;
+                if (ref.target === null) {
+                    resolvedTarget = sourceTarget;
+                } else if (ref.target === "private") {
+                    // [[private:...]] from a shared page — not addressable.
+                    if (sourceTarget !== "private") {
+                        report.unknownTargets.push({
+                            from: `${sourceTarget}:${slug}`,
+                            targetName: ref.target,
+                        });
+                        continue;
+                    }
+                    resolvedTarget = "private";
+                } else if (configuredTargetNames.has(ref.target)) {
+                    resolvedTarget = ref.target;
+                } else {
+                    report.unknownTargets.push({
+                        from: `${sourceTarget}:${slug}`,
+                        targetName: ref.target,
+                    });
+                    continue;
+                }
+                const targetKey = `${resolvedTarget}:${resolvedSlug}`;
+                if (!pages.has(targetKey)) {
+                    report.brokenLinks.push({
+                        from: `${sourceTarget}:${slug}`,
+                        toSlug: resolvedSlug,
+                        target: resolvedTarget,
+                    });
+                } else {
+                    inbound.get(targetKey)?.add(`${sourceTarget}:${slug}`);
+                }
+            }
+        }
+
+        // Pass 3: orphans + staleness + contradiction loops.
+        const stalenessMs =
+            this._config.stalenessThresholdDays * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const seenLoops = new Set<string>();
+
+        for (const [key, page] of pages) {
+            const inboundSet = inbound.get(key);
+            if (!inboundSet || inboundSet.size === 0) {
+                // Pages with no inbound links AND no related[] pointers from
+                // others. Redirects (with redirectTo set) are not orphans —
+                // they exist to forward and shouldn't be flagged.
+                if (!page.redirectTo) {
+                    report.orphans.push(key);
+                }
+            }
+
+            // Staleness: page.updated is older than threshold AND no source's
+            // mtime/date is newer. Cheap heuristic — compare against today.
+            try {
+                const updated = new Date(page.updated).getTime();
+                if (
+                    !isNaN(updated) &&
+                    now - updated > stalenessMs
+                ) {
+                    report.stalePages.push({
+                        slug: key,
+                        updated: page.updated,
+                        // We don't yet know a definitive "newest source" date;
+                        // surface the page's `updated` for the operator to
+                        // investigate. A future enhancement can stat source files.
+                        newestSource: page.updated,
+                    });
+                }
+            } catch {
+                // Bad date — ignore.
+            }
+
+            // Contradiction loops: A.contradicts -> B AND B.contradicts -> A.
+            if (page.contradicts && page.contradicts.length > 0) {
+                const [t, s] = splitKey(key);
+                for (const otherSlug of page.contradicts) {
+                    const otherKey = `${t}:${otherSlug}`;
+                    const other = pages.get(otherKey);
+                    if (!other?.contradicts?.includes(s)) continue;
+                    const loopKey = [key, otherKey].sort().join("<->");
+                    if (seenLoops.has(loopKey)) continue;
+                    seenLoops.add(loopKey);
+                    report.contradictionLoops.push([key, otherKey]);
+                }
+            }
+        }
+
+        return report;
+    }
+
+    /**
+     * Merge page `src` into `dst` within the same target. Appends `src`'s body
+     * to `dst`'s body under an `## (merged from <src>)` heading, unions the
+     * source lists, and overwrites `src` with a redirect stub pointing at
+     * `dst`. Refuses on reader-role targets.
+     */
+    async merge(
+        srcSlug: string,
+        dstSlug: string,
+        target: WikiTarget = "private",
+    ): Promise<void> {
+        this._assertWritable(target);
+        validateSlug(srcSlug);
+        validateSlug(dstSlug);
+        if (srcSlug === dstSlug) {
+            throw new Error(`merge: src and dst slugs are identical (${srcSlug}).`);
+        }
+        const src = await this.read(srcSlug, target);
+        if (!src) throw new Error(`merge: source page "${srcSlug}" does not exist.`);
+        const dst = await this.read(dstSlug, target);
+        if (!dst) throw new Error(`merge: destination page "${dstSlug}" does not exist.`);
+
+        // Union sources, deduping while preserving order.
+        const seen = new Set(dst.sources);
+        const mergedSources = [...dst.sources];
+        for (const s of src.sources) {
+            if (!seen.has(s)) {
+                seen.add(s);
+                mergedSources.push(s);
+            }
+        }
+
+        // Append src body under a clearly-marked heading so the operator can
+        // edit/dedup later. We don't try to interleave — preserves provenance.
+        const mergedBody =
+            dst.body.trimEnd() +
+            "\n\n" +
+            `## (merged from \`${srcSlug}\` on ${todayIso()})\n\n` +
+            src.body.trim() +
+            "\n";
+
+        const mergedRelated = unionSlugs(dst.related, src.related, [
+            srcSlug,
+            dstSlug,
+        ]);
+
+        const mergedPage: WikiPage = {
+            ...dst,
+            sources: mergedSources,
+            related: mergedRelated,
+            body: mergedBody,
+            updated: todayIso(),
+        };
+        if (src.contradicts && src.contradicts.length > 0) {
+            mergedPage.contradicts = unionSlugs(
+                dst.contradicts ?? [],
+                src.contradicts,
+                [srcSlug],
+            );
+        }
+        await this.write(mergedPage, target);
+
+        // Replace src with a redirect stub.
+        const redirect: WikiPage = {
+            slug: srcSlug,
+            name: src.name,
+            description: `Redirects to [[${dstSlug}]] (merged on ${todayIso()})`,
+            category: src.category,
+            created: src.created,
+            updated: todayIso(),
+            sources: src.sources,
+            related: [dstSlug],
+            redirectTo: dstSlug,
+            body: `This page was merged into [[${dstSlug}]] on ${todayIso()}.\n`,
+        };
+        await this.write(redirect, target);
+    }
+
+    /**
+     * Rename `oldSlug` → `newSlug` within `target`. Writes the page at the
+     * new slug, then replaces the old slug with a redirect stub. Refuses on
+     * reader-role targets. `newSlug` must not already exist.
+     */
+    async rename(
+        oldSlug: string,
+        newSlug: string,
+        target: WikiTarget = "private",
+    ): Promise<void> {
+        this._assertWritable(target);
+        validateSlug(oldSlug);
+        validateSlug(newSlug);
+        if (oldSlug === newSlug) {
+            throw new Error(`rename: old and new slugs are identical (${oldSlug}).`);
+        }
+        const page = await this.read(oldSlug, target);
+        if (!page) throw new Error(`rename: page "${oldSlug}" does not exist.`);
+        if (await this.read(newSlug, target)) {
+            throw new Error(
+                `rename: destination "${newSlug}" already exists. Use merge() instead.`,
+            );
+        }
+        const renamed: WikiPage = {
+            ...page,
+            slug: newSlug,
+            updated: todayIso(),
+        };
+        await this.write(renamed, target);
+
+        const redirect: WikiPage = {
+            slug: oldSlug,
+            name: page.name,
+            description: `Redirects to [[${newSlug}]] (renamed on ${todayIso()})`,
+            category: page.category,
+            created: page.created,
+            updated: todayIso(),
+            sources: page.sources,
+            related: [newSlug],
+            redirectTo: newSlug,
+            body: `This page was renamed to [[${newSlug}]] on ${todayIso()}.\n`,
+        };
+        await this.write(redirect, target);
+    }
+
+    /**
+     * Regenerate a page's body from its declared sources using the configured
+     * LLM model. Preserves the page's slug, name, description, category, and
+     * source list — only the body and `updated` change. Throws if no model
+     * was injected at construction time, or if the page has no sources, or
+     * if all source files fail to load.
+     */
+    async rebuild(
+        slug: string,
+        target: WikiTarget = "private",
+    ): Promise<WikiPage> {
+        this._assertWritable(target);
+        validateSlug(slug);
+        if (!this._model) {
+            throw new Error(
+                `WikiEngine.rebuild requires a model. Pass deps.model to the constructor.`,
+            );
+        }
+        const page = await this.read(slug, target);
+        if (!page) throw new Error(`rebuild: page "${slug}" does not exist.`);
+        if (page.sources.length === 0) {
+            throw new Error(`rebuild: page "${slug}" has no sources to rebuild from.`);
+        }
+
+        const sourceTexts: { uri: string; content: string }[] = [];
+        for (const sourceUri of page.sources) {
+            const content = await this._readSource(sourceUri, target);
+            if (content !== null) {
+                sourceTexts.push({ uri: sourceUri, content });
+            }
+        }
+        if (sourceTexts.length === 0) {
+            throw new Error(
+                `rebuild: none of "${slug}"'s ${page.sources.length} source(s) could be read.`,
+            );
+        }
+
+        const prompt = buildRebuildPrompt(page, sourceTexts);
+        const completion = await this._model.complete(prompt, {
+            systemPrompt: WIKI_REBUILD_SYSTEM_PROMPT,
+            temperature: 0.4,
+            maxTokens: 2000,
+        });
+        const newBody = stripCodeFence(completion.text).trim();
+        if (!newBody) {
+            throw new Error(`rebuild: model returned an empty body for "${slug}".`);
+        }
+        const rebuilt: WikiPage = {
+            ...page,
+            body: ensureTrailingNewline(newBody),
+            updated: todayIso(),
+            confidence:
+                page.sources.length >=
+                (this._config.minSourcesForSynthesis ?? 3)
+                    ? page.confidence ?? "medium"
+                    : "low",
+        };
+        await this.write(rebuilt, target);
+        return rebuilt;
+    }
+
+    /**
+     * Rebuild every page in `target` from its sources. Skips redirects and
+     * single-source stubs (the rebuild prompt assumes synthesis is meaningful;
+     * a 1-source page is just the source). Returns a structured report.
+     */
+    async rebuildAll(target: WikiTarget = "private"): Promise<WikiRebuildReport> {
+        this._assertWritable(target);
+        const report: WikiRebuildReport = {
+            rebuilt: [],
+            skipped: [],
+            failed: [],
+        };
+        const slugs = await this.list(target);
+        for (const slug of slugs) {
+            const page = await this.read(slug, target);
+            if (!page) {
+                report.skipped.push(slug);
+                continue;
+            }
+            if (page.redirectTo) {
+                report.skipped.push(slug);
+                continue;
+            }
+            if (page.sources.length < 2) {
+                // Stubs (1 source) aren't useful to "regenerate" — they're
+                // the source itself. Phase D's dreaming integration is what
+                // promotes stubs.
+                report.skipped.push(slug);
+                continue;
+            }
+            try {
+                await this.rebuild(slug, target);
+                report.rebuilt.push(slug);
+            } catch (err) {
+                report.failed.push({
+                    slug,
+                    reason: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+        return report;
+    }
+
     // --- internals ---
 
     private _pagePath(slug: string, target: WikiTarget): string {
@@ -317,6 +717,32 @@ export class WikiEngine {
             throw new Error(
                 `Wiki target "${target}" is read-only for this agent.`,
             );
+        }
+    }
+
+    /**
+     * Read a source file referenced by a wiki page's `sources` list. Source
+     * URIs are typically `memory/YYYY-MM-DD.md` (or `WISDOM.md`, or another
+     * `memory/wiki/<slug>.md`). Returns null on missing or unreadable files
+     * so callers can keep going.
+     */
+    private async _readSource(
+        sourceUri: string,
+        target: WikiTarget,
+    ): Promise<string | null> {
+        const resolved = this._resolveOne(target);
+        // Absolute paths are passed through verbatim; relative paths are
+        // resolved against the target's root (since shared wikis may live
+        // outside the agent's private root).
+        const fullPath = path.isAbsolute(sourceUri)
+            ? sourceUri
+            : path.join(resolved.root, sourceUri);
+        if (!(await this._storage.pathExists(fullPath))) return null;
+        try {
+            const buf = await this._storage.readFile(fullPath);
+            return buf.toString("utf-8");
+        } catch {
+            return null;
         }
     }
 }
@@ -523,4 +949,79 @@ function ensureTrailingNewline(s: string): string {
 
 function todayIso(): string {
     return new Date().toISOString().split("T")[0];
+}
+
+function splitKey(key: string): [WikiTarget, string] {
+    const idx = key.indexOf(":");
+    if (idx === -1) return ["private", key];
+    return [key.slice(0, idx), key.slice(idx + 1)];
+}
+
+function unionSlugs(...lists: string[][]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const list of lists) {
+        for (const s of list) {
+            if (!seen.has(s)) {
+                seen.add(s);
+                out.push(s);
+            }
+        }
+    }
+    return out;
+}
+
+/**
+ * Strip a leading/trailing ```markdown fence the LLM occasionally wraps the
+ * body in. Idempotent on already-fenceless input.
+ */
+function stripCodeFence(text: string): string {
+    const trimmed = text.trim();
+    const match = /^```(?:markdown|md)?\n([\s\S]*?)\n?```$/.exec(trimmed);
+    if (match) return match[1];
+    return trimmed;
+}
+
+const WIKI_REBUILD_SYSTEM_PROMPT = [
+    "You are regenerating a wiki page from its underlying source memories.",
+    "Read every source carefully. Write a single coherent page that synthesizes them.",
+    "",
+    "Rules:",
+    "- Write only the page body (no frontmatter, no ``` fences, no preamble).",
+    "- Use markdown headings starting at H2 (`## …`). The H1 is implied by the page name.",
+    "- Stay grounded in the sources. If sources contradict, note the contradiction explicitly.",
+    "- Preserve specific facts, names, dates, decisions, and numbers verbatim from the sources.",
+    "- Cross-reference related wiki pages with `[[slug]]` links when natural — never invent slugs.",
+    "- Concept and project pages should preserve the **Why:** / **How to apply:** discipline if it was present in the prior body.",
+    "- Be concise. Compounding synthesis is the point; redundancy is not.",
+].join("\n");
+
+function buildRebuildPrompt(
+    page: WikiPage,
+    sources: { uri: string; content: string }[],
+): string {
+    const lines: string[] = [];
+    lines.push(`# ${page.name}`);
+    lines.push("");
+    lines.push(`Category: ${page.category}`);
+    lines.push(`Slug: ${page.slug}`);
+    if (page.description) lines.push(`Description: ${page.description}`);
+    if (page.related.length > 0) {
+        lines.push(`Related pages: ${page.related.map((s) => `[[${s}]]`).join(", ")}`);
+    }
+    lines.push("");
+    lines.push(`## Previous page body (for reference)`);
+    lines.push(page.body.trim() || "(empty — first synthesis)");
+    lines.push("");
+    lines.push(`## Sources (${sources.length})`);
+    for (const s of sources) {
+        lines.push("");
+        lines.push(`### ${s.uri}`);
+        lines.push(s.content.trim());
+    }
+    lines.push("");
+    lines.push(
+        `Now write the new body for "${page.name}" as a wiki page. Body only — no frontmatter.`,
+    );
+    return lines.join("\n");
 }

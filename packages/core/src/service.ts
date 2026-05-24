@@ -106,6 +106,7 @@ export class MemoryService {
             config.memoryRoot,
             this._storage,
             config.wiki,
+            { model: config.model },
         );
         this._search = new SearchService(
             this._index,

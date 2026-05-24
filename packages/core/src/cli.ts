@@ -690,6 +690,162 @@ wikiCmd
     });
 
 wikiCmd
+    .command("lint")
+    .description("Validate the private wiki (broken links, orphans, stale, drift, contradictions)")
+    .option("--include-shared", "Also lint shared wikis")
+    .action(async (cmdOpts: any) => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const report = await svc.wiki.lint({
+            includeShared: cmdOpts.includeShared === true,
+        });
+        if (globalOpts.json) {
+            output(report, true);
+            return;
+        }
+        const totalScanned = Object.values(report.scanned).reduce(
+            (a, b) => a + b,
+            0,
+        );
+        console.log(`Scanned ${totalScanned} page(s) across ${Object.keys(report.scanned).length} target(s).`);
+        if (report.brokenLinks.length > 0) {
+            console.log(`\nBroken links (${report.brokenLinks.length}):`);
+            for (const b of report.brokenLinks) {
+                console.log(`  ${b.from} → [[${b.target === "private" ? "" : b.target + ":"}${b.toSlug}]]`);
+            }
+        }
+        if (report.orphans.length > 0) {
+            console.log(`\nOrphans — no inbound links (${report.orphans.length}):`);
+            for (const o of report.orphans) console.log(`  ${o}`);
+        }
+        if (report.stalePages.length > 0) {
+            console.log(`\nStale pages (${report.stalePages.length}):`);
+            for (const s of report.stalePages) {
+                console.log(`  ${s.slug} — last updated ${s.updated}`);
+            }
+        }
+        if (report.missingCategory.length > 0) {
+            console.log(`\nMissing category (${report.missingCategory.length}):`);
+            for (const m of report.missingCategory) console.log(`  ${m}`);
+        }
+        if (report.slugDrift.length > 0) {
+            console.log(`\nSlug drift (${report.slugDrift.length}):`);
+            for (const d of report.slugDrift) {
+                console.log(`  ${d.file} → frontmatter declares "${d.declaredSlug}"`);
+            }
+        }
+        if (report.contradictionLoops.length > 0) {
+            console.log(`\nContradiction loops (${report.contradictionLoops.length}):`);
+            for (const [a, b] of report.contradictionLoops) {
+                console.log(`  ${a} ↔ ${b}`);
+            }
+        }
+        if (report.unknownTargets.length > 0) {
+            console.log(`\nUnknown shared-wiki targets (${report.unknownTargets.length}):`);
+            for (const u of report.unknownTargets) {
+                console.log(`  ${u.from} → [[${u.targetName}:…]]`);
+            }
+        }
+        const issueCount =
+            report.brokenLinks.length +
+            report.orphans.length +
+            report.stalePages.length +
+            report.missingCategory.length +
+            report.slugDrift.length +
+            report.contradictionLoops.length +
+            report.unknownTargets.length;
+        if (issueCount === 0) console.log("\nNo issues found.");
+    });
+
+wikiCmd
+    .command("merge <src> <dst>")
+    .description("Merge two wiki pages (leaves a redirect at src)")
+    .option("--shared <name>", "Operate within a shared wiki")
+    .action(async (src: string, dst: string, cmdOpts: any) => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const target: string = cmdOpts.shared ?? "private";
+        await svc.wiki.merge(src, dst, target);
+        await svc.wiki.rebuildIndex(target);
+        output(
+            globalOpts.json
+                ? { merged: { src, dst, target } }
+                : `Merged "${src}" into "${dst}" (${target === "private" ? "private" : `[${target}]`}). Redirect left at "${src}".`,
+            globalOpts.json,
+        );
+    });
+
+wikiCmd
+    .command("rename <oldSlug> <newSlug>")
+    .description("Rename a wiki page (leaves a redirect at the old slug)")
+    .option("--shared <name>", "Operate within a shared wiki")
+    .action(async (oldSlug: string, newSlug: string, cmdOpts: any) => {
+        const globalOpts = program.opts();
+        const svc = getService({ dir: globalOpts.dir, enableWiki: true });
+        await svc.initialize();
+        const target: string = cmdOpts.shared ?? "private";
+        await svc.wiki.rename(oldSlug, newSlug, target);
+        await svc.wiki.rebuildIndex(target);
+        output(
+            globalOpts.json
+                ? { renamed: { from: oldSlug, to: newSlug, target } }
+                : `Renamed "${oldSlug}" → "${newSlug}" (${target === "private" ? "private" : `[${target}]`}). Redirect left at "${oldSlug}".`,
+            globalOpts.json,
+        );
+    });
+
+wikiCmd
+    .command("rebuild [slug]")
+    .description("Regenerate a wiki page (or every page with --all) from sources via LLM")
+    .option("--all", "Rebuild every multi-source page in the target")
+    .option("--shared <name>", "Operate within a shared wiki")
+    .option(
+        "--agent <name>",
+        "CLI agent to drive synthesis (claude/codex/copilot)",
+        "claude",
+    )
+    .action(async (slug: string | undefined, cmdOpts: any) => {
+        const globalOpts = program.opts();
+        const svc = getService({
+            dir: globalOpts.dir,
+            enableWiki: true,
+            agent: cmdOpts.agent,
+        });
+        await svc.initialize();
+        const target: string = cmdOpts.shared ?? "private";
+        if (cmdOpts.all) {
+            const report = await svc.wiki.rebuildAll(target);
+            output(
+                globalOpts.json
+                    ? report
+                    : `Rebuilt ${report.rebuilt.length} page(s); skipped ${report.skipped.length}; failed ${report.failed.length}.\n` +
+                          (report.failed.length > 0
+                              ? "Failures:\n" +
+                                report.failed
+                                    .map((f) => `  ${f.slug}: ${f.reason}`)
+                                    .join("\n")
+                              : ""),
+                globalOpts.json,
+            );
+            return;
+        }
+        if (!slug) {
+            console.error("Provide a slug, or use --all to rebuild every page.");
+            process.exitCode = 1;
+            return;
+        }
+        const page = await svc.wiki.rebuild(slug, target);
+        output(
+            globalOpts.json
+                ? page
+                : `Rebuilt "${slug}" (${page.sources.length} source${page.sources.length === 1 ? "" : "s"}, confidence: ${page.confidence ?? "unset"}).`,
+            globalOpts.json,
+        );
+    });
+
+wikiCmd
     .command("status")
     .description("Per-target page counts and identity summary")
     .action(async () => {
