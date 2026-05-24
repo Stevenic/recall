@@ -16,7 +16,7 @@
  */
 
 import * as path from "node:path";
-import type { MemoryService, SearchResult } from "recall";
+import { extractDateFromUri, type MemoryService, type SearchResult } from "recall";
 
 /**
  * Detect Azure OpenAI content-filter rejections (400 with
@@ -36,21 +36,52 @@ function isContentFilterError(err: unknown): boolean {
 }
 
 /**
- * Memory-recall system prompt. Mirrors the OpenClaw harness verbatim for
- * the citation, refusal, and grounding clauses so the bench measures
- * apples-to-apples answering quality across the two memory systems.
+ * Memory-recall system prompt. Splits memory into two layers and tells
+ * the agent how to choose between them:
+ *
+ *   - Wiki pages are the agent's **current state of record** — what is
+ *     true NOW about a topic. Mutable; evolves as the agent learns.
+ *   - Daily logs are the **history evidence trail** — what was written
+ *     when. Immutable. The wiki cites them.
+ *
+ * The agent picks based on the question shape: "what is X?" → wiki first;
+ * "what did we say on day Y?" → daily; "how did X evolve?" →
+ * memory_timeline. This is the answer to the RAG-temporal-contradiction
+ * problem: instead of letting the LLM resolve "we chose Postgres" vs
+ * "switched to MySQL" by hoping vector search ranks the newer one
+ * higher, we make the architectural distinction explicit and route
+ * questions accordingly.
  */
 export const AGENT_SYSTEM_PROMPT =
-    "## Memory Recall\n" +
-    "Before answering anything about prior work, decisions, dates, people, " +
-    "preferences, or todos: run memory_search; then use memory_get to pull " +
-    "specific files when you need more context than the snippet provides. " +
-    "If low confidence after search, say you checked.\n" +
-    "Citations: include `(Source: YYYY-MM-DD)` referencing the date of the " +
-    "memory excerpt that supports the fact. Do not cite file paths.\n\n" +
-    "Be concise. Extract specific facts, names, dates, and numbers verbatim " +
-    "from memory when they appear. Never invent details that aren't in " +
-    "memory.";
+    "## Memory Recall\n\n" +
+    "The agent's memory has two layers:\n" +
+    "- **Wiki pages** (`memory/wiki/<slug>.md`) — current state of record. " +
+    "What is true NOW about a topic (a person, a project, a concept). " +
+    "Mutable; evolves as the agent learns. The first place to look for " +
+    "anything currently-true.\n" +
+    "- **Daily logs** (`memory/YYYY-MM-DD.md`) — immutable history. What " +
+    "was said or decided on a specific day. Evidence for citations.\n\n" +
+    "### Choosing a tool\n" +
+    "- *Current state* questions (\"what is X?\", \"who is Y?\", \"what's the " +
+    "current policy on Z?\"): **search the wiki first** with " +
+    "memory_search. If a wiki page exists, it's the answer — use the " +
+    "dailies it cites for evidence.\n" +
+    "- *Point-in-time* questions (\"what did we say on day N?\", \"what " +
+    "happened on March 15?\"): memory_search the dailies directly.\n" +
+    "- *Trajectory* questions (\"when did we decide X?\", \"how did Y " +
+    "evolve?\", \"what changed between day A and day B?\"): use " +
+    "**memory_timeline** to get matching memories in chronological order. " +
+    "Reason about the order to find the latest decision; do NOT trust " +
+    "first-mention ordering from a relevance search.\n" +
+    "- Use memory_get when you need more context than a search snippet " +
+    "provides.\n\n" +
+    "### Answering\n" +
+    "Be concise. Extract specific facts, names, dates, and numbers " +
+    "verbatim from memory when they appear. Never invent details that " +
+    "aren't in memory. If you can't find the answer with confidence after " +
+    "searching, say you checked memory and didn't find it.\n\n" +
+    "Citations: include `(Source: YYYY-MM-DD)` referencing the date of " +
+    "the memory excerpt that supports the fact. Do not cite file paths.";
 
 export const AGENT_TOOLS = [
     {
@@ -103,6 +134,36 @@ export const AGENT_TOOLS = [
             },
         },
     },
+    {
+        type: "function" as const,
+        function: {
+            name: "memory_timeline",
+            description:
+                "Return memories matching a topic in CHRONOLOGICAL ORDER (oldest → " +
+                "newest), with the date prepended to each entry. Use this for " +
+                "decision-tracking, temporal-reasoning, and \"how did X evolve\" " +
+                "questions where the relative order of events matters. Unlike " +
+                "memory_search, which returns by relevance and scrambles chronology, " +
+                "this preserves the timeline so you can find the latest decision " +
+                "and identify when things changed.",
+            parameters: {
+                type: "object",
+                properties: {
+                    topic: {
+                        type: "string",
+                        description:
+                            "Topic to scan the timeline for. Natural language; not just keywords.",
+                    },
+                    limit: {
+                        type: "integer",
+                        description: "Max memories to include. Default 12.",
+                    },
+                },
+                required: ["topic"],
+                additionalProperties: false,
+            },
+        },
+    },
 ];
 
 export interface AgentLoopDeps {
@@ -116,14 +177,21 @@ export interface AgentLoopDeps {
     };
     /** Model id (OpenAI) or deployment name (Azure). */
     model: string;
-    /** Recall MemoryService that backs memory_search / memory_get. */
+    /** Recall MemoryService that backs memory_search / memory_get / memory_timeline. */
     service: MemoryService;
     /** Absolute path to the memory root (used to resolve memory_get paths). */
     memoryRoot: string;
-    /** Adapter's max-results setting; cap on `memory_search.limit`. */
+    /** Adapter's max-results setting; cap on tool calls. */
     maxSearchResults: number;
     /** Optional cap on tool-loop iterations. Default 6. */
     maxIterations?: number;
+    /**
+     * Optional pre-fetched wiki context to inject at the top of the first
+     * user message. Lets the harness do a wiki-first pre-pass before the
+     * loop starts so the agent sees current-state wiki pages without
+     * needing to discover them via tool calls.
+     */
+    wikiPreamble?: string;
 }
 
 export interface AgentLoopResult {
@@ -152,9 +220,12 @@ export async function runAgentLoop(
 ): Promise<AgentLoopResult> {
     const maxIterations = deps.maxIterations ?? 6;
 
+    const userContent = deps.wikiPreamble
+        ? `${deps.wikiPreamble}Question: ${question}`
+        : question;
     const messages: ChatMessage[] = [
         { role: "system", content: AGENT_SYSTEM_PROMPT },
-        { role: "user", content: question },
+        { role: "user", content: userContent },
     ];
 
     const retrieval: Array<{ path: string; score: number; snippet: string }> = [];
@@ -234,6 +305,15 @@ export async function runAgentLoop(
                     });
                 } else if (name === "memory_get") {
                     resultText = await executeMemoryGet(deps, args);
+                    trace.push({
+                        tool: name,
+                        args,
+                        resultPreview: resultText.slice(0, 200),
+                    });
+                } else if (name === "memory_timeline") {
+                    const out = await executeMemoryTimeline(deps, args);
+                    for (const r of out.results) retrieval.push(r);
+                    resultText = out.text;
                     trace.push({
                         tool: name,
                         args,
@@ -352,6 +432,82 @@ async function executeMemorySearch(
         )
         .join("\n\n");
     return { text: formatted, results };
+}
+
+/**
+ * Chronologically-ordered timeline of memories matching `topic`. Pulls a
+ * generous candidate set via vector search, extracts a date from each
+ * URI (daily / weekly / monthly / wiki by `updated`), sorts oldest →
+ * newest, and formats with explicit "first → latest" framing. The
+ * candidate set is unfiltered by content type so dailies, summaries, and
+ * wiki pages all appear in their natural place in the timeline.
+ */
+async function executeMemoryTimeline(
+    deps: AgentLoopDeps,
+    args: Record<string, unknown>,
+): Promise<{
+    text: string;
+    results: Array<{ path: string; score: number; snippet: string }>;
+}> {
+    const topic = typeof args.topic === "string" ? args.topic : "";
+    if (!topic.trim()) {
+        return { text: "memory_timeline: missing 'topic' argument.", results: [] };
+    }
+    const requestedLimit = typeof args.limit === "number" ? args.limit : 12;
+    // Oversample so we can sort + take limit AFTER chronological ordering,
+    // not just top-N-by-relevance.
+    const oversample = Math.min(
+        Math.max(requestedLimit * 2, deps.maxSearchResults),
+        Math.max(requestedLimit * 2, 30),
+    );
+    const hits: SearchResult[] = await deps.service.search(topic, {
+        maxResults: oversample,
+        skipSync: true,
+    });
+    if (hits.length === 0) {
+        return {
+            text: `memory_timeline("${topic}") → no results.`,
+            results: [],
+        };
+    }
+
+    // Attach an extracted date to each hit. Hits without an extractable
+    // date land at the end (date == null) so they don't pollute the
+    // chronological view.
+    type Dated = SearchResult & { _date: Date | null };
+    const dated: Dated[] = hits.map((h) => ({
+        ...h,
+        _date: extractDateFromUri(h.uri),
+    }));
+    dated.sort((a, b) => {
+        if (a._date && b._date) return a._date.getTime() - b._date.getTime();
+        if (a._date) return -1;
+        if (b._date) return 1;
+        return 0;
+    });
+
+    const limited = dated.slice(0, requestedLimit);
+    const results = limited.map((h) => ({
+        path: h.uri,
+        score: h.score,
+        snippet: (h.text ?? "").slice(0, 600),
+    }));
+    const blocks = limited.map((h, idx) => {
+        const dateLabel = h._date
+            ? h._date.toISOString().slice(0, 10)
+            : "(undated)";
+        const ordinal =
+            idx === 0
+                ? "[first mention]"
+                : idx === limited.length - 1
+                  ? "[latest mention]"
+                  : "";
+        return `${dateLabel} ${ordinal} ${h.uri}\n${(h.text ?? "").trim().slice(0, 500)}`;
+    });
+    const text =
+        `Timeline for "${topic}" (${limited.length} entries, oldest → newest):\n\n` +
+        blocks.join("\n\n---\n\n");
+    return { text, results };
 }
 
 async function executeMemoryGet(

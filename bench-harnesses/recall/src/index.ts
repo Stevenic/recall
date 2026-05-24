@@ -305,6 +305,45 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
                 synthesisProvider === 'azure'
                     ? modelSpec.replace(/^azure:/i, '')
                     : modelSpec.replace(/^openai:/i, '');
+
+            // Wiki-first pre-pass. Pull the top wiki page matches for the
+            // question and surface them to the agent loop as a preamble.
+            // Wiki pages are the architectural answer to "what is
+            // currently true?"; surfacing them up front nudges the model
+            // to anchor on them rather than reconstructing from
+            // chronologically-scattered dailies. Best-effort — if wiki
+            // search fails or returns nothing, the loop still runs.
+            let wikiPreamble = '';
+            const wikiPrior: RetrievalEntry[] = [];
+            try {
+                const wikiHits: SearchResult[] = await service.search(
+                    question,
+                    { maxResults: 3, wikiOnly: true, skipSync: true },
+                );
+                if (wikiHits.length > 0) {
+                    const blocks = wikiHits.map(
+                        (h) =>
+                            `${h.uri} (score: ${h.score.toFixed(2)})\n${(h.text ?? '').trim().slice(0, 600)}`,
+                    );
+                    wikiPreamble =
+                        'Likely-relevant wiki pages for this question ' +
+                        '(current state of record — prefer these for ' +
+                        '"what is X" questions; use the dailies they ' +
+                        'cite for evidence):\n\n' +
+                        blocks.join('\n\n---\n\n') +
+                        '\n\n---\n\n';
+                    for (const h of wikiHits) {
+                        wikiPrior.push({
+                            path: h.uri,
+                            score: h.score,
+                            snippet: (h.text ?? '').slice(0, 600),
+                        });
+                    }
+                }
+            } catch {
+                // Wiki layer may be disabled or empty — proceed without.
+            }
+
             const result = await runAgentLoop(question, {
                 openai,
                 model: modelId,
@@ -312,7 +351,16 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
                 memoryRoot,
                 maxSearchResults: searchK,
                 maxIterations: agentMaxIterations,
+                wikiPreamble,
             });
+            // Merge the wiki-prior retrieval into the agent's reported
+            // retrieval so the failure log surfaces the full set of
+            // memories the system saw (not just what the agent's tool
+            // calls touched).
+            const seen = new Set(result.retrieval.map((r) => r.path));
+            for (const p of wikiPrior) {
+                if (!seen.has(p.path)) result.retrieval.push(p);
+            }
             return { answer: result.answer, retrieval: result.retrieval };
         }
 
