@@ -8,6 +8,7 @@ import { ResultType } from "./interfaces/index.js";
 import type { MemoryFiles } from "./files.js";
 import type { HierarchicalMemoryConfig } from "./hierarchical-config.js";
 import type { SearchLogger } from "./search-logger.js";
+import type { WikiEngine } from "./wiki-engine.js";
 import { parseCatalogEntry, matchCatalog, type CatalogEntry } from "./catalog.js";
 import { expandQuery } from "./query-expansion.js";
 import {
@@ -64,7 +65,7 @@ export interface SearchWikiConfig {
     scoreBoost?: number;
 }
 
-const DEFAULT_WIKI_SCORE_BOOST = 1.3;
+const DEFAULT_WIKI_SCORE_BOOST = 1.5;
 
 /**
  * Two-phase hierarchical search:
@@ -79,6 +80,7 @@ export class SearchService {
     private readonly _files: MemoryFiles;
     private readonly _config: HierarchicalMemoryConfig;
     private readonly _wikiConfig: SearchWikiConfig;
+    private readonly _wiki: WikiEngine | undefined;
     private _searchLogger: SearchLogger | null = null;
 
     constructor(
@@ -86,11 +88,13 @@ export class SearchService {
         files: MemoryFiles,
         config?: HierarchicalMemoryConfig,
         wikiConfig?: SearchWikiConfig,
+        wiki?: WikiEngine,
     ) {
         this._index = index;
         this._files = files;
         this._config = config ?? {};
         this._wikiConfig = wikiConfig ?? {};
+        this._wiki = wiki;
     }
 
     /**
@@ -550,15 +554,22 @@ export class SearchService {
     }
 
     /**
-     * Match typed memories by frontmatter keywords.
+     * Match the agent's "catalog" — typed memories and (Phase B+) wiki pages
+     * — by frontmatter keyword overlap. Catalog matching uses the
+     * `name` / `description` / `type` fields and is exact-match-flavored,
+     * which makes it a reliable first hop for factual-recall queries that
+     * mention the page name verbatim. After Phase E migration, typed
+     * memories are migrated to wiki pages, so the wiki branch keeps the
+     * signal alive.
      */
     private async _catalogSearch(
         query: string,
         maxResults: number,
     ): Promise<SearchResult[]> {
-        const typedFiles = await this._files.listTypedMemories();
         const entries: CatalogEntry[] = [];
 
+        // Typed memories (legacy; still present in unmigrated repos).
+        const typedFiles = await this._files.listTypedMemories();
         for (const filename of typedFiles) {
             const content = await this._files.readTypedMemory(filename);
             if (!content) continue;
@@ -566,9 +577,53 @@ export class SearchService {
             if (entry) entries.push(entry);
         }
 
+        // Wiki pages. Wiki frontmatter ships `type: wiki` + `category: …`;
+        // the same parser pulls them in with `metadata.contentType =
+        // "typed_memory"` by default, so we patch the entry's metadata to
+        // reflect the wiki contentType + slug. That makes the downstream
+        // wiki score boost in the reranker fire when the catalog finds the
+        // page first.
+        if (this._wiki?.enabled) {
+            const wikiSlugs = await this._wiki.list("private");
+            for (const slug of wikiSlugs) {
+                const page = await this._wiki.read(slug, "private");
+                if (!page || page.redirectTo) continue;
+                const uri = `memory/wiki/${slug}.md`;
+                entries.push({
+                    uri,
+                    name: page.name,
+                    description: page.description,
+                    type: page.category,
+                    metadata: {
+                        contentType: "wiki",
+                        wikiCategory: page.category,
+                        wikiSlug: page.slug,
+                        wikiTarget: "private",
+                        wikiSources: page.sources.length,
+                        period: page.updated,
+                    },
+                });
+            }
+        }
+
         const matches = matchCatalog(entries, query, maxResults);
 
+        // Fill in result text from the underlying source. For wiki entries
+        // we re-read the page through the engine; for typed memories we use
+        // the existing file API. URIs that don't match either pattern fall
+        // through with empty text.
         for (const match of matches) {
+            if (match.uri.startsWith("memory/wiki/") && this._wiki?.enabled) {
+                const slug = match.uri
+                    .replace(/^memory\/wiki\//, "")
+                    .replace(/\.md$/, "");
+                const page = await this._wiki.read(slug, "private");
+                if (page) {
+                    match.text =
+                        `# ${page.name}\n${page.description}\n\n${page.body.trim()}`;
+                }
+                continue;
+            }
             const content = await this._files.readTypedMemory(match.uri);
             if (content) match.text = content;
         }

@@ -115,6 +115,7 @@ export class MemoryService {
             this._wiki.enabled
                 ? { scoreBoost: this._wiki.config.scoreBoost }
                 : undefined,
+            this._wiki.enabled ? this._wiki : undefined,
         );
 
         // Wire up search logging if dreaming is enabled

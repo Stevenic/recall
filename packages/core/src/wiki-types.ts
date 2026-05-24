@@ -44,7 +44,7 @@ export const DEFAULT_WIKI_CONFIG: Required<
     Omit<WikiConfig, "shared" | "enabled">
 > & { enabled: boolean; shared: SharedWikiConfig[] } = {
     enabled: false,
-    scoreBoost: 1.3,
+    scoreBoost: 1.5,
     minSourcesForStub: 1,
     minSourcesForSynthesis: 3,
     stalenessThresholdDays: 90,
