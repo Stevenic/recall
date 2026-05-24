@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "bench-harnesses/*"
+    "bench-harnesses/*",
+    "!bench-harnesses/openclaw"
   ],
   "scripts": {
     "build": "npm run build --workspace=packages/core && npm run build --workspace=packages/recall-bench && npm run build --workspace=bench-harnesses/recall",
@@ -15,7 +16,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "vectra": "^0.14.0"
+    "vectra": "^0.15.0"
   },
   "devDependencies": {
     "canvas": "^3.2.3",
