@@ -43,12 +43,14 @@ export async function collectSignals(
         entityCandidates,
         stalenessCandidates,
         wisdomCandidates,
+        supersessionCandidates,
     ] = await Promise.all([
         collectHitFrequencySignals(entries),
         collectGapSignals(entries, config?.nullQueryScoreThreshold ?? 0.3),
         collectEntitySignals(files, windowDays, config?.entityMinDays ?? 3),
         collectStalenessSignals(files, stalenessThreshold),
         collectWisdomDriftSignals(files, entries),
+        collectSupersessionSignals(files, windowDays),
     ]);
 
     // Combine and score all candidates
@@ -82,6 +84,15 @@ export async function collectSignals(
         allCandidates.push({
             ...c,
             score: c.score * weights.queryDiversity,
+        });
+    }
+    // Supersession candidates are scored by decision-marker density; we
+    // re-use the staleness weight since both signals are about "the wiki
+    // may no longer reflect the truth."
+    for (const c of supersessionCandidates) {
+        allCandidates.push({
+            ...c,
+            score: c.score * weights.staleness,
         });
     }
 
@@ -295,6 +306,81 @@ export async function collectStalenessSignals(
                 description: `${memType} memory "${data.name ?? filename}" is ${daysOld} days old (threshold: ${thresholdDays})`,
             });
         }
+    }
+
+    return candidates.sort((a, b) => b.score - a.score);
+}
+
+// ─── Supersession Signals ────────────────────────────────
+
+/**
+ * Decision-marker patterns that suggest a daily contains a fact-update.
+ * Tighter than salience.ts's set — we want signals that genuinely indicate
+ * a prior position changed, not just "we considered X" or "looked at Y".
+ */
+const SUPERSESSION_MARKERS = [
+    /\bdecided\s+(?:to|on|against)\b/i,
+    /\bswitched\s+(?:to|from|away\s+from)\b/i,
+    /\bchose\s+\w+\s+over\b/i,
+    /\bchanged\s+(?:our|my|the)\s+mind\b/i,
+    /\breversed\s+(?:our|my|the)\s+(?:decision|call|stance)\b/i,
+    /\bcorrected\b/i,
+    /\b(?:no\s+longer|not\s+anymore)\b.{0,40}\b(?:going\s+with|using|on)\b/i,
+    /\breplaced\s+\w+\s+with\b/i,
+    /\bupgraded\s+from\b/i,
+    /\bdowngraded\s+from\b/i,
+    /\bdeprecated\b/i,
+    /\bretired\b/i,
+];
+
+/**
+ * Scan recent dailies for decision-marker phrases that suggest a fact has
+ * changed. Each matching daily becomes a `supersession_signal` candidate;
+ * the analyze pass then compares the daily against current wiki state and
+ * decides whether a supersession actually happened.
+ *
+ * Score scales with marker density (capped at 1.0). Days near the end of
+ * the window score higher (recent changes are more likely to need to be
+ * reflected in the wiki).
+ */
+export async function collectSupersessionSignals(
+    files: MemoryFiles,
+    windowDays: number,
+): Promise<DreamCandidate[]> {
+    const dailies = await files.listDailies();
+    if (dailies.length === 0) return [];
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - windowDays);
+    const cutoffStr = cutoff.toISOString().split("T")[0];
+
+    const candidates: DreamCandidate[] = [];
+    // Only scan dailies inside the signal window.
+    const recent = dailies.filter((d) => d >= cutoffStr);
+
+    for (const date of recent) {
+        const content = await files.readDaily(date);
+        if (!content) continue;
+        let markers = 0;
+        for (const re of SUPERSESSION_MARKERS) {
+            if (re.test(content)) markers++;
+        }
+        if (markers === 0) continue;
+        // Marker count → 0..1 score; 3+ markers saturates.
+        const markerScore = Math.min(1, markers / 3);
+        // Recency multiplier — most recent dailies inside the window score
+        // 1.0; oldest in-window scores ~0.5.
+        const ageDays = Math.max(
+            0,
+            (Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24),
+        );
+        const recency = Math.max(0.5, 1 - ageDays / (windowDays * 2));
+        candidates.push({
+            type: "supersession_signal",
+            score: markerScore * recency,
+            uris: [`memory/${date}.md`],
+            description: `Decision markers in ${date} (${markers} hit${markers === 1 ? "" : "s"}) — check if wiki state should be updated.`,
+        });
     }
 
     return candidates.sort((a, b) => b.score - a.score);

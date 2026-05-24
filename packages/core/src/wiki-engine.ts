@@ -7,6 +7,7 @@ import {
     isStub,
     type ResolvedWikiTarget,
     type SharedWikiConfig,
+    type SupersedesEntry,
     type WikiCategory,
     type WikiConfig,
     type WikiLinkRef,
@@ -194,6 +195,43 @@ export class WikiEngine {
         };
         await this.write(page, target);
         return page;
+    }
+
+    /**
+     * Record that this page's current claim supersedes an older one. Appends
+     * a {@link SupersedesEntry} to the page's `supersedes` frontmatter list,
+     * deduping by source URI. Advances `updated`. Used by dreaming when it
+     * detects that a new daily contradicts existing wiki state.
+     */
+    async recordSupersession(
+        slug: string,
+        entry: { source: string; fact?: string; supersededOn?: string },
+        target: WikiTarget = "private",
+    ): Promise<WikiPage> {
+        this._assertWritable(target);
+        validateSlug(slug);
+        const existing = await this.read(slug, target);
+        if (!existing) {
+            throw new Error(
+                `recordSupersession: page "${slug}" does not exist (target: ${target}).`,
+            );
+        }
+        const supersedes = existing.supersedes ? [...existing.supersedes] : [];
+        if (!supersedes.some((s) => s.source === entry.source)) {
+            const fullEntry: SupersedesEntry = {
+                source: entry.source,
+                supersededOn: entry.supersededOn ?? todayIso(),
+            };
+            if (entry.fact !== undefined) fullEntry.fact = entry.fact;
+            supersedes.push(fullEntry);
+        }
+        const updated: WikiPage = {
+            ...existing,
+            supersedes,
+            updated: todayIso(),
+        };
+        await this.write(updated, target);
+        return updated;
     }
 
     /**
@@ -1053,6 +1091,7 @@ export function parseWikiPage(content: string, expectedSlug: string): WikiPage {
     const contradicts = Array.isArray(data.contradicts)
         ? (data.contradicts as string[])
         : undefined;
+    const supersedes = parseSupersedes(data.supersedes);
     return {
         slug,
         name: (data.name as string | undefined) ?? slug,
@@ -1070,9 +1109,34 @@ export function parseWikiPage(content: string, expectedSlug: string): WikiPage {
         related,
         confidence: data.confidence as WikiPage["confidence"],
         contradicts,
+        supersedes,
         redirectTo: data.redirect_to as string | undefined,
         body: parsed.content,
     };
+}
+
+function parseSupersedes(raw: unknown): SupersedesEntry[] | undefined {
+    if (!Array.isArray(raw) || raw.length === 0) return undefined;
+    const out: SupersedesEntry[] = [];
+    for (const item of raw) {
+        if (!item || typeof item !== "object") continue;
+        const r = item as Record<string, unknown>;
+        if (typeof r.source !== "string" || !r.source) continue;
+        const entry: SupersedesEntry = {
+            source: r.source,
+            supersededOn:
+                typeof r.supersededOn === "string"
+                    ? r.supersededOn
+                    : typeof r.superseded_on === "string"
+                      ? r.superseded_on
+                      : todayIso(),
+        };
+        // Only include `fact` when it's a real string. Setting `fact:
+        // undefined` explicitly would break the next YAML serialize pass.
+        if (typeof r.fact === "string" && r.fact.length > 0) entry.fact = r.fact;
+        out.push(entry);
+    }
+    return out.length > 0 ? out : undefined;
 }
 
 /** Serialize a {@link WikiPage} to a markdown file with frontmatter. */
@@ -1091,6 +1155,9 @@ export function serializeWikiPage(page: WikiPage): string {
     if (page.confidence) fm.confidence = page.confidence;
     if (page.contradicts && page.contradicts.length > 0) {
         fm.contradicts = page.contradicts;
+    }
+    if (page.supersedes && page.supersedes.length > 0) {
+        fm.supersedes = page.supersedes;
     }
     if (page.redirectTo) fm.redirect_to = page.redirectTo;
     return matter.stringify(ensureTrailingNewline(page.body), fm);

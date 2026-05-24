@@ -68,10 +68,36 @@ export interface WikiPage {
     confidence?: "high" | "medium" | "low";
     /** Wiki slugs whose claims this page disagrees with */
     contradicts?: string[];
+    /**
+     * Records that this page's current claim overrides an earlier one. Each
+     * entry points at the older source (typically a daily log) plus an
+     * optional summary of the prior claim. Maintained by dreaming when it
+     * detects that a new daily contradicts existing wiki state — the wiki
+     * page evolves to the new truth, and the old claim is recorded here
+     * for traceability. Lets retrieval and synthesis know "this page used
+     * to say X; it now says Y."
+     */
+    supersedes?: SupersedesEntry[];
     /** Optional redirect to another slug (for merge / rename / promote stubs) */
     redirectTo?: string;
     /** Page body (markdown, no frontmatter) */
     body: string;
+}
+
+/**
+ * A record of a prior claim that this wiki page now overrides. Frontmatter
+ * representation in `supersedes:` on the page.
+ */
+export interface SupersedesEntry {
+    /** URI of the older source whose claim is now superseded (e.g. memory/2026-01-10.md). */
+    source: string;
+    /**
+     * Optional one-line summary of the prior claim, useful for the diary
+     * and for downstream LLM context. Omit when summary isn't available.
+     */
+    fact?: string;
+    /** ISO date the supersession was recorded. Auto-set when omitted. */
+    supersededOn: string;
 }
 
 /** Convenience: a page is a stub when it has a single source. */

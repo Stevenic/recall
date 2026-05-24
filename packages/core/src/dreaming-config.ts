@@ -55,6 +55,11 @@ export type DreamWikiOp =
           sources: string[];
           related?: string[];
           confidence?: "high" | "medium" | "low";
+          /**
+           * Optional supersession record. Present when the new page overrides
+           * a prior claim that lived in a daily log or another memory.
+           */
+          supersedes?: { source: string; fact?: string };
       }
     | {
           op: "update";
@@ -63,6 +68,12 @@ export type DreamWikiOp =
           appendBody: string;
           /** Source URI to add (deduped against existing sources). */
           source: string;
+          /**
+           * Optional supersession record. Present when the appended fact
+           * overrides an older claim. The page's `supersedes` frontmatter
+           * gets this entry appended (deduped by source URI).
+           */
+          supersedes?: { source: string; fact?: string };
       }
     | {
           op: "contradict";
@@ -118,7 +129,15 @@ export type DreamCandidateType =
     | "stale_memory"
     | "wisdom_drift"
     | "high_frequency"
-    | "null_query";
+    | "null_query"
+    /**
+     * A recent daily contains decision markers ("decided to", "switched to",
+     * "chose X over Y", "changed our mind", "corrected", "updated") that
+     * suggest a fact may have changed. Dreaming reviews the daily against
+     * existing wiki state and proposes a wiki op with `supersedes` when a
+     * supersession is confirmed. See §12.4 + the wiki refactor design.
+     */
+    | "supersession_signal";
 
 export interface DreamCandidate {
     type: DreamCandidateType;

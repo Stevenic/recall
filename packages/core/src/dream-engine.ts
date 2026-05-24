@@ -361,6 +361,13 @@ export class DreamEngine {
                 systemPrompt = templates.gapAnalysis;
                 break;
             case "wisdom_drift":
+            case "supersession_signal":
+                // Supersession candidates share the contradiction template —
+                // both ask the model to compare a new claim against existing
+                // state and decide whether something has changed. The
+                // template is extended to handle the wiki-as-current-truth
+                // framing and emit `supersedes`-bearing wiki_ops when the
+                // daily overrides a wiki claim.
                 systemPrompt = templates.contradictionDetection;
                 break;
             case "stale_memory":
@@ -411,6 +418,35 @@ export class DreamEngine {
         // For null queries, include the query text
         if (candidate.type === "null_query") {
             parts.push(`## Query\n\n${candidate.description}`);
+        }
+
+        // For supersession signals, also include the top wiki pages that
+        // semantically match the daily's content. This is what lets the
+        // analyzer detect "this daily contradicts the wiki" — without the
+        // wiki context, the model can't tell whether a fact has actually
+        // changed or is just being re-stated. Best-effort: if the wiki
+        // layer is disabled or the index isn't ready, fall through.
+        if (candidate.type === "supersession_signal" && this._wiki?.enabled) {
+            const dailyContent = parts[0] ?? candidate.description;
+            try {
+                const wikiHits = await this._index.query(dailyContent, {
+                    maxResults: 4,
+                    filter: { contentType: "wiki" },
+                });
+                if (wikiHits.length > 0) {
+                    parts.push(
+                        "## Current wiki state (candidates for supersession)\n\n" +
+                            wikiHits
+                                .map(
+                                    (h) =>
+                                        `### ${h.uri}\n${(h.text ?? "").trim()}`,
+                                )
+                                .join("\n\n"),
+                    );
+                }
+            } catch {
+                // Wiki search failed (e.g. index not ready) — proceed without.
+            }
         }
 
         if (parts.length === 0) return null;
@@ -652,11 +688,20 @@ export class DreamEngine {
                         op.body,
                         "private",
                     );
+                    let detail = `create-on-existing → appended (${updated.sources.length} sources)`;
+                    if (op.supersedes) {
+                        await this._wiki.recordSupersession(
+                            op.slug,
+                            op.supersedes,
+                            "private",
+                        );
+                        detail += `; supersedes ${op.supersedes.source}`;
+                    }
                     return {
                         op: op.op,
                         slug: op.slug,
                         ok: true,
-                        detail: `create-on-existing → appended (${updated.sources.length} sources)`,
+                        detail,
                     };
                 }
                 if (op.category === "theme") {
@@ -693,11 +738,20 @@ export class DreamEngine {
                         await this._wiki.append(op.slug, extra, "", "private");
                     }
                 }
+                let detail = `created (${op.sources.length} source${op.sources.length === 1 ? "" : "s"})`;
+                if (op.supersedes) {
+                    await this._wiki.recordSupersession(
+                        op.slug,
+                        op.supersedes,
+                        "private",
+                    );
+                    detail += `; supersedes ${op.supersedes.source}`;
+                }
                 return {
                     op: op.op,
                     slug: op.slug,
                     ok: true,
-                    detail: `created (${op.sources.length} source${op.sources.length === 1 ? "" : "s"})`,
+                    detail,
                 };
             }
             if (op.op === "update") {
@@ -707,11 +761,20 @@ export class DreamEngine {
                     op.appendBody,
                     "private",
                 );
+                let detail = `appended ${op.source}`;
+                if (op.supersedes) {
+                    await this._wiki.recordSupersession(
+                        op.slug,
+                        op.supersedes,
+                        "private",
+                    );
+                    detail += `; supersedes ${op.supersedes.source}`;
+                }
                 return {
                     op: op.op,
                     slug: op.slug,
                     ok: true,
-                    detail: `appended ${op.source}`,
+                    detail,
                 };
             }
             // op === "contradict"
@@ -841,7 +904,7 @@ function coerceWikiOp(
             : [];
         const sources = sourcesIn.length > 0 ? sourcesIn : candidate.uris;
         if (sources.length === 0) return null;
-        return {
+        const out: Extract<DreamWikiOp, { op: "create" }> = {
             op: "create",
             slug,
             category: category as DreamWikiOp extends { op: "create"; category: infer C }
@@ -852,18 +915,23 @@ function coerceWikiOp(
                 typeof r.description === "string" ? r.description : "",
             body,
             sources,
-            related: Array.isArray(r.related)
-                ? (r.related as string[]).filter(
-                      (s) => typeof s === "string" && SLUG_RE.test(s),
-                  )
-                : undefined,
-            confidence:
-                r.confidence === "high" ||
-                r.confidence === "medium" ||
-                r.confidence === "low"
-                    ? r.confidence
-                    : undefined,
         };
+        const related = Array.isArray(r.related)
+            ? (r.related as string[]).filter(
+                  (s) => typeof s === "string" && SLUG_RE.test(s),
+              )
+            : undefined;
+        if (related !== undefined) out.related = related;
+        const confidence =
+            r.confidence === "high" ||
+            r.confidence === "medium" ||
+            r.confidence === "low"
+                ? r.confidence
+                : undefined;
+        if (confidence !== undefined) out.confidence = confidence;
+        const supersedes = coerceSupersedes(r.supersedes);
+        if (supersedes) out.supersedes = supersedes;
+        return out;
     }
     if (op === "update") {
         const appendBody =
@@ -874,7 +942,15 @@ function coerceWikiOp(
                   : "";
         const source = typeof r.source === "string" ? r.source : "";
         if (!source || !appendBody.trim()) return null;
-        return { op: "update", slug, appendBody, source };
+        const out: Extract<DreamWikiOp, { op: "update" }> = {
+            op: "update",
+            slug,
+            appendBody,
+            source,
+        };
+        const supersedes = coerceSupersedes(r.supersedes);
+        if (supersedes) out.supersedes = supersedes;
+        return out;
     }
     if (op === "contradict") {
         const contradicts = Array.isArray(r.contradicts)
@@ -891,6 +967,23 @@ function coerceWikiOp(
         };
     }
     return null;
+}
+
+/**
+ * Validate a model-supplied `supersedes` object into the shape DreamWikiOp
+ * expects: `{ source: string; fact?: string }`. Returns null when source
+ * is missing or empty so the parent op stays usable.
+ */
+function coerceSupersedes(
+    raw: unknown,
+): { source: string; fact?: string } | null {
+    if (!raw || typeof raw !== "object") return null;
+    const r = raw as Record<string, unknown>;
+    const source = typeof r.source === "string" ? r.source.trim() : "";
+    if (!source) return null;
+    const out: { source: string; fact?: string } = { source };
+    if (typeof r.fact === "string" && r.fact.length > 0) out.fact = r.fact;
+    return out;
 }
 
 // ─── Analysis Prompt Templates ───────────────────────────
@@ -991,14 +1084,21 @@ Respond with a JSON object:
 - Distinguish between intentional silence (nothing happened) and missing coverage
 - Suggest what kind of information would fill each gap`;
 
-const CONTRADICTION_TEMPLATE = `You are an analytical memory engine detecting contradictions between stated principles and observed behavior, and detecting wisdom entries that have drifted toward topical (per spec §12.4).
+const CONTRADICTION_TEMPLATE = `You are an analytical memory engine detecting contradictions and supersessions.
 
-<TASK>
-Compare the WISDOM.md entries against the provided recent memories. For each wisdom entry, choose exactly one outcome:
+You may be given any of three input shapes:
 
-1. UPDATE — the principle is right but needs sharper wording given new evidence. → emit a "contradictions" entry with the recommendation.
-2. CONTRADICT — the principle is no longer accurate; newer evidence overrides it. → emit a "contradictions" entry recommending removal or rewrite.
-3. PROMOTE_TO_WIKI — the entry is topical (about a specific person, project, system, or recurring theme) rather than a cross-topic principle. → emit a "wiki_ops" create op that captures the topical knowledge as a wiki page. WISDOM.md should retain only the underlying principle (if any).
+  (a) WISDOM.md + recent memories (the classic wisdom-drift case).
+  (b) A single recent daily log + the "Current wiki state (candidates for supersession)" block — wiki pages that semantically match the daily. This is the supersession-signal case.
+  (c) Both.
+
+<TASKS>
+For each input, choose one or more of these outcomes:
+
+1. UPDATE wisdom — a WISDOM.md principle needs sharper wording. → emit a "contradictions" entry.
+2. CONTRADICT wisdom — a WISDOM.md principle is no longer accurate. → emit a "contradictions" entry recommending rewrite.
+3. PROMOTE_TO_WIKI — a wisdom entry is topical (about a specific person, project, system, or recurring theme) rather than a cross-topic principle. → emit a "wiki_ops" create op (per spec §12.4).
+4. SUPERSEDE wiki — the new daily contains a fact that overrides an existing wiki claim. The daily wins; the wiki must evolve. → emit a "wiki_ops" update (or create, if no matching page exists) with a "supersedes" field pointing at the prior source. The wiki page is "current state"; the old daily stays in history.
 
 <OUTPUT_FORMAT>
 Respond with a JSON object:
@@ -1015,21 +1115,29 @@ Respond with a JSON object:
   "gaps": [],
   "wiki_ops": [
     {
-      "op": "create",
+      "op": "create" | "update",
       "slug": "kebab-case-slug",
       "category": "entity" | "concept" | "project" | "reference" | "theme",
       "name": "Human-readable title",
       "description": "One-line description",
-      "body": "Markdown body. Concept/project pages SHOULD lead with a rule/fact followed by **Why:** and **How to apply:**.",
-      "sources": ["memory/YYYY-MM-DD.md", ...]
+      "body": "Markdown body (create) or appendBody (update). Concept/project pages SHOULD lead with a rule/fact followed by **Why:** and **How to apply:**.",
+      "appendBody": "Markdown fragment for update ops",
+      "source": "memory/YYYY-MM-DD.md (single source for update ops)",
+      "sources": ["memory/YYYY-MM-DD.md", ...],
+      "supersedes": {
+        "source": "memory/YYYY-MM-DD.md (the older claim's source)",
+        "fact": "One-line summary of the prior claim being overridden"
+      }
     }
   ]
 }
 
 <RULES>
-- Only flag genuine contradictions with clear evidence
-- Evolution is not contradiction — if a principle was refined, recommend an update (outcome 1)
-- Promote to wiki when the entry describes a *thing* rather than a *rule*:
+- Only flag genuine contradictions / supersessions with clear evidence in the provided text.
+- Evolution is not contradiction. If a principle was refined or a fact got more specific, prefer UPDATE (with no supersedes).
+- A supersession is when one fact *replaces* another (e.g. "switched from Postgres to MySQL"), not when one *adds* to another ("also testing MySQL on the side"). Be conservative.
+- Wiki pages are the current state of record. A supersession op tells future retrieval "this page used to say X; it now says Y, and here's the older source." Always include "supersedes.source" pointing at the URI that holds the older claim.
+- Promote to wiki when the wisdom entry describes a *thing* rather than a *rule*:
   - "Use Postgres for the ledger" — topical → promote (project: ledger-storage)
   - "Prefer additive migrations" — principle → keep in WISDOM.md
 - Slugs are lowercase ASCII, hyphen-separated. Sources must be URIs from the provided memories.`;
