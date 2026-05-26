@@ -132,7 +132,7 @@ describe("WikiEngine.migrateTypedMemories", () => {
         const report = await engine.migrateTypedMemories();
         const page = await engine.read("redis");
         expect(report.migrated["feedback_redis.md"]).toBe("redis");
-        expect(page!.sources).toEqual([
+        expect(page!.sources.map((s) => s.uri)).toEqual([
             "memory/2026-04-08.md",
             "memory/2026-03-15.md",
         ]);
@@ -146,7 +146,7 @@ describe("WikiEngine.migrateTypedMemories", () => {
         await engine.migrateTypedMemories();
         const page = await engine.read("alice");
         expect(page!.sources).toHaveLength(1);
-        expect(page!.sources[0]).toMatch(/^migration:\d{4}-\d{2}-\d{2}:user_alice\.md$/);
+        expect(page!.sources[0].uri).toMatch(/^migration:\d{4}-\d{2}-\d{2}:user_alice\.md$/);
     });
 
     it("ignores files that don't match the <type>_<topic>.md pattern", async () => {

@@ -1,0 +1,55 @@
+# Recall 180d with gpt-5.4-mini for dreaming (instead of gpt-5.4).
+# Companion to ea-180d-recall-dreaming.yaml — same stack, only the
+# dreaming model changes. Test of whether the stronger reasoning model
+# is actually earning its cost on dreaming's wiki_op decisions.
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  judge: azure:gpt-5.4-mini
+  appellateJudge: azure:gpt-5.4
+  generation: azure:gpt-5.4-mini
+
+harness:
+  adapter: ../../../bench-harnesses/recall/dist/index.js
+  factory: createRecallAdapter
+  config:
+    name: Recall (dreaming-mini)
+    model: azure:gpt-5.4-mini
+    identityName: Jordan
+    identity: |
+      Jordan is an AI executive assistant for the CFO of a mid-cap technology
+      company. Trusted operator: anticipatory, discreet, calm under pressure,
+      protective of the principal's time and confidentiality. Drafts but does
+      not send sensitive (HR, legal, board, customer-escalation)
+      communications without principal review.
+    searchK: 10
+    contextBudget: 9000
+    enableCompaction: true
+    enableDreaming: true
+    answerMode: agent
+    agentMaxIterations: 12
+    synthesisProvider: azure
+    # A/B test: same model for dreaming as everything else (mini).
+    # Comparing this to ea-180d-recall-dreaming.yaml's gpt-5.4 dreaming
+    # tells us whether the stronger model is materially better at the
+    # wiki_op + merge-with-supersession decisions.
+    dreamingModel: azure:gpt-5.4-mini
+
+run:
+  ranges:
+    start: 6
+    end: 180
+    step: 6
+  seed: 42
+  timeout: 180000
+  parallelism: 1
+  sample: 50
+  judgeMemoryWindow: 1
+  groupsEnabled: false

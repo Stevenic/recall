@@ -101,7 +101,7 @@ describe("DreamEngine — wiki ops application (Phase D)", () => {
             name: "Auth Middleware",
             description: "The auth middleware module's design and tradeoffs.",
             body: "Cookies → JWT migration is in progress.\n\n**Why:** Compliance.\n\n**How to apply:** Prefer JWT path.",
-            sources: ["memory/2026-04-01.md", "memory/2026-04-02.md"],
+            sources: [{ uri: "memory/2026-04-01.md" }, { uri: "memory/2026-04-02.md" }],
             related: ["postgres"],
             confidence: "medium",
         });
@@ -118,8 +118,8 @@ describe("DreamEngine — wiki ops application (Phase D)", () => {
         expect(page!.category).toBe("concept");
         expect(page!.name).toBe("Auth Middleware");
         // stub() only takes the first source; the rest are appended.
-        expect(page!.sources).toContain("memory/2026-04-01.md");
-        expect(page!.sources).toContain("memory/2026-04-02.md");
+        expect(page!.sources.map((s) => s.uri)).toContain("memory/2026-04-01.md");
+        expect(page!.sources.map((s) => s.uri)).toContain("memory/2026-04-02.md");
         expect(page!.related).toContain("postgres");
     });
 
@@ -145,7 +145,7 @@ describe("DreamEngine — wiki ops application (Phase D)", () => {
         const page = await wiki.read("auth-middleware");
         expect(page!.body).toContain("Initial body");
         expect(page!.body).toContain("rolled out to staging");
-        expect(page!.sources).toContain("memory/2026-04-02.md");
+        expect(page!.sources.map((s) => s.uri)).toContain("memory/2026-04-02.md");
     });
 
     it("applies a contradict op by setting contradicts frontmatter", async () => {
@@ -204,7 +204,7 @@ describe("DreamEngine — wiki ops application (Phase D)", () => {
         const page = await wiki.read("topic");
         expect(page!.body).toContain("Original");
         expect(page!.body).toContain("Additional context from dreaming");
-        expect(page!.sources).toContain("memory/2026-04-02.md");
+        expect(page!.sources.map((s) => s.uri)).toContain("memory/2026-04-02.md");
     });
 
     it("reports a failure (rather than throwing) when contradict targets a nonexistent page", async () => {
@@ -231,7 +231,7 @@ describe("DreamEngine — wiki ops application (Phase D)", () => {
             name: "Skipped",
             description: "Should not be created.",
             body: "Lede.\n\n**Why:** w.\n\n**How to apply:** h.",
-            sources: ["memory/2026-04-01.md"],
+            sources: [{ uri: "memory/2026-04-01.md" }],
         });
         const result = await engine.writeResults([ar], 1, { skipWiki: true });
         expect(result.wikiUpdates).toHaveLength(0);
@@ -251,7 +251,7 @@ describe("DreamEngine — wiki ops in DREAMS.md", () => {
             name: "Diary Target",
             description: "For testing diary output.",
             body: "Body.\n\n**Why:** w.\n\n**How to apply:** h.",
-            sources: ["memory/2026-04-01.md"],
+            sources: [{ uri: "memory/2026-04-01.md" }],
         });
         await engine.writeResults([ar], 1);
         const diaryBuf = await storage.readFile(path.join(ROOT, "DREAMS.md"));
@@ -283,7 +283,7 @@ describe("DreamEngine — wiki_ops parsing from JSON", () => {
                     name: "Via JSON",
                     description: "Came from the model.",
                     body: "Body content.\n\n**Why:** w.\n\n**How to apply:** h.",
-                    sources: ["memory/2026-04-01.md"],
+                    sources: [{ uri: "memory/2026-04-01.md" }],
                 },
             ],
         });
@@ -334,7 +334,7 @@ describe("WikiEngine.migrateInsights", () => {
         const page = await wiki.read("auth-evolution");
         expect(page).not.toBeNull();
         expect(page!.category).toBe("theme");
-        expect(page!.sources).toEqual([
+        expect(page!.sources.map((s) => s.uri)).toEqual([
             "memory/2026-04-01.md",
             "memory/2026-04-08.md",
         ]);
@@ -359,5 +359,169 @@ describe("WikiEngine.migrateInsights", () => {
         const report = await wiki.migrateInsights();
         expect(report.created).toEqual([]);
         expect(report.skipped).toEqual([]);
+    });
+});
+
+describe("DreamEngine — entity rename detection (post-write hook)", () => {
+    it("redirects the obsolete page and supersedes the canonical when verifier says 'same'", async () => {
+        const { engine, wiki, model } = await setup();
+        // Two pages with overlapping sources but divergent name tokens —
+        // the rename case the detector targets.
+        await wiki.stub({
+            slug: "northstar-components",
+            name: "Northstar Components",
+            description: "Original vendor name for the Condor target.",
+            category: "entity",
+            source: "memory/2026-01-03.md",
+            body: "Initial entity stub for the target acquisition.",
+        });
+        // Bring it to >=3 sources so the rename detector trips the gate.
+        await wiki.append(
+            "northstar-components",
+            "memory/2026-01-05.md",
+            "Additional sources.",
+        );
+        await wiki.append(
+            "northstar-components",
+            "memory/2026-01-07.md",
+            "More activity around the entity.",
+        );
+        await wiki.stub({
+            slug: "northstar-gridworks",
+            name: "Northstar Gridworks",
+            description: "Renamed vendor (post-2026-01-14).",
+            category: "entity",
+            source: "memory/2026-01-14.md",
+            body: "Second entity stub after the rename.",
+        });
+        await wiki.append(
+            "northstar-gridworks",
+            "memory/2026-01-05.md", // shared source with the first page
+            "Cross-reference back to the original entity.",
+        );
+        await wiki.append(
+            "northstar-gridworks",
+            "memory/2026-01-07.md", // also shared
+            "Another shared source.",
+        );
+        // Verifier confirms the rename with canonical = the later-named page.
+        model.response = JSON.stringify({
+            same: true,
+            canonical_slug: "northstar-gridworks",
+            old_name: "Northstar Components",
+            confidence: "high",
+            reasoning: "explicit rename language.",
+        });
+        // Trigger by issuing a fresh write to the canonical page.
+        const ar = emptyAnalysisResult(candidate(["memory/2026-01-14.md"]));
+        ar.wikiOps.push({
+            op: "update",
+            slug: "northstar-gridworks",
+            appendBody: "Post-rename activity.",
+            source: "memory/2026-01-14.md",
+        });
+        await engine.writeResults([ar], 1);
+
+        const obsolete = await wiki.read("northstar-components");
+        const canonical = await wiki.read("northstar-gridworks");
+        expect(obsolete).not.toBeNull();
+        expect(canonical).not.toBeNull();
+        expect(obsolete!.redirectTo).toBe("northstar-gridworks");
+        expect(obsolete!.body).toContain("merged into");
+        expect(canonical!.supersedes ?? []).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    source: "wiki:northstar-components",
+                    fact: expect.stringContaining("renamed"),
+                }),
+            ]),
+        );
+    });
+
+    it("does nothing when the verifier returns same=false", async () => {
+        const { engine, wiki, model } = await setup();
+        await wiki.stub({
+            slug: "acme-launch",
+            name: "Acme Launch",
+            description: "A launch program.",
+            category: "project",
+            source: "memory/2026-02-01.md",
+            body: "Launch prep.",
+        });
+        await wiki.append("acme-launch", "memory/2026-02-02.md", "More prep.");
+        await wiki.append("acme-launch", "memory/2026-02-03.md", "Even more prep.");
+        await wiki.stub({
+            slug: "globex-launch",
+            name: "Globex Launch",
+            description: "A different launch.",
+            category: "project",
+            source: "memory/2026-02-01.md", // intentionally overlaps
+            body: "Different launch context.",
+        });
+        await wiki.append("globex-launch", "memory/2026-02-02.md", "Shared meeting notes.");
+        await wiki.append("globex-launch", "memory/2026-02-03.md", "More shared context.");
+        model.response = JSON.stringify({
+            same: false,
+            canonical_slug: null,
+            old_name: null,
+            confidence: "high",
+            reasoning: "two distinct launches.",
+        });
+        const ar = emptyAnalysisResult(candidate(["memory/2026-02-03.md"]));
+        ar.wikiOps.push({
+            op: "update",
+            slug: "globex-launch",
+            appendBody: "More work.",
+            source: "memory/2026-02-04.md",
+        });
+        await engine.writeResults([ar], 1);
+        const acme = await wiki.read("acme-launch");
+        const globex = await wiki.read("globex-launch");
+        expect(acme!.redirectTo).toBeUndefined();
+        expect(globex!.redirectTo).toBeUndefined();
+        expect(acme!.supersedes ?? []).toEqual([]);
+        expect(globex!.supersedes ?? []).toEqual([]);
+    });
+
+    it("skips pages with fewer than 3 sources (structural pre-filter)", async () => {
+        const { engine, wiki, model } = await setup();
+        await wiki.stub({
+            slug: "a-page",
+            name: "A Page",
+            description: "Too few sources.",
+            category: "entity",
+            source: "memory/2026-04-01.md",
+            body: "Body.",
+        });
+        // Only 1 source — below the ≥3 trigger.
+        await wiki.stub({
+            slug: "b-page",
+            name: "B Page",
+            description: "Also too few sources.",
+            category: "entity",
+            source: "memory/2026-04-01.md",
+            body: "Body.",
+        });
+        // If the verifier WERE called, it would merge. Set response
+        // to confirm — the assertion is that we DON'T see a merge.
+        model.response = JSON.stringify({
+            same: true,
+            canonical_slug: "b-page",
+            old_name: "A Page",
+            confidence: "high",
+            reasoning: "should-not-be-asked.",
+        });
+        const ar = emptyAnalysisResult(candidate(["memory/2026-04-02.md"]));
+        ar.wikiOps.push({
+            op: "update",
+            slug: "b-page",
+            appendBody: "More.",
+            source: "memory/2026-04-02.md",
+        });
+        await engine.writeResults([ar], 1);
+        const a = await wiki.read("a-page");
+        const b = await wiki.read("b-page");
+        expect(a!.redirectTo).toBeUndefined();
+        expect(b!.redirectTo).toBeUndefined();
     });
 });

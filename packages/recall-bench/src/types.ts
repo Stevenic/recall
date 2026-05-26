@@ -184,6 +184,15 @@ export interface QAPair {
     forbiddenSessions?: string[];
     /** What a correctly-behaving memory system should do for this question. */
     expectedDisclosure?: ExpectedDisclosure;
+    /**
+     * Day-number cutoff after which this Q&A becomes obsolete because the
+     * corpus has superseded the fact the reference encodes. Lets a Q&A
+     * author retire pairs whose unpinned phrasing would yield the latest
+     * value rather than the day-N-window value the reference holds.
+     * Omit for pairs whose reference stays correct for the lifetime of
+     * the corpus.
+     */
+    irrelevantAfter?: number;
 }
 
 // ---------------------------------------------------------------------------

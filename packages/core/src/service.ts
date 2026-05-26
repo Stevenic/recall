@@ -15,7 +15,9 @@ import type { HierarchicalMemoryConfig } from "./hierarchical-config.js";
 import type { SearchResult } from "./interfaces/index.js";
 import { LocalFileStorage } from "./defaults/local-file-storage.js";
 import { LocalEmbeddings } from "./defaults/local-embeddings.js";
+import { LocalReranker } from "./defaults/local-reranker.js";
 import { VectraIndex } from "./defaults/vectra-index.js";
+import type { Reranker } from "./interfaces/reranker.js";
 import { computeSalienceWeights } from "./salience.js";
 import { SearchLogger } from "./search-logger.js";
 import { DreamEngine } from "./dream-engine.js";
@@ -28,6 +30,8 @@ import type {
 import { IdentityLoader, type IdentityConfig } from "./identity.js";
 import { WikiEngine } from "./wiki-engine.js";
 import type { WikiConfig } from "./wiki-types.js";
+import { withTemporalTag } from "./temporal-tag.js";
+export { withTemporalTag } from "./temporal-tag.js";
 
 export interface WatchConfig {
     syncOnChange?: boolean; // default: true
@@ -41,6 +45,23 @@ export interface MemoryServiceConfig {
     embeddings?: EmbeddingsModel;
     index?: MemoryIndex;
     model?: MemoryModel;
+    /**
+     * Optional model override for dreaming. When unset, dreaming uses
+     * `model`. Useful when dreaming benefits from a stronger reasoning
+     * model than compaction or query-time synthesis — dreaming's
+     * cross-cutting analysis + wiki-op decisions reward extra capability
+     * more than per-turn synthesis does.
+     */
+    dreamingModel?: MemoryModel;
+    /**
+     * Optional cross-encoder reranker for second-stage retrieval. When
+     * set, search pulls a larger first-stage candidate set and reranks
+     * it before returning. When unset, defaults to a local `LocalReranker`
+     * (Xenova/ms-marco-MiniLM-L-6-v2, ~22MB, no API key). Pass `null` to
+     * disable reranking entirely (e.g. for tests that don't want to load
+     * the cross-encoder model).
+     */
+    reranker?: Reranker | null;
     compaction?: Partial<CompactionConfig>;
     watch?: WatchConfig;
     hierarchical?: HierarchicalMemoryConfig;
@@ -108,6 +129,20 @@ export class MemoryService {
             config.wiki,
             { model: config.model },
         );
+        // Resolve reranker. Default-on with `LocalReranker` (Xenova/ms-
+        // marco-MiniLM-L-6-v2, ~22MB lazy ONNX). `null` opts out; an
+        // explicit instance overrides the default.
+        //
+        // SearchService skips the rerank pass when the query has an
+        // explicit date pin — the cross-encoder rates token-similar
+        // dailies above date-anchored ones and on those questions the
+        // agent's prompt already knows to memory_get the pinned date
+        // directly. For everything else the rerank materially improves
+        // top-3 precision.
+        const reranker: Reranker | undefined =
+            config.reranker === null
+                ? undefined
+                : (config.reranker ?? new LocalReranker());
         this._search = new SearchService(
             this._index,
             this._files,
@@ -116,6 +151,7 @@ export class MemoryService {
                 ? { scoreBoost: this._wiki.config.scoreBoost }
                 : undefined,
             this._wiki.enabled ? this._wiki : undefined,
+            reranker,
         );
 
         // Wire up search logging if dreaming is enabled
@@ -271,16 +307,18 @@ export class MemoryService {
 
     private _getDreamEngine(): DreamEngine {
         if (!this._dreamEngine) {
-            if (!this._config.model) {
+            const dreamingModel =
+                this._config.dreamingModel ?? this._config.model;
+            if (!dreamingModel) {
                 throw new Error(
-                    "A MemoryModel is required for dreaming. Pass `model` in MemoryServiceConfig.",
+                    "A MemoryModel is required for dreaming. Pass `model` or `dreamingModel` in MemoryServiceConfig.",
                 );
             }
             const logger = this._searchLogger ?? new SearchLogger(this._config.memoryRoot, this._storage);
             this._dreamEngine = new DreamEngine(
                 this._files,
                 this._index,
-                this._config.model,
+                dreamingModel,
                 this._storage,
                 logger,
                 this._config.dreaming,
@@ -637,6 +675,11 @@ export class MemoryService {
                     wikiSlug: page.slug,
                     wikiTarget: "private",
                     wikiSources: page.sources.length,
+                    // Grounding flags so the search-time scorer can demote
+                    // pages with unverified or stale claims without an
+                    // extra read. Absent when verification hasn't run.
+                    wikiUnverified: page.grounding?.unverified.length ?? 0,
+                    wikiStale: page.grounding?.stale.length ?? 0,
                 },
             );
         }
@@ -646,40 +689,6 @@ export class MemoryService {
 // ---------------------------------------------------------------------------
 // Temporal embedding helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Prepend an `[as of YYYY-MM-DD]` tag to indexed content. This makes the
- * memory's date a first-class signal in the embedding — queries about
- * "current X" naturally weight toward later dates because the tag carries
- * temporal semantics into the vector space. Cheap (one extra short line
- * per chunk) but possibly the highest-leverage indexing change for
- * temporal-reasoning and contradiction-resolution categories.
- *
- * `date` accepts an ISO date string (YYYY-MM-DD) directly. Other inputs
- * are coerced via Date; if the result is invalid the content is returned
- * untagged so we never corrupt a doc with a junk header.
- */
-export function withTemporalTag(content: string, date: string | Date): string {
-    const iso =
-        typeof date === "string"
-            ? /^\d{4}-\d{2}-\d{2}$/.test(date)
-                ? date
-                : tryIsoFromString(date)
-            : tryIsoFromDate(date);
-    if (!iso) return content;
-    return `[as of ${iso}]\n\n${content}`;
-}
-
-function tryIsoFromString(s: string): string | null {
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString().slice(0, 10);
-}
-
-function tryIsoFromDate(d: Date): string | null {
-    if (isNaN(d.getTime())) return null;
-    return d.toISOString().slice(0, 10);
-}
 
 /** Pull YYYY-MM-DD from filenames like `2026-04-15.md` or `2026-04-15-slug.md`. */
 function extractDateFromFilename(filename: string): string | null {

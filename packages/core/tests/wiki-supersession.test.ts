@@ -96,7 +96,7 @@ describe("WikiPage.supersedes — serialize/parse", () => {
             category: "concept",
             created: "2026-04-01",
             updated: "2026-04-01",
-            sources: ["memory/2026-04-01.md"],
+            sources: [{ uri: "memory/2026-04-01.md" }],
             related: [],
             body: "Body.\n\n**Why:** w.\n\n**How to apply:** h.",
         });
@@ -226,8 +226,17 @@ describe("collectSupersessionSignals", () => {
         expect(candidates).toHaveLength(0);
     });
 
-    it("ignores dailies older than the window", async () => {
+    it("ignores dailies older than the window relative to the latest daily", async () => {
+        // The signal collector anchors its window on the LATEST daily on
+        // disk (not wall-clock) so bench runs over dated corpora still
+        // fire. Set up: one recent daily (no marker) and one very old
+        // daily with a marker that falls outside windowDays.
+        const today = new Date().toISOString().slice(0, 10);
         const veryOld = "2020-01-01";
+        await files.writeDaily(
+            today,
+            `# Today\n\nQuiet day. Reviewed PRs.\n`,
+        );
         await files.writeDaily(
             veryOld,
             `# Old\n\nDecided to switch to MySQL.\n`,
@@ -329,7 +338,7 @@ describe("DreamEngine — supersession op application", () => {
             name: "Ledger database",
             description: "The ledger storage choice.",
             body: "MySQL.\n\n**Why:** Throughput.\n\n**How to apply:** New schema.",
-            sources: ["memory/2026-01-30.md"],
+            sources: [{ uri: "memory/2026-01-30.md" }],
             supersedes: {
                 source: "memory/2026-01-10.md",
                 fact: "Original Postgres pick from day-10 retro",

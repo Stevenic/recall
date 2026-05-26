@@ -36,8 +36,8 @@
     - 7
   requires_synthesis: false
 - id: executive-assistant-q004
-  question: What were the two main ERP migration design topics Jordan kept tracking in the first week?
-  answer: Chart-of-accounts mapping and intercompany eliminations, along with close-calendar sequencing.
+  question: Which ERP migration design topics did Jordan keep tracking in the first week?
+  answer: Jordan kept tracking chart-of-accounts mapping, intercompany eliminations, and close-calendar sequencing.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -158,7 +158,7 @@
     - 14
   requires_synthesis: false
 - id: executive-assistant-q014
-  question: Which internal meeting rule did Jordan keep active unless the meeting was Europe-related?
+  question: Which internal meeting rule did Jamie keep active unless the meeting was Europe-related?
   answer: No internal meetings before 8:30 AM unless Europe-related.
   category: factual-recall
   difficulty: easy
@@ -200,7 +200,7 @@
     - 14
   requires_synthesis: false
 - id: executive-assistant-q017
-  question: Which board member's style did Jordan keep modeling as bottom-line-first and crisp?
+  question: Which board member's style was kept as the reference for board prep as bottom-line-first and crisp?
   answer: Henry Whitfield.
   category: factual-recall
   difficulty: easy
@@ -293,7 +293,7 @@
   requires_synthesis: false
 - id: executive-assistant-q024
   question: What school-year guardrail did Jordan keep active about afternoons, and on which two weekdays did he specifically preserve flexibility where possible?
-  answer: He kept Tuesday and Thursday afternoons flexible where possible.
+  answer: He kept the school-year guardrail of preserving weekday flexibility where possible, specifically keeping Tuesday and Thursday afternoons flexible when possible.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -328,7 +328,7 @@
     - 19
   requires_synthesis: false
 - id: executive-assistant-q027
-  question: What three standing calendar rules did Jordan keep preserving for Jamie during this window?
+  question: What three standing calendar rules did Jordan keep preserving for Jamie's own working calendar during this window?
   answer: No internal meetings before 8:30 unless Europe-related, protect Friday afternoons where possible, and avoid stacking emotionally heavy conversations before board or earnings moments.
   category: factual-recall
   difficulty: easy
@@ -558,8 +558,8 @@
     - 28
   requires_synthesis: false
 - id: executive-assistant-q046
-  question: In the 2026-01-28 executive-team note, what did Jordan require before any external customer communication left the company?
-  answer: Jamie review.
+  question: In the 2026-01-28 executive-team note, what review was required before any customer-facing note left the company?
+  answer: Jamie review was required before any customer-facing note left the company.
   category: decision-tracking
   difficulty: easy
   relevant_days:
@@ -581,7 +581,7 @@
   requires_synthesis: false
 - id: executive-assistant-q048
   question: How did Jordan’s personal communication-style heuristic evolve by 2026-01-27?
-  answer: It stayed centered on direct, human wording with warmth used sparingly, but Jordan became more attentive to avoiding anything that felt overly polished, overly eager, or assistant-like.
+  answer: It stayed centered on direct, human wording with warmth used sparingly, and by 2026-01-27 the heuristic continued to emphasize avoiding drafts that felt overly polished, templated, or assistant-like.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -633,8 +633,8 @@
     - 32
   requires_synthesis: false
 - id: executive-assistant-q054
-  question: What did Jordan say about the ERP migration's place in executive-team on 2026-01-29 and again on 2026-02-04?
-  answer: It stayed in the narrower principal-thread lane unless there was a concrete decision, control issue, or timeline risk.
+  question: What was Jamie's posture on whether the ERP migration belonged on the executive-team agenda on 2026-01-29, and what was the broader routing rule restated on 2026-02-04?
+  answer: On 2026-01-29, Jamie still preferred lightweight executive-team updates unless there was a concrete decision, control issue, or timeline risk. On 2026-02-04, the routing rule was to keep early-stage items on the narrowest useful path and widen to executive-team only when there was a concrete decision, control issue, or timing risk.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -643,7 +643,7 @@
   requires_synthesis: false
 - id: executive-assistant-q055
   question: How did Jamie's personal communication-style preference evolve across the window from 2026-01-29 to 2026-02-04?
-  answer: It stayed direct, human, and concise, but Jordan kept noting that personal notes should feel increasingly natural, lightly warm, and less polished or over-edited.
+  answer: It stayed direct, human, and concise, while the notes increasingly emphasized that personal messages should feel natural, lightly warm, and less polished or over-edited.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -733,7 +733,7 @@
   requires_synthesis: false
 - id: executive-assistant-q063
   question: Across the EA-network syncs in this window, what scheduling format did Marcus Chen repeatedly ask for when Beth needed Jamie time?
-  answer: Three clean options with the context up front, rather than a single forced choice or single slot.
+  answer: Three options with the context up front.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -815,7 +815,7 @@
   requires_synthesis: true
 - id: executive-assistant-q071
   question: What remained unconfirmed about Tess’s pediatric appointment throughout the window?
-  answer: The exact appointment date and time were still not locked, and pickup coverage still needed to be verified if the visit ran long.
+  answer: What remained unconfirmed was the exact appointment time, and pickup coverage still needed to be verified if the visit ran long.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -841,6 +841,7 @@
     - 41
     - 42
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q073
   question: What file did Jordan create on Sunday (2026-02-15) for the Caldwell Group written remediation plan?
   answer: "`incidents/caldwell_group_remediation_plan_draft.md`"
@@ -900,7 +901,7 @@
   requires_synthesis: false
 - id: executive-assistant-q079
   question: What was Jordan's answer to Sara Okonkwo about whether the Q1 operating narrative needed to change because of the ERP program?
-  answer: No change was needed; the Q1 operating narrative stayed unchanged unless ERP timing began to affect close confidence, forecast quality, reporting cadence, or another concrete finance/control issue.
+  answer: "Jordan told Sara that no change was needed today: the Q1 operating narrative should stay unchanged unless ERP timing started to create a concrete timing or control issue. He flagged ERP as a watch item because it could eventually affect close timing, reporting cadence, or working-capital processes, but said he had not seen a material finance delta yet."
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -908,7 +909,7 @@
   requires_synthesis: false
 - id: executive-assistant-q080
   question: Did Jordan receive any new school communication about Riley between Thursday (2026-02-12) and Wednesday (2026-02-18) of this window?
-  answer: No. Each day's family update said no new school communication or no fresh teacher feedback had arrived.
+  answer: No. On each day from Thursday, 2026-02-12 through Wednesday, 2026-02-18, the Riley family update said no new school communication arrived; several entries also noted that no fresh teacher feedback had arrived yet.
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -940,7 +941,7 @@
     - 49
   requires_synthesis: true
 - id: executive-assistant-q083
-  question: What standing travel preferences did Jordan keep as defaults for Jamie throughout this window?
+  question: What standing travel preferences did Jamie keep as defaults throughout this window?
   answer: Aisle seats, avoiding red-eyes when possible, and leaving at least 90 minutes between landing and external meetings.
   category: recency-bias-resistance
   difficulty: easy
@@ -962,7 +963,7 @@
     - 49
   requires_synthesis: true
 - id: executive-assistant-q085
-  question: What were the three core ERP migration design topics Jordan kept tracking during days 50–56?
+  question: What three core ERP migration design topics was Jordan tracking on day 50?
   answer: Chart-of-accounts mapping, intercompany eliminations, and close-calendar sequencing.
   category: factual-recall
   difficulty: easy
@@ -1073,8 +1074,8 @@
     - 56
   requires_synthesis: false
 - id: executive-assistant-q097
-  question: By 2026-02-25, had the Q1 earnings issue been broadened to a wider executive-team briefing?
-  answer: No. Jordan kept the narrative contained to Jamie, Daniel, and finance, and no broader executive-team briefing had been scheduled.
+  question: By 2026-02-25, had Jordan scheduled or launched a broader executive-team briefing on the Q1 earnings narrative beyond targeted check-ins, or was broader socialization still deferred until the variance bridge was clearer?
+  answer: "Broader executive-team socialization was still deferred by 2026-02-25: Jordan kept the core narrative ownership with Jamie, Daniel, and finance and had not scheduled a broader exec-team briefing, though there were targeted executive-team check-ins with leaders like Sara, Rashid, Beth, Greg, and Aisha."
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -1154,8 +1155,8 @@
     - 63
   requires_synthesis: true
 - id: executive-assistant-q106
-  question: What changed in the Caldwell escalation between 2026-02-26 and 2026-02-27?
-  answer: On 2026-02-26 it was still in active recovery mode with service status and recovery ETA pending; by 2026-02-27 service had stabilized, the remediation plan was accepted, and the relationship reset was confirmed, moving the incident out of emergency posture.
+  question: How did the Caldwell escalation status change from 2026-02-26 to 2026-02-27?
+  answer: On 2026-02-26, the Caldwell escalation was still in active recovery mode, with root-cause status and recovery ETA still needing confirmation and sponsor-review timing still pending. By 2026-02-27, service had stabilized, the remediation plan had been accepted, and the relationship reset was confirmed, so the incident was moved out of emergency posture and into closeout/follow-through.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -1266,7 +1267,7 @@
   requires_synthesis: false
 - id: executive-assistant-q118
   question: Before 2026-03-11's urgent narrative pivot, what had Jordan repeatedly decided about whether to bring Priscilla and Daniel into the Q1 earnings loop?
-  answer: Jordan repeatedly held off and did not push Priscilla or Daniel into the loop without Jamie’s go-ahead; only on 2026-03-11 did Jamie explicitly request an urgent narrative session with them.
+  answer: Jordan repeatedly held off and did not push Priscilla or Daniel into the loop without Jamie’s go-ahead; before 2026-03-11, the standing posture was to wait for Jamie’s approval or next prompt on whether to start message-shaping with them.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -1303,7 +1304,7 @@
   requires_synthesis: false
 - id: executive-assistant-q121
   question: "How did Jordan characterize the ERP migration across the week: as a systems conversion, an operating reset, or something else?"
-  answer: Jordan consistently treated it as an early design-capture, operating-finance issue rather than just a systems conversion or an operating reset.
+  answer: Jordan characterized the ERP migration as an early-stage design capture or operating-finance issue, not just a systems conversion. In executive-team discussion, it was also described as program-management rather than an operating reset.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -1416,8 +1417,8 @@
     - 77
   requires_synthesis: true
 - id: executive-assistant-q132
-  question: When Greg Liu asked for a same-day commercial read, what was Jordan's standing answer across the week?
-  answer: That there was no immediate commercial action required; Jordan would escalate only if the bridge or related work showed revenue timing, customer commitments, customer confidence, or other customer-facing commercial impact.
+  question: Across days 71, 72, and 77, when Greg Liu asked for a same-day commercial read, what consistent answer did Jordan give about whether any immediate commercial action was needed and what would trigger escalation?
+  answer: Jordan’s consistent answer was that no immediate commercial action was required; Jordan would escalate only if the earnings/variance bridge showed revenue timing, customer commitments or expectations, customer confidence, or other customer-facing impact.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -1471,8 +1472,8 @@
     - 77
   requires_synthesis: true
 - id: executive-assistant-q137
-  question: How did Daniel Kim's phrasing about the earnings read evolve between Wednesday (2026-03-18) and Tuesday (2026-03-12)?
-  answer: On Wednesday he said, 'If there’s a harder read, I want to know before it leaks into other conversations.' By Tuesday he sharpened that to, 'I want the hard read, not the softened version.'
+  question: How did Daniel Kim’s phrasing about the earnings read change between the 2026-03-12 daily and the 2026-03-18 daily?
+  answer: "It became more direct: on 2026-03-12 Daniel said, “If there’s a harder read, I want to know before it leaks into other conversations,” and on 2026-03-18 he said, “I want the hard read, not the softened version.”"
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -1511,7 +1512,7 @@
   requires_synthesis: false
 - id: executive-assistant-q141
   question: Did Jordan send any investor-facing, board-facing, or customer-facing material during the weekend (2026-03-22) stabilization sweeps?
-  answer: No. On both Saturday and Sunday, Jordan kept all three workstreams in draft or review state and did not send investor-facing, board-facing, or customer-facing material.
+  answer: No. On both Saturday and Sunday, the logs say all three workstreams stayed in draft or review state and no investor-facing, board-facing, or customer-facing material was sent.
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -1590,7 +1591,7 @@
   requires_synthesis: true
 - id: executive-assistant-q149
   question: In the family planning thread, what remained pending for Tess's pediatric appointment throughout the window?
-  answer: The exact appointment date and time were still not locked, and pickup coverage still needed to be verified if the visit ran long.
+  answer: What remained pending throughout the window was confirmation of Tess’s exact appointment date and time, along with verification of who would cover pickup if the visit ran long.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -1730,7 +1731,7 @@
   requires_synthesis: false
 - id: executive-assistant-q163
   question: What were the three highest-risk areas Jordan kept at the center of Q1 likely-questions handling during the earnings closeout work?
-  answer: Demand softness, margin pressure, and what changed in operating posture.
+  answer: Demand softness, margin pressure, and operating-posture change.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -1768,9 +1769,10 @@
     - 97
     - 98
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q167
   question: After the initial Condor setup milestone in the principal session, when was the target identity explicitly mapped, and to what company?
-  answer: The setup milestone appeared in the principal session on days 95–97, and the identity was explicitly mapped in the isolated Project Condor session on 2026-04-06 to Northstar Gridworks, Inc.
+  answer: After the initial Condor setup milestone in the principal session, the target identity was explicitly mapped in the isolated Project Condor session on 2026-04-05 to Northstar Gridworks, Inc.
   category: cross-reference
   difficulty: medium
   relevant_days:
@@ -1794,7 +1796,7 @@
   requires_synthesis: true
 - id: executive-assistant-q169
   question: Across days 92–98, did Riley receive any new school communication or confirmed conference slots?
-  answer: No. Jordan repeatedly noted that no new school communication arrived and that conference dates remained unconfirmed.
+  answer: Yes. Across days 92–98, Riley’s logs repeatedly say no new school communication arrived, and the broader child-calendar sweep notes that conference dates remained unconfirmed, with conference dates still awaited from Mrs. Hammond.
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -1836,7 +1838,7 @@
   requires_synthesis: true
 - id: executive-assistant-q172
   question: What changed between the weekend principal-session handling of Q1 follow-up and 2026-04-08's handling of it?
-  answer: Over the weekend, Jordan treated the Q1 call and follow-up as complete for logging purposes but still kept residual edits and wording questions pending; by 2026-04-08, Jordan had actually closed the sell-side follow-up and transferred the remaining commitments into To Do for tracked execution.
+  answer: Over the weekend, the log treated the Q1 call and follow-up as complete even though residual edits, wording questions, and additional investor-follow-up language were still pending; by 2026-04-08, the sell-side follow-up was explicitly closed and the remaining open Q1 commitments were moved into To Do.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -1846,7 +1848,7 @@
   requires_synthesis: true
 - id: executive-assistant-q173
   question: Why did Jordan keep debt commitment language for Project Condor in draft form rather than circulate it more broadly?
-  answer: Because the financing structure was still contingent on Jamie’s final price discipline and remaining diligence and legal outputs, especially covenant headroom and the change-of-control risk, so Jordan kept the debt language internal to the Condor group until Jamie reviewed the refreshed diligence summary.
+  answer: Because the financing structure was still contingent on Jamie’s final price discipline and the remaining diligence and legal outputs, Jordan kept the debt language internal to the Condor group and in draft form until Jamie reviewed the refreshed diligence summary.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -1925,6 +1927,7 @@
   relevant_days:
     - 99
   requires_synthesis: false
+  irrelevant_after: 142
 - id: executive-assistant-q181
   question: What financing structure remained in draft for Project Condor through the window?
   answer: $70M cash on hand, $95M senior secured term loan, and $25M delayed-draw revolver availability, for $190M total committed capacity.
@@ -1939,6 +1942,7 @@
     - 104
     - 105
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q182
   question: What did Rashid Patel warn could happen if executive-team follow-through notes started sounding like a disclosure document?
   answer: He said he wanted to see it first and told Jordan to keep the internal notes clean and factual.
@@ -1976,6 +1980,7 @@
     - 104
     - 105
   requires_synthesis: true
+  irrelevant_after: 499
 - id: executive-assistant-q185
   question: How did Jordan keep the Q1 investor narrative aligned with board-prep after the earnings call?
   answer: By keeping the board story synchronized with the locked FY27 guidance reset language and the profitable-growth framing, without introducing a separate board narrative fork.
@@ -1986,7 +1991,7 @@
   requires_synthesis: true
 - id: executive-assistant-q186
   question: What exact wording did Jamie approve for the board-facing availability note after correcting the overly specific draft?
-  answer: Use only that Jamie had a personal hard-stop from 10:00 to 12:00, and urgent items should route to Jordan.
+  answer: Use only that Jamie had a personal hard-stop from 10:00 to 12:00, and urgent items should route to me.
   category: contradiction-resolution
   difficulty: easy
   relevant_days:
@@ -1994,7 +1999,7 @@
   requires_synthesis: false
 - id: executive-assistant-q187
   question: In the corrected board-prep handling, who was supposed to receive urgent items during Jamie's hard-stop?
-  answer: Jordan.
+  answer: Urgent items were supposed to route to me during Jamie’s hard-stop.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -2044,6 +2049,7 @@
   relevant_days:
     - 106
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q193
   question: Across the Condor diligence updates in this window, what remained the central financial issue and what percentage of FY2025 revenue did it represent?
   answer: Top-three-customer concentration remained the central financial issue, representing roughly 46% of FY2025 revenue.
@@ -2058,6 +2064,7 @@
     - 111
     - 112
   requires_synthesis: true
+  irrelevant_after: 142
 - id: executive-assistant-q194
   question: What did Jamie tell Jordan about how to structure briefings and explanations of the miss?
   answer: “Keep it tight. I want the answer first, then the why. Don't over-explain the miss.”
@@ -2104,7 +2111,7 @@
   requires_synthesis: true
 - id: executive-assistant-q198
   question: What exact board-safe wording did Jamie approve for the corrected board-prep note, and how were urgent items supposed to be handled during that window?
-  answer: The note was to say only that Jamie had a personal hard-stop from 10:00 to 12:00, and urgent items should route to Jordan.
+  answer: The note was to say only that Jamie had a personal hard-stop from 10:00 to 12:00, and urgent items should route to me.
   category: contradiction-resolution
   difficulty: easy
   relevant_days:
@@ -2207,6 +2214,7 @@
     - 118
     - 119
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q208
   question: What was the confirmed top-three-customer concentration for Northstar Gridworks in the Condor diligence updates?
   answer: The top three customers represented roughly 46% of FY2025 revenue.
@@ -2221,6 +2229,7 @@
     - 118
     - 119
   requires_synthesis: false
+  irrelevant_after: 142
 - id: executive-assistant-q209
   question: Did the family or personal-children sessions ever confirm Riley's conference dates, sports practice times, or Tess's exact pediatric appointment time during days 113–119?
   answer: No. Riley's conference dates and sports practice times remained unconfirmed, and Tess's exact pediatric appointment time was still pending final confirmation.
@@ -2320,6 +2329,7 @@
     - 125
     - 126
   requires_synthesis: true
+  irrelevant_after: 142
 - id: executive-assistant-q219
   question: What financing structure stayed in place for Project Condor through Tuesday, 2026-05-05?
   answer: $70M cash on hand, a $95M senior secured term loan, and $25M of delayed-draw revolver availability, for $190M total committed capacity.
@@ -2348,8 +2358,8 @@
     - 125
   requires_synthesis: true
 - id: executive-assistant-q221
-  question: On Tuesday (2026-05-06), what two concrete household adjustments were made even though the family calendar was otherwise kept light?
-  answer: Jordan protected the morning around Riley’s school item and held the afternoon open for Tess’s medical coverage.
+  question: On the Tuesday household coordination entry for 2026-05-05, what two concrete household adjustments were made even though the family calendar was otherwise kept light?
+  answer: "The household calendar was kept light, but two concrete adjustments were made: the morning was protected around Riley’s school item, and the afternoon was held open for Tess’s medical coverage."
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -2450,8 +2460,8 @@
     - 133
   requires_synthesis: false
 - id: executive-assistant-q230
-  question: What was the latest stated boundary for Jamie's outbound authority during days 127–133?
-  answer: Jordan could send on Jamie’s behalf for routine logistics only, while sensitive or externally risky items still required Jamie review.
+  question: During days 127–133, what was the latest stated boundary for send-on-behalf outbound authority on Jamie’s behalf?
+  answer: Send-on-behalf authority remained limited to routine logistics only, while sensitive or externally risky items still required Jamie review.
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
@@ -2487,7 +2497,7 @@
   requires_synthesis: false
 - id: executive-assistant-q233
   question: How did the direct-reports focus shift from 2026-05-07 to 2026-05-12?
-  answer: "On 2026-05-07, the direct reports were aligned around ERP phased-rollout dependencies across treasury, accounting, forecast, and IR. By 2026-05-12, the focus had shifted to post-close follow-through: treasury watch mode, accounting dependency visibility, forecast bridge reconciliation to Jamie’s locked language, and keeping open commitments in To Do."
+  answer: "On 2026-05-07, the direct reports were aligned around ERP phased-rollout dependency tracking across treasury, accounting, forecast, and IR, with open commitments kept in To Do. By 2026-05-12, the focus had shifted to post-close follow-through: treasury in watch mode, accounting dependency visibility, forecast bridge reconciliation to locked language, and keeping remaining open commitments in To Do."
   category: synthesis
   difficulty: hard
   relevant_days:
@@ -2503,8 +2513,8 @@
     - 140
   requires_synthesis: false
 - id: executive-assistant-q235
-  question: What file on 2026-05-20 was updated to track follow-up questions for the first round of Condor management presentations?
-  answer: "`project-condor/condor_q_and_a_tracker_v45.md`"
+  question: What file on 2026-05-20 was updated as the single source of truth for Condor follow-up questions?
+  answer: "`project-condor/qna_tracker.md`"
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -2565,6 +2575,7 @@
     - 139
     - 140
   requires_synthesis: false
+  irrelevant_after: 481
 - id: executive-assistant-q242
   question: How did the timing of Jamie's late-June family travel planning become more specific by 2026-05-20 compared with days 135–139?
   answer: Earlier it was framed generically as a late-June family window after the June board and Q2 earnings sequence, but by 2026-05-20 Jamie specifically asked to plan family travel immediately after the late-June earnings push while keeping the destination out of work-facing notes.
@@ -2687,16 +2698,16 @@
     - 147
   requires_synthesis: true
 - id: executive-assistant-q253
-  question: What school-related updates for Riley and Tess were still unconfirmed by Tuesday, 2026-05-27?
-  answer: Conference dates from Mrs. Hammond and Riley’s and Tess’s sports schedules or practice times were still unconfirmed.
+  question: What school-related items for Riley and Tess were still unconfirmed by Tuesday, 2026-05-27?
+  answer: Conference dates from Mrs. Hammond and sports practice times were still unconfirmed.
   category: factual-recall
   difficulty: easy
   relevant_days:
     - 147
   requires_synthesis: false
 - id: executive-assistant-q254
-  question: What did Marcus Chen require for Beth-related scheduling asks that touched Jamie, according to the EA-network sync repeated through the week?
-  answer: Three options plus context, with a neutral title and the decision frame if it touched Jamie.
+  question: What did Marcus Chen require for Beth-related scheduling asks, and what extra handling did he want if the ask touched Jamie, according to the EA-network sync repeated through the week?
+  answer: Three options plus context; if it touched Jamie, keep the title neutral and give him the decision frame.
   category: group-session-attribution
   difficulty: easy
   relevant_days:
@@ -2761,7 +2772,7 @@
   requires_synthesis: true
 - id: executive-assistant-q261
   question: What was the corrected status of the earlier Condor belief that the base case was $510M with $50M synergy?
-  answer: It was marked superseded and no longer valid as a working reference.
+  answer: It was no longer valid as a working reference; the revised valuation was treated as the only valid working reference.
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
@@ -2783,6 +2794,7 @@
     - 153
     - 154
   requires_synthesis: true
+  irrelevant_after: 154
 - id: executive-assistant-q263
   question: Did Jordan receive any send-as authority or independent expense approval for Jamie during days 148–154?
   answer: No. The boundary stayed at send-on-behalf for routine logistics only, with no send-as authority and no independent expense approval granted.
@@ -2824,7 +2836,7 @@
   requires_synthesis: false
 - id: executive-assistant-q267
   question: Between days 151 and 154, what changed in Jamie's operating posture from the weekend (2026-05-31) to the workweek?
-  answer: On days 151–152, Jordan treated the days as quiet, low-noise maintenance days with no new work-facing commitments; on days 153–154, the posture shifted to high-load close-week sequencing and calendar protection around June close, ERP checkpoints, and Q2 board prep.
+  answer: From the weekend (days 151–152) to the workweek (days 153–154), Jamie’s posture shifted from quiet, low-noise maintenance days with conservative triage and no new work-facing commitments into a tighter weekday sequencing-and-protection mode. On Monday and Tuesday, the focus was on protecting prep time, avoiding calendar sprawl, and sequencing work around the June close, ERP migration checkpoints, and Q2 board-cycle timing.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -2835,7 +2847,7 @@
   requires_synthesis: true
 - id: executive-assistant-q268
   question: On which day did the Q2 board pre-read distribution begin with the budget-reforecast and operating-risk sections front-loaded?
-  answer: 2026-06-07 (2026-06-06, Saturday).
+  answer: 2026-06-06 (Saturday).
   category: temporal-reasoning
   difficulty: easy
   relevant_days:
@@ -2918,6 +2930,7 @@
     - 160
     - 161
   requires_synthesis: true
+  irrelevant_after: 233
 - id: executive-assistant-q277
   question: What remained the key legal issue in Project Condor across the week?
   answer: The change-of-control consent issue remained the key legal issue.
@@ -2992,6 +3005,7 @@
   relevant_days:
     - 168
   requires_synthesis: false
+  irrelevant_after: 233
 - id: executive-assistant-q284
   question: What earlier Condor valuation belief was explicitly marked superseded in the correction log during this window?
   answer: The earlier $510M base case with $50M synergy.
@@ -3018,6 +3032,7 @@
     - 162
     - 168
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q287
   question: Across the June 10–16 principal updates, what three ERP migration references remained the stable baseline?
   answer: Chart-of-accounts mapping, intercompany eliminations, and close-calendar sequencing.
@@ -3175,6 +3190,7 @@
     - 174
     - 175
   requires_synthesis: true
+  irrelevant_after: 233
 - id: executive-assistant-q303
   question: What financing package remained unchanged in the Condor legal-financing thread?
   answer: $70M cash on hand, a $95M senior secured term loan, $25M delayed-draw revolver availability, for $190M total committed capacity.
@@ -3189,6 +3205,7 @@
     - 174
     - 175
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q304
   question: How did the board-prep narrative on 2026-06-24 connect to the earnings script work on the same day?
   answer: Board prep was updated to echo the earnings script’s emphasis on margin durability and customer recovery, treating Caldwell as a contained escalation with visible response actions while keeping the board language aligned without duplicating the earnings workstream.
@@ -3215,7 +3232,7 @@
   requires_synthesis: false
 - id: executive-assistant-q307
   question: Across the principal-session ERP migration updates in this window, what design elements were kept unchanged?
-  answer: Jordan kept chart-of-accounts mapping as the baseline reference, left intercompany elimination logic unchanged, and preserved close-calendar sequencing as the operating plan.
+  answer: The principal-session ERP migration updates kept chart-of-accounts mapping as the baseline reference, left intercompany elimination logic unchanged, and preserved close-calendar sequencing as the operating plan.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -3269,8 +3286,8 @@
     - 176
   requires_synthesis: false
 - id: executive-assistant-q313
-  question: What changed between 2026-06-25 and 2026-06-30 regarding the Caldwell Group reschedule status?
-  answer: On 2026-06-25, the external send was still blocked pending Jamie’s review; by 2026-06-30, a customer-facing reschedule had been sent to Theresa Caldwell after Jamie’s approval, with the corrected destination-free wording.
+  question: What was the Caldwell Group reschedule status on 2026-06-25, and what was the latest explicitly recorded status before then?
+  answer: On 2026-06-25, the corpus says the Theresa Caldwell customer-facing reschedule note had already been sent after Jamie’s approval, using destination-free wording and offering alternate times after his return. The latest prior explicit status was on 2026-06-24, when the external send was still blocked pending Jamie’s review.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -3303,6 +3320,7 @@
     - 176
     - 182
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q317
   question: What post-call scheduling change did Jamie request around the Q2 earnings cycle, and how was it treated?
   answer: Jamie requested a lighter meeting load immediately after the holiday week, and Jordan treated it as a calendar and pacing directive rather than a narrative change.
@@ -3321,7 +3339,7 @@
   requires_synthesis: true
 - id: executive-assistant-q319
   question: Did Jamie’s authorization boundary expand during days 177–182 to allow Jordan to independently handle customer escalations, board items, HR/legal topics, or other material-risk messages?
-  answer: No. Jordan explicitly noted that Jamie’s authorization scope did not change and that no such authority was inferred.
+  answer: No. The logs state that Jamie’s outbound authority boundary was not extended, that no authority was inferred for customer escalations, board items, HR/legal topics, or any material-risk message, and that Jamie’s authorization scope did not change during this period.
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -3363,8 +3381,8 @@
     - 189
   requires_synthesis: false
 - id: executive-assistant-q324
-  question: Across July 1 through July 3, what version changes did the ERP steering checkpoint outline go through?
-  answer: It moved from `erp/steering_checkpoint_outline_v13.md` on July 1 to `v14` on July 2 and `v15` on July 3.
+  question: Across the daily records for 2026-07-01 through 2026-07-03, what version changes did the ERP steering checkpoint outline go through?
+  answer: It moved from `erp/steering_checkpoint_outline_v13.md` on 2026-07-01 to `v14` on 2026-07-02 and `v15` on 2026-07-03.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -3380,6 +3398,7 @@
   relevant_days:
     - 189
   requires_synthesis: false
+  irrelevant_after: 233
 - id: executive-assistant-q326
   question: What earlier Condor valuation belief was explicitly marked superseded during this window?
   answer: The earlier $510M base case with $50M synergy.
@@ -3388,6 +3407,7 @@
   relevant_days:
     - 183
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q327
   question: In the ea-network thread, whose scheduling rule required three options plus context for Beth-related asks, and what additional title rule applied when Jamie was implicated?
   answer: Marcus Chen’s rule; if it touched Jamie, the title had to stay neutral.
@@ -3411,7 +3431,7 @@
   requires_synthesis: true
 - id: executive-assistant-q329
   question: Did Jordan ever disclose the family vacation destination in any work-facing or customer-facing artifact during days 183–189?
-  answer: No. Jordan repeatedly kept the destination out of work-facing, customer-facing, and semi-external language.
+  answer: No. Jordan repeatedly kept the destination out of work-facing and customer-facing language.
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -3442,8 +3462,8 @@
     - 188
   requires_synthesis: false
 - id: executive-assistant-q332
-  question: What new permission did Jamie grant on 2026-07-14, and what limitation did Jordan keep on it?
-  answer: Jamie granted send-as permission for a narrow class of inbox auto-replies, and Jordan kept it limited to low-risk routine responses with an audit trail, excluding sensitive HR, legal, board, and customer-escalation content.
+  question: What new permission did Jamie grant on 2026-07-14, and what limitations did Jamie keep on it?
+  answer: Jamie granted send-as permission for a narrow class of inbox auto-replies, while keeping it limited to low-risk routine responses with an audit trail and excluding sensitive HR, legal, board, and customer-escalation content.
   category: decision-tracking
   difficulty: easy
   relevant_days:
@@ -3513,6 +3533,7 @@
   relevant_days:
     - 196
   requires_synthesis: false
+  irrelevant_after: 233
 - id: executive-assistant-q340
   question: What older Condor valuation belief was explicitly marked as superseded during the July 8–14 refreshes?
   answer: The earlier $510M base case with $50M synergy.
@@ -3527,6 +3548,7 @@
     - 195
     - 196
   requires_synthesis: true
+  irrelevant_after: 499
 - id: executive-assistant-q341
   question: In the EA-network protocol, what did Marcus Chen require for Beth-related scheduling asks that touched Jamie?
   answer: Three options plus context, with a neutral title and the decision frame if it touched Jamie.
@@ -3627,6 +3649,7 @@
     - 202
     - 203
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q351
   question: What latest Condor valuation range and walkaway floor did Jamie ask Jordan to restate during this window?
   answer: The indicative purchase-price range was $245M–$275M enterprise value, and the walkaway floor was $235M enterprise value.
@@ -3665,8 +3688,8 @@
     - 200
   requires_synthesis: false
 - id: executive-assistant-q354
-  question: Did Jordan create any new files, calendar changes, or outbound messages in the principal session on Sunday (2026-07-20)?
-  answer: No. Jordan created no new files, made no calendar changes, and sent no outbound messages in the principal session on Sunday.
+  question: In the principal session on Sunday (2026-07-20), did Jordan create any new files, make any calendar changes, or send any outbound messages?
+  answer: No. In the principal session on Sunday, Jordan created no new files, made no calendar changes, and sent no outbound messages.
   category: negative-recall
   difficulty: easy
   relevant_days:
@@ -3681,7 +3704,7 @@
     - 210
   requires_synthesis: false
 - id: executive-assistant-q356
-  question: What did Jamie tell Yuki on 2026-07-28 to use as the forecast baseline for the first FY27 budget pass?
+  question: What did Jamie tell Yuki on 2026-07-27 to use as the forecast baseline for the first FY27 budget pass?
   answer: Jamie said, “Use the one we can defend, and keep the downside honest.”
   category: group-session-attribution
   difficulty: easy
@@ -3733,6 +3756,7 @@
     - 209
     - 210
   requires_synthesis: true
+  irrelevant_after: 233
 - id: executive-assistant-q361
   question: In the Monday (2026-07-28) board-prep materials, what FY27 budget timeline did Jordan preserve as board-safe context?
   answer: Assumptions reset remained in progress for summer 2026; divisional submissions were still on track for early fall; CEO/CFO iteration was slated for October; ELT sign-off in November; and board approval in December.
@@ -3780,7 +3804,7 @@
   requires_synthesis: true
 - id: executive-assistant-q365
   question: How did the executive-team treatment of external messaging compare between the capital-allocation framework on 2026-07-23 and the FY27 budget reset on 2026-07-28?
-  answer: In both cases, Jordan kept the work internal and did not approve any external messaging change or investor-facing rewrite until Jamie explicitly asked and the framework or budget story was stable enough to defend.
+  answer: In both cases, the work stayed internal and no external messaging change or investor-facing rewrite was approved while the framework or budget story was still being shaped. For the capital-allocation framework, Jamie said, “Not until the framework is stable enough to defend,” and for the FY27 budget reset, he said, “Not until the numbers and the story both hold together,” with external use deferred until Jamie explicitly asked for it.
   category: cross-reference
   difficulty: hard
   relevant_days:
@@ -3802,7 +3826,7 @@
     - 210
   requires_synthesis: true
 - id: executive-assistant-q367
-  question: On 2026-07-30, what instruction did Jamie give the direct-reports group about the ERP migration baseline?
+  question: On 2026-07-30, what instruction did Jamie give the direct-reports group about the ERP migration baseline and dependencies?
   answer: Jamie said, "Keep the finance dependencies visible, but don’t reopen the baseline."
   category: group-session-attribution
   difficulty: easy
@@ -3880,6 +3904,7 @@
     - 211
     - 217
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q376
   question: How did the direct-reports focus shift from 2026-07-30 to 2026-08-04?
   answer: On 2026-07-30 the direct-reports touchpoint was about ERP migration dependencies across treasury, accounting, forecast, and IR; by 2026-08-04 it had shifted to FY27 budget-refresh dependencies while keeping the same discipline of tracking impacts without reopening the planning baseline.
@@ -3933,7 +3958,7 @@
   requires_synthesis: false
 - id: executive-assistant-q382
   question: Across the weekend (2026-08-09) days in this window, did Jordan create a normal 6:30 AM weekday briefing?
-  answer: No. Jordan explicitly did not create a briefing on Saturday, 2026-08-08, or Sunday, 2026-08-09.
+  answer: No. The logs show that no weekday-style 6:30 AM briefing was created on Saturday, 2026-08-08, or Sunday, 2026-08-09.
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -3958,6 +3983,7 @@
     - 218
     - 224
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q385
   question: What were Jamie's standing travel defaults that Jordan kept checking against upcoming holds?
   answer: Aisle preference, no red-eyes if avoidable, and at least 90 minutes between landing and external meetings.
@@ -4037,7 +4063,7 @@
     - 231
   requires_synthesis: false
 - id: executive-assistant-q393
-  question: Who said, "Bring me the deltas that matter, and keep the rest in the workstreams" during the August 18 executive-team touchpoint?
+  question: Who said, "Bring me the deltas that matter, and keep the rest in the workstreams" in the executive-team touchpoint recorded on day 231 (covering the August 18 operating narrative)?
   answer: Daniel Kim.
   category: group-session-attribution
   difficulty: easy
@@ -4080,9 +4106,10 @@
     - 230
     - 231
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q397
-  question: Did Jordan authorize any investor-facing rewrite for the FY27 budget or forecast narrative in the executive-team sessions on days 230 or 231?
-  answer: No. Investor-facing language remained internal pending stability and Jamie's approval.
+  question: In the executive-team sessions on days 230 or 231, was any investor-facing rewrite for the FY27 budget or forecast narrative approved, and if so by whom?
+  answer: "No. In the executive-team sessions on days 230 and 231, no investor-facing rewrite was approved; the investor narrative stayed internal pending forecast/framework stability, and any external narrative shift was deferred until Jamie asked for it."
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -4160,7 +4187,7 @@
   requires_synthesis: false
 - id: executive-assistant-q404
   question: What was Jamie's approved send-as boundary during this window for inbox handling?
-  answer: Jordan could use send-as only for routine low-risk auto-replies; HR, legal, board, and customer-escalation messages stayed draft-only unless Jamie reviewed them.
+  answer: Send-as was limited to routine low-risk auto-replies; HR, legal, board, and customer-escalation messages stayed draft-only unless Jamie reviewed them.
   category: decision-tracking
   difficulty: easy
   relevant_days:
@@ -4210,6 +4237,7 @@
     - 232
     - 238
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q410
   question: What were Jamie's three walkaway triggers for Project Condor in this window?
   answer: Customer concentration or renewal risk worsening meaningfully; implementation capacity proving structural rather than temporary; and legal consent timing creating unacceptable close uncertainty.
@@ -4240,6 +4268,7 @@
   relevant_days:
     - 232
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q413
   question: In the Monday (2026-08-25) board-prep lane, what timeline did Jordan preserve as board-safe context for the FY27 annual budget cycle?
   answer: Assumptions reset remained in progress for summer 2026; divisional submissions were on track for early fall; CEO/CFO iteration was slated for October; ELT sign-off in November; and board approval in December.
@@ -4271,8 +4300,8 @@
     - 238
   requires_synthesis: true
 - id: executive-assistant-q416
-  question: On what day did Tomás Reyes's abrupt resignation to join a competitor first appear in the log?
-  answer: 2026-08-28 (2026-08-27).
+  question: On which daily log date did Tomás Reyes’s resignation to join a competitor first appear, and what event date was recorded in that entry?
+  answer: It first appeared in the 2026-08-28 daily log, which recorded that Tomás told Jamie on 2026-08-27 that he was leaving for a competitor.
   category: temporal-reasoning
   difficulty: easy
   relevant_days:
@@ -4300,6 +4329,7 @@
     - 244
     - 245
   requires_synthesis: true
+  irrelevant_after: 499
 - id: executive-assistant-q419
   question: Who said, “Keep the finance dependencies visible, but don’t reopen the baseline.”?
   answer: Jamie.
@@ -4342,8 +4372,8 @@
     - 245
   requires_synthesis: false
 - id: executive-assistant-q423
-  question: Did Jordan authorize any investor communication after Priscilla's checks on ERP, planning, or budget language during this window?
-  answer: No. Investor-facing language remained on hold and Jamie-reviewed only.
+  question: After Priscilla’s checks on ERP, planning, or budget language during this window, was any investor communication authorized?
+  answer: No. After Priscilla’s checks, investor-facing language remained on hold and no investor communication was authorized; everything stayed in review-only / Jamie-reviewed status.
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -4471,6 +4501,7 @@
     - 251
     - 252
   requires_synthesis: true
+  irrelevant_after: 499
 - id: executive-assistant-q436
   question: What financing structure remained unchanged in the Condor legal-financing thread through days 246 to 252?
   answer: $70M cash on hand, $95M senior secured term loan, $25M delayed-draw revolver availability, for $190M total committed capacity.
@@ -4485,6 +4516,7 @@
     - 251
     - 252
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q437
   question: Did any confirmed conference slots or sports practice times arrive for Riley and Tess during days 246 to 252?
   answer: No. Across those days, no confirmed conference slots or sports practice times were reported.
@@ -4513,6 +4545,7 @@
     - 251
     - 252
   requires_synthesis: true
+  irrelevant_after: 499
 - id: executive-assistant-q439
   question: Who said, "Open the search. Keep the title neutral until we decide how we want to message it"?
   answer: Jamie Park.
@@ -4529,9 +4562,10 @@
   relevant_days:
     - 254
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q441
-  question: Which teacher raised a concern about Riley, what was the concern, and what possible next step was suggested?
-  answer: Riley's math teacher flagged a pattern of late homework and suggested a conference before the end of the month if the trend continued.
+  question: Which teacher raised a concern about Riley, what was the concern, and what possible next step was suggested in the 2026-09-10 family note?
+  answer: Riley's math teacher raised the concern; the issue was a pattern of late homework, and a conference before the end of the month was suggested if the trend continued.
   category: decision-tracking
   difficulty: easy
   relevant_days:
@@ -4644,6 +4678,7 @@
   relevant_days:
     - 260
   requires_synthesis: true
+  irrelevant_after: 260
 - id: executive-assistant-q453
   question: As of Tuesday (2026-09-23), what Condor valuation was explicitly kept in wrong-belief state?
   answer: $510M base-case valuation with $50M synergy.
@@ -4660,6 +4695,7 @@
   relevant_days:
     - 266
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q455
   question: Across the Tuesday (2026-09-23) ea-network sync, what condition did Jordan require before moving anything on Jamie's side for Daniel, Sara, Beth, or Aisha?
   answer: A clear business reason and displacement context.
@@ -4687,7 +4723,7 @@
   requires_synthesis: false
 - id: executive-assistant-q458
   question: When did the principal-session board work shift from agenda shaping to packet assembly with a tighter summary page?
-  answer: The shift happened on Monday, 2026-09-21 (2026-09-22).
+  answer: The shift happened on Monday, 2026-09-21.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:
@@ -4919,6 +4955,7 @@
   relevant_days:
     - 280
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q481
   question: Who said, "Keep it to the decision, the risk, and the fallback. If Henry wants more, I’ll give him more — but not in the first minute."?
   answer: Jamie.
@@ -5035,6 +5072,7 @@
     - 286
     - 287
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q494
   question: Across the Wednesday (2026-10-14)-through-Tuesday (2026-10-13) Condor diligence updates from Sandra Ramirez, what two pressure points kept recurring?
   answer: Customer concentration / renewal dependence and working-capital normalization.
@@ -5064,8 +5102,8 @@
     - 287
   requires_synthesis: false
 - id: executive-assistant-q496
-  question: What was the repeated rule for Jamie's authorization scope on inbox handling during this window?
-  answer: Jordan was limited to send-as for routine auto-replies only, while HR, legal, board, and customer-escalation messages stayed draft-only unless Jamie reviewed them.
+  question: What was the repeated rule for Jamie’s inbox authorization scope during this window?
+  answer: The assistant was limited to send-as for routine auto-replies only, while HR, legal, board, and customer-escalation messages stayed draft-only unless Jamie reviewed them.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -5291,9 +5329,10 @@
     - 300
     - 301
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q518
-  question: What financing structure remained unchanged in the Condor legal-financing thread through Tuesday (2026-10-22)?
-  answer: $70M cash on hand, $95M senior secured term loan, $25M delayed-draw revolver availability, for $190M total committed capacity.
+  question: What financing structure remained unchanged in the Condor legal-financing thread through Wednesday, 2026-10-21?
+  answer: The working package stayed unchanged at $70M cash on hand, $95M senior secured term loan, and $25M delayed-draw revolver availability, for $190M total committed capacity.
   category: recency-bias-resistance
   difficulty: medium
   relevant_days:
@@ -5432,7 +5471,7 @@
   requires_synthesis: true
 - id: executive-assistant-q533
   question: Did Jordan ever draft or authorize any external communication about Tomás Reyes's resignation during days 302–308?
-  answer: No. Jordan explicitly did not draft any external communication and kept the news confined to Jamie and the minimum necessary coordination path.
+  answer: No evidence in days 302–308 shows Jordan drafting or authorizing any external communication about Tomás Reyes’s resignation. The logs repeatedly say Jordan did not draft any external communication and did not circulate the news beyond Jamie and the minimum necessary coordination path.
   category: negative-recall
   difficulty: medium
   relevant_days:
@@ -5458,6 +5497,7 @@
     - 307
     - 308
   requires_synthesis: true
+  irrelevant_after: 499
 - id: executive-assistant-q535
   question: What morning briefing time was used for Jamie on the weekday (2026-11-02) principal sessions in days 306–308?
   answer: 6:30 AM.
@@ -5508,7 +5548,7 @@
   requires_synthesis: false
 - id: executive-assistant-q540
   question: Across the executive-team Q3 miss discussions on days 314 and 315, what stayed unchanged about external messaging?
-  answer: External messaging remained blocked pending Jamie's approval of the final narrative; no market-, customer-, or employee-facing language was authorized.
+  answer: "External messaging stayed blocked on both days pending Jamie’s confirmation of the final narrative; no external messaging change was approved."
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -5574,6 +5614,7 @@
     - 314
     - 315
   requires_synthesis: false
+  irrelevant_after: 347
 - id: executive-assistant-q547
   question: What specific financing components made up Project Condor's unchanged working package, and what was the total committed capacity?
   answer: $70M cash on hand, a $95M senior secured term loan, and $25M of delayed-draw revolver availability, for $190M total committed capacity.
@@ -5625,7 +5666,7 @@
   requires_synthesis: false
 - id: executive-assistant-q553
   question: What did Maya want kept separate so the controller transition would not blur the FY27 budget intake?
-  answer: She wanted the submission tracker kept clean and the budget intake kept distinct from the close transition, with treasury's baseline watched separately.
+  answer: She wanted the submission tracker kept clean and didn’t want the close transition to blur the budget intake.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -5708,6 +5749,7 @@
   relevant_days:
     - 323
   requires_synthesis: false
+  irrelevant_after: 347
 - id: executive-assistant-q561
   question: What was the total committed financing capacity being carried for Project Condor during this window?
   answer: $190M total committed capacity.
@@ -5716,6 +5758,7 @@
   relevant_days:
     - 323
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q562
   question: For Project Condor, what remained the key legal issue across the daily updates in this window?
   answer: The change-of-control consent issue remained the key legal issue.
@@ -5738,6 +5781,7 @@
   relevant_days:
     - 323
   requires_synthesis: false
+  irrelevant_after: 359
 - id: executive-assistant-q564
   question: Why was the personal estate-planning signature session rescheduled on 2026-11-21?
   answer: It was rescheduled once to avoid a conflict with the December board and comp week.
@@ -5770,6 +5814,7 @@
   relevant_days:
     - 323
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q568
   question: How did Daniel describe the boundary between board materials and the budget process during board-prep alignment checks?
   answer: He said, “Keep the board story consistent with the budget direction, but don’t make the board room do the budget committee’s job.”
@@ -5849,6 +5894,7 @@
   relevant_days:
     - 330
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q576
   question: What financing structure remained unchanged in the Condor legal-financing thread across this window?
   answer: $70M cash on hand, a $95M senior secured term loan, and $25M delayed-draw revolver availability, for $190M total committed capacity.
@@ -5858,6 +5904,7 @@
     - 330
     - 336
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q577
   question: What two pressure points did Sandra Ramirez keep emphasizing in the Condor diligence updates?
   answer: Customer concentration / renewal dependence and working-capital normalization.
@@ -5902,6 +5949,7 @@
   relevant_days:
     - 330
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q582
   question: Did any new conference confirmations, sports schedule changes, or permission-slip deadlines arrive for Riley and Tess during days 330–336?
   answer: No. Throughout the window, those items remained unconfirmed and the household stayed in watch mode.
@@ -5957,6 +6005,7 @@
     - 337
     - 343
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q588
   question: What standing EA-network scheduling standard did Marcus Chen require for Beth-related asks that might affect Jamie?
   answer: Three options plus context, with a neutral title and the decision frame.
@@ -5983,6 +6032,7 @@
   relevant_days:
     - 337
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q591
   question: Across days 337–343, what remained the only immediate finance risk surface in the executive-team ERP discussions?
   answer: Close-path dependencies.
@@ -6035,6 +6085,7 @@
   relevant_days:
     - 348
   requires_synthesis: false
+  irrelevant_after: 348
 - id: executive-assistant-q597
   question: What prior wrong belief about Yuki Tanaka’s FY27 compensation remained only as historical context after the correction?
   answer: The superseded belief was that Yuki Tanaka’s FY27 bonus target was 35% with standard equity refresh.
@@ -6043,6 +6094,7 @@
   relevant_days:
     - 348
   requires_synthesis: false
+  irrelevant_after: 348
 - id: executive-assistant-q598
   question: Who said, “The board meeting is done. I need the approved items, the follow-up asks, and who owns each one.”?
   answer: Jamie Park.
@@ -6068,6 +6120,7 @@
     - 344
     - 350
   requires_synthesis: true
+  irrelevant_after: 403
 - id: executive-assistant-q601
   question: What were the two recurring diligence pressure points in Sandra Ramirez’s Condor updates throughout this window?
   answer: Customer concentration / renewal dependence and working-capital normalization.
@@ -6111,8 +6164,8 @@
     - 350
   requires_synthesis: false
 - id: executive-assistant-q605
-  question: How did the FY27 budget’s board status evolve across this window from 2026-12-10 to 2026-12-16?
-  answer: It began on 2026-12-10 as a final board-approval packet on the approval path, was recorded as approved after the Q4 board meeting by days 345–346, stayed in closeout and follow-through mode on days 347–349, and by 2026-12-16 the board pre-read had been distributed with final revenue, EBITDA, and capex targets locked.
+  question: Across days 344–350, what statuses are explicitly recorded for the FY27 budget and board materials, including any mentions of approval, closeout follow-through, and later board pre-read distribution?
+  answer: The dailies show the FY27 budget on the final board-approval path on 2026-12-10; by 2026-12-12 the board meeting outcome is recorded as complete and the budget is treated as approved, with days 347–349 focused on closeout and follow-through against the approved baseline; day 350 then separately records distribution of a board pre-read with final revenue, EBITDA, and capex targets, even though that sits awkwardly with the earlier approval-complete language.
   category: temporal-reasoning
   difficulty: hard
   relevant_days:
@@ -6157,6 +6210,7 @@
     - 356
     - 357
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q609
   question: What financing structure for Project Condor remained unchanged through the week?
   answer: $70M cash on hand, a $95M senior secured term loan, and $25M delayed-draw revolver availability, for $190M total committed capacity.
@@ -6171,6 +6225,7 @@
     - 356
     - 357
   requires_synthesis: false
+  irrelevant_after: 403
 - id: executive-assistant-q610
   question: What was the main legal friction point in the Condor legal-financing thread throughout the window?
   answer: The change-of-control consent issue.
@@ -6187,13 +6242,14 @@
   requires_synthesis: false
 - id: executive-assistant-q611
   question: What latest active compensation decision was preserved for Yuki Tanaka after the correction thread?
-  answer: Yuki Tanaka’s FY27 bonus target remained 30% with a coaching plan attached after the 360 review, with standard equity refresh otherwise unchanged.
+  answer: "The latest active compensation decision preserved for Yuki Tanaka was the revised FY27 recommendation: a 30% bonus target plus a coaching plan, with standard equity refresh otherwise unchanged."
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
     - 351
     - 352
   requires_synthesis: false
+  irrelevant_after: 487
 - id: executive-assistant-q612
   question: What standing boundary did Jamie set between personal wealth and compensation prep, and was any residual cross-reference found during the comp-committee checks this week?
   answer: Jamie’s instruction was, “My personal investment balance must never be cross-referenced into comp prep,” and the checks found no active or lingering personal-finance references in the comp workflow.
@@ -6290,8 +6346,8 @@
     - 362
   requires_synthesis: false
 - id: executive-assistant-q620
-  question: What was the superseded Condor banker case that Jamie, Daniel, and Jordan kept in wrong-belief state during the final negotiation close?
-  answer: $510M base-case valuation with $50M synergy.
+  question: What was the superseded Condor banker case that Jamie, Daniel, Rashid, and Sandra kept in wrong-belief state during the final negotiation close?
+  answer: The superseded banker case was $510M base-case valuation with $50M synergy, kept in wrong-belief state during the final Condor negotiation close.
   category: contradiction-resolution
   difficulty: easy
   relevant_days:
@@ -6367,7 +6423,7 @@
   requires_synthesis: true
 - id: executive-assistant-q627
   question: What remained the gating item before adviser outreach or meeting prep in Jamie's personal-finance work?
-  answer: Document completeness—specifically the missing 2025 tax documents, brokerage statements, and related institution details.
+  answer: Document completeness—the missing personal-finance documents remained the gating item before adviser outreach or meeting prep.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -6547,6 +6603,7 @@
     - 377
     - 378
   requires_synthesis: false
+  irrelevant_after: 481
 - id: executive-assistant-q644
   question: Across the ERP migration updates in this window, which three design areas were repeatedly treated as stable reference points?
   answer: Chart-of-accounts mapping, intercompany eliminations, and close-calendar sequencing.
@@ -6721,7 +6778,7 @@
   requires_synthesis: false
 - id: executive-assistant-q658
   question: Why was the boardroom used instead of the 12th-floor conference room for the Caldwell visit prep?
-  answer: Because the meeting was external and high-stakes, and the 12th-floor conference room was considered an unreliable fallback due to AV reliability issues.
+  answer: Because the meeting was external and high-stakes, and the boardroom was used instead of a lower-reliability conference room. The memory also notes that the 12th-floor conference room is unreliable for VIP/external calls.
   category: decision-tracking
   difficulty: easy
   relevant_days:
@@ -6749,7 +6806,7 @@
   requires_synthesis: true
 - id: executive-assistant-q661
   question: According to Marcus Chen in the EA-network syncs, what standard remained active for Beth-related scheduling asks that could affect Jamie?
-  answer: Marcus's three-option standard with context, neutral title, clear displacement, and no ambiguity.
+  answer: Marcus confirmed that his three-option standard remained active for any Beth-related scheduling ask that could affect Jamie.
   category: group-session-attribution
   difficulty: easy
   relevant_days:
@@ -6843,6 +6900,7 @@
     - 384
     - 385
   requires_synthesis: true
+  irrelevant_after: 499
 - id: executive-assistant-q670
   question: For the Caldwell Group CEO onsite visit, what date was confirmed for the HQ visit?
   answer: 2027-02-09.
@@ -6851,6 +6909,7 @@
   relevant_days:
     - 386
   requires_synthesis: false
+  irrelevant_after: 409
 - id: executive-assistant-q671
   question: Which venue was kept as the primary room for Theresa Caldwell's onsite visit, with the 12th-floor conference room treated as an unreliable fallback?
   answer: The boardroom.
@@ -6876,8 +6935,8 @@
     - 386
   requires_synthesis: false
 - id: executive-assistant-q674
-  question: In the Condor live financing record, what were the four components and total committed capacity?
-  answer: $70M cash on hand, $95M senior secured term loan, $25M delayed-draw revolver availability, for $190M total committed capacity.
+  question: In the Condor live financing record, what were the financing components and total committed capacity?
+  answer: $70M cash on hand, $95M senior secured term loan, and $25M delayed-draw revolver availability, for $190M total committed capacity.
   category: factual-recall
   difficulty: easy
   relevant_days:
@@ -6949,6 +7008,7 @@
   relevant_days:
     - 386
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q681
   question: How did Jordan keep personal-finance work separated from company-sensitive work during the Jan 21–27 personal-finance passes?
   answer: Jordan kept personal-finance fully isolated from Mosaic finance, comp, payroll, equity, legal, and insider-sensitive work; did not route anything through Rashid or company legal; kept adviser review as a neutral personal calendar item; held estate-attorney outreach for Jamie approval; and kept household wealth details out of comp-prep material unless Jamie explicitly authorized otherwise.
@@ -7375,7 +7435,7 @@
   requires_synthesis: false
 - id: executive-assistant-q723
   question: After the derivative suit was opened on 2027-02-24, what remained pending before the privileged legal workstream could fully proceed?
-  answer: Outside counsel coordination and any litigation-hold notices remained pending; Rashid also still needed to confirm outside-counsel names, hold scope, and the first production milestone.
+  answer: Outside counsel coordination and any litigation-hold notices remained pending.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -7391,7 +7451,7 @@
   requires_synthesis: false
 - id: executive-assistant-q725
   question: What changed in the estate-planning arc by 2027-02-24 compared with the prior days in this window?
-  answer: By 2027-02-24, the estate-planning packet was finalized and signed, storage instructions were confirmed, and Jordan marked the packet complete; earlier days kept outbound attorney outreach in review state pending Jamie approval.
+  answer: By 2027-02-24, the estate-planning arc had moved from a review-only, pending-approval state to a completed signed packet with storage instructions confirmed and the household copy location recorded; on the prior days, outbound attorney outreach was still being held in review pending Jamie’s approval.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -7532,8 +7592,8 @@
     - 426
   requires_synthesis: false
 - id: executive-assistant-q739
-  question: What remained the hard constraint in Jamie's spring break 2027 family trip planning across the week?
-  answer: School calendar fit.
+  question: In Jamie’s spring break 2027 family trip planning notes across Feb. 25–Mar. 3, what remained the hard/gating constraint for choosing dates?
+  answer: School calendar fit (the school schedule).
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -7556,7 +7616,7 @@
   requires_synthesis: true
 - id: executive-assistant-q741
   question: What standing scheduling standard did Marcus Chen say he still needed for anything that could touch Jamie?
-  answer: Three options plus context, with a neutral title, clear displacement, and no ambiguity.
+  answer: Marcus Chen said he still needed three options plus context for anything that could touch Jamie.
   category: group-session-attribution
   difficulty: easy
   relevant_days:
@@ -7608,7 +7668,7 @@
   requires_synthesis: false
 - id: executive-assistant-q746
   question: How did Jordan's handling of the Q1 2027 board meeting date change between March 8 and the later days in this window?
-  answer: On 2027-03-08, Jordan held 2027-03-31 as the initial provisional Q1 board date following the standing cadence. By 2027-03-09 and 2027-03-10, Jordan treated that prior placeholder as superseded and kept the board on a corrected scheduling path, using only the cover phrase "scheduling conflict" in board-facing and executive-facing language.
+  answer: On 2027-03-08, Jordan held 2027-03-31 as the initial provisional Q1 board date following the standing cadence. By 2027-03-09 and 2027-03-10, Jordan treated that earlier placeholder as superseded, kept the board on a corrected scheduling path, and used the cover phrase "scheduling conflict" in board-facing language while keeping the underlying reason isolated.
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
@@ -7628,7 +7688,7 @@
   requires_synthesis: true
 - id: executive-assistant-q748
   question: What did Patricia Brennan instruct Jordan to do with internal investigation findings tied to the Condor acquisition?
-  answer: Keep them in a separate restricted appendix and do not merge them into the production record or response chronology.
+  answer: She instructed Jordan to keep the internal investigation findings tied to the Condor acquisition in a separate restricted appendix and not merge them into the production record.
   category: decision-tracking
   difficulty: easy
   relevant_days:
@@ -7665,8 +7725,8 @@
     - 434
   requires_synthesis: false
 - id: executive-assistant-q752
-  question: What changed in the children-related planning between the Saturday (2027-03-06) and Monday (2027-03-08) school-year passes?
-  answer: On Saturday, spring camp planning was escalated from watch mode to active selection mode because preferred sessions were filling fast. By Monday, the child-related planning had returned to watch mode for conferences, sports, and permission slips, with no new confirmations or tentative holds added.
+  question: What changed in the children-related planning mode between the Saturday (2027-03-06) and Monday (2027-03-08) school-year passes?
+  answer: On Saturday, spring camp planning was escalated from watch mode to active selection mode because preferred sessions were filling fast. By Monday, the regular school-year logistics pass was back in watch mode for conferences, sports, permission slips, and school notices, with no new confirmed school updates.
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -7719,7 +7779,7 @@
   requires_synthesis: false
 - id: executive-assistant-q757
   question: As of the latest day in the window, was March 31 still being treated as the working answer for the Q1 2027 board meeting?
-  answer: No. By 2027-03-17, March 31 was not the working answer; the board-date correction was still gated on Jamie’s confirmation of a replacement date.
+  answer: No. As of 2027-03-16, March 31 was not still being treated as the working answer; the board-date correction remained unresolved pending Jamie’s confirmation of the replacement date.
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
@@ -7728,6 +7788,7 @@
     - 440
     - 441
   requires_synthesis: true
+  irrelevant_after: 441
 - id: executive-assistant-q758
   question: What was Jamie’s standing instruction for board narrative framing in the board-prep sessions?
   answer: '"Keep it to the decision, the risk, and the fallback. If Henry wants more, I’ll give him more — but not in the first minute."'
@@ -7736,6 +7797,7 @@
   relevant_days:
     - 435
   requires_synthesis: false
+  irrelevant_after: 499
 - id: executive-assistant-q759
   question: Who said, "Tighter summary page. No extra appendix unless I ask for it"?
   answer: Henry Whitfield
@@ -7777,8 +7839,8 @@
     - 440
   requires_synthesis: false
 - id: executive-assistant-q763
-  question: What was the operating rule for any future Jamie witness-prep request in the SEC inquiry workstream?
-  answer: Any Jamie witness-prep request had to route through Rashid Patel and Patricia Brennan first, and any legal prep hold would use a neutral private calendar title with a 30-minute buffer.
+  question: What was the operating rule for any future Jamie witness-prep request in the SEC inquiry workstream, including how any legal prep hold should be staged?
+  answer: Any future Jamie witness-prep request had to route through Rashid Patel and Patricia Brennan first, and any legal prep hold would use a neutral private calendar title with a 30-minute buffer.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -7828,6 +7890,7 @@
     - 440
     - 441
   requires_synthesis: true
+  irrelevant_after: 499
 - id: executive-assistant-q767
   question: Across the ea-network check-ins in this window, what standard did Marcus Chen keep applying for any Beth-related scheduling ask that could affect Jamie?
   answer: Marcus kept applying the three-option standard with context, neutral title, clear displacement, and no ambiguity for any Beth-related scheduling ask that could affect Jamie.
@@ -7857,6 +7920,7 @@
   relevant_days:
     - 442
   requires_synthesis: false
+  irrelevant_after: 452
 - id: executive-assistant-q770
   question: According to Daniel Kim in the 2027-03-23 investor-narrative workshop, how did he want the story to sound?
   answer: He said, “We need the story to sound disciplined, not defensive.”
@@ -7906,8 +7970,8 @@
     - 446
   requires_synthesis: true
 - id: executive-assistant-q776
-  question: How did the status of the spring-break 2027 family trip change from 2027-03-21 to 2027-03-23?
-  answer: On 2027-03-21 it moved to confirmation and the itinerary was treated as confirmed; by 2027-03-23 it was back in late-stage planning with dates, lodging, and school fit still not locked without Jamie’s confirmation.
+  question: How did the status of Jamie’s spring-break 2027 family trip change between the 2027-03-21 and 2027-03-23 daily notes?
+  answer: "On 2027-03-21, the trip had moved from late-stage review to confirmation: the itinerary was treated as confirmed and private calendar holds remained in place for the confirmed travel window. By 2027-03-23, the thread had reverted to late-stage planning, with dates, lodging, and school fit again treated as active variables rather than locked."
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -8030,8 +8094,8 @@
     - 449
   requires_synthesis: false
 - id: executive-assistant-q789
-  question: What did Rashid say about narrative wording that could sound like guidance or a promise?
-  answer: He said anything that reads like guidance, smells like guidance, or sounds like a recovery promise needs Jamie's review first.
+  question: What did Rashid say on March 29–30 about wording that could be read as guidance?
+  answer: He said, 'Anything that smells like guidance needs Jamie’s review.'
   category: synthesis
   difficulty: medium
   relevant_days:
@@ -8041,7 +8105,7 @@
   requires_synthesis: true
 - id: executive-assistant-q790
   question: What standing scheduling standard did Marcus Chen keep emphasizing for asks that touched Jamie's calendar?
-  answer: Three options plus context, with neutral title, clear displacement, and no ambiguity.
+  answer: Marcus Chen kept emphasizing a standing standard of three options plus context for anything that touched Jamie’s calendar, with a neutral title, clear displacement, and no ambiguity.
   category: recency-bias-resistance
   difficulty: medium
   relevant_days:
@@ -8316,7 +8380,7 @@
     - 463
   requires_synthesis: false
 - id: executive-assistant-q818
-  question: What remained the only active personal-records chase items in Jamie's personal-finance thread throughout this window?
+  question: During days 463–469, what remained the only active personal-records chase items in Jamie's personal-finance thread?
   answer: Missing personal statements and brokerage records.
   category: recency-bias-resistance
   difficulty: medium
@@ -8395,7 +8459,7 @@
   requires_synthesis: true
 - id: executive-assistant-q826
   question: In the legal-confidential thread during days 470–476, what was the latest status of the mixed-document set?
-  answer: It was still withheld pending Patricia Brennan’s final privilege call and kept out of the production record.
+  answer: It was still withheld pending Patricia Brennan’s final privilege call.
   category: contradiction-resolution
   difficulty: medium
   relevant_days:
@@ -8433,7 +8497,7 @@
   requires_synthesis: true
 - id: executive-assistant-q829
   question: How did Jordan keep the spring 2027 investor narrative reset separated from other sensitive lanes during this window?
-  answer: Jordan kept the investor-facing summary separate from the internal legal-sensitive record, prevented board discussion from leaking into investor-facing language, bounded Condor integration language, and held final external phrasing until Daniel alignment and Jamie review.
+  answer: Jordan kept the investor-facing summary separate from the internal legal-sensitive record, prevented board discussion from leaking into investor-facing language, bounded Condor integration language, and held final external phrasing until Daniel alignment.
   category: synthesis
   difficulty: hard
   relevant_days:
@@ -8595,8 +8659,8 @@
     - 483
   requires_synthesis: true
 - id: executive-assistant-q843
-  question: On which day were two July rehearsal placeholders first held for Investor 2031-07-20?
-  answer: 2027-05-03 (2027-05-02, Sunday).
+  question: On which day were two July rehearsal placeholders first held for Investor Day 2027?
+  answer: Two July rehearsal placeholders for Investor Day 2027 were first held on day 488 (2027-05-02).
   category: temporal-reasoning
   difficulty: easy
   relevant_days:
@@ -8724,7 +8788,7 @@
   requires_synthesis: true
 - id: executive-assistant-q855
   question: On what day was the spring 2027 investor narrative first described in this window as locked for investor-facing use?
-  answer: 2027-05-07 (2027-05-06).
+  answer: 2027-05-06.
   category: temporal-reasoning
   difficulty: easy
   relevant_days:
@@ -8763,14 +8827,14 @@
   requires_synthesis: false
 - id: executive-assistant-q859
   question: How many July rehearsal placeholders were held for Investor Day prep, and when was that recorded in this window?
-  answer: Two July rehearsal placeholders were held, recorded on 2027-05-11 (2027-05-10).
+  answer: Two July rehearsal placeholders were held, recorded on 2027-05-10.
   category: factual-recall
   difficulty: easy
   relevant_days:
     - 496
   requires_synthesis: false
 - id: executive-assistant-q860
-  question: What commitments were captured from Jamie and Daniel during the Caldwell Group onsite on 2027-05-11?
+  question: According to the direct-reports note recorded on 2027-05-10 about the Caldwell Group onsite, what commitments were captured from Jamie and Daniel?
   answer: Jamie said he would own the finance follow-up and the internal alignment note, and Daniel said he would close the executive narrative and confirm the next check-in path.
   category: decision-tracking
   difficulty: medium
@@ -8895,7 +8959,7 @@
   requires_synthesis: false
 - id: executive-assistant-q871
   question: What did Rashid Patel repeatedly say should stay out if it sounded like a promise or commitment?
-  answer: Anything that could be read as guidance, commitment, or disclosure—anything sounding like a promise—needed to stay out of circulation until Jamie reviewed it.
+  answer: Rashid Patel repeatedly said that anything sounding like a promise or commitment should stay out.
   category: decision-tracking
   difficulty: medium
   relevant_days:
@@ -8923,8 +8987,8 @@
     - 500
   requires_synthesis: true
 - id: executive-assistant-q874
-  question: What calendar action did Jordan take after Priscilla and Yuki aligned on Investor Day appendix ownership?
-  answer: Jordan placed two July rehearsal holds on Jamie’s calendar as internal placeholders.
+  question: After Priscilla and Yuki aligned on Investor Day appendix ownership, what calendar action was taken?
+  answer: Two July rehearsal holds were placed on Jamie’s calendar as internal placeholders.
   category: temporal-reasoning
   difficulty: medium
   relevant_days:

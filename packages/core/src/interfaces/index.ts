@@ -66,6 +66,16 @@ export interface SearchResult {
         bm25: number;
         parent: number;
     };
+    /**
+     * Optional 1-based line range of the matched chunk in its source file.
+     * When set, the agent can issue `memory_get(uri, from, lines)` with
+     * the chunk's exact window to drill in without pulling the whole
+     * file. Mirrors OpenClaw production's `MemorySearchResult.startLine`
+     * / `endLine` so the bench compares memory systems on equal footing.
+     * Omitted when the underlying index doesn't expose chunk positions.
+     */
+    startLine?: number;
+    endLine?: number;
 }
 
 export interface IndexStats {

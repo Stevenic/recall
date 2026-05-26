@@ -26,10 +26,19 @@ harness:
     embeddingProvider: openai
     embeddingModel: text-embedding-3-small
     synthesisModel: gpt-5.4-mini
-    maxSearchResults: 15
-    minScore: 0.1
+    # Aligned to OpenClaw production defaults
+    # (extensions/memory-core/src/agents/memory-search.ts:
+    #   DEFAULT_MAX_RESULTS=6, DEFAULT_MIN_SCORE=0.35).
+    # The prior values (15, 0.1) were over-generous overrides from
+    # early bench iterations; pulling them back to prod defaults lets
+    # OpenClaw run with the same retrieval shape it ships with.
+    maxSearchResults: 6
+    minScore: 0.35
     answerMode: agent
-    agentMaxIterations: 6
+    # 20 vs the prior 6: production OpenClaw has no per-turn iteration
+    # cap (interactive REPL). 20 is the bench's "production-like" budget;
+    # matched on the Recall side for symmetry.
+    agentMaxIterations: 20
     synthesisProvider: azure
 
 run:

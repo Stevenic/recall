@@ -181,7 +181,7 @@ describe("WikiEngine — read/write/list", () => {
             category: "project",
             created: "2026-04-01",
             updated: "2026-04-15",
-            sources: ["memory/2026-04-01.md", "memory/2026-04-15.md"],
+            sources: [{ uri: "memory/2026-04-01.md" }, { uri: "memory/2026-04-15.md" }],
             related: ["compliance-review"],
             confidence: "medium",
             body: "Body content here.\n",
@@ -190,7 +190,7 @@ describe("WikiEngine — read/write/list", () => {
         expect(page).not.toBeNull();
         expect(page!.name).toBe("Auth Middleware");
         expect(page!.category).toBe("project");
-        expect(page!.sources).toEqual([
+        expect(page!.sources.map((s) => s.uri)).toEqual([
             "memory/2026-04-01.md",
             "memory/2026-04-15.md",
         ]);
@@ -219,7 +219,7 @@ describe("WikiEngine — read/write/list", () => {
                     category: "entity",
                     created: "2026-04-01",
                     updated: "2026-04-01",
-                    sources: ["memory/2026-04-01.md"],
+                    sources: [{ uri: "memory/2026-04-01.md" }],
                     related: [],
                     body: "Stripe.\n",
                 },
@@ -239,7 +239,7 @@ describe("WikiEngine — read/write/list", () => {
                 category: "entity",
                 created: "2026-04-01",
                 updated: "2026-04-01",
-                sources: ["memory/2026-04-01.md"],
+                sources: [{ uri: "memory/2026-04-01.md" }],
                 related: [],
                 body: "body\n",
             });
@@ -304,7 +304,7 @@ describe("WikiEngine — stub", () => {
             body,
         });
         expect(page.confidence).toBe("low");
-        expect(page.sources).toEqual(["memory/2026-04-26.md"]);
+        expect(page.sources.map((s) => s.uri)).toEqual(["memory/2026-04-26.md"]);
         expect(isStub(page)).toBe(true);
         expect(page.body).toContain("**Why:**");
     });
@@ -365,7 +365,7 @@ describe("WikiEngine — append", () => {
             "memory/2026-04-15.md",
             "Phase 2: JWT migration begins.",
         );
-        expect(updated.sources).toEqual([
+        expect(updated.sources.map((s) => s.uri)).toEqual([
             "memory/2026-04-01.md",
             "memory/2026-04-15.md",
         ]);
@@ -388,7 +388,7 @@ describe("WikiEngine — append", () => {
             "memory/2026-04-01.md",
             "more",
         );
-        expect(updated.sources).toEqual(["memory/2026-04-01.md"]);
+        expect(updated.sources.map((s) => s.uri)).toEqual(["memory/2026-04-01.md"]);
     });
 
     it("throws when the page does not exist", async () => {
@@ -471,7 +471,7 @@ describe("parseWikiPage / serializeWikiPage", () => {
             category: "project" as const,
             created: "2026-02-15",
             updated: "2026-04-26",
-            sources: ["memory/2026-02-15.md", "memory/2026-04-26.md"],
+            sources: [{ uri: "memory/2026-02-15.md" }, { uri: "memory/2026-04-26.md" }],
             related: ["compliance-review"],
             confidence: "high" as const,
             contradicts: ["legacy-auth"],
@@ -482,7 +482,7 @@ describe("parseWikiPage / serializeWikiPage", () => {
         expect(parsed.slug).toBe(original.slug);
         expect(parsed.name).toBe(original.name);
         expect(parsed.category).toBe(original.category);
-        expect(parsed.sources).toEqual(original.sources);
+        expect(parsed.sources.map((s) => s.uri)).toEqual(original.sources.map((s) => s.uri));
         expect(parsed.related).toEqual(original.related);
         expect(parsed.confidence).toBe(original.confidence);
         expect(parsed.contradicts).toEqual(original.contradicts);

@@ -888,10 +888,21 @@ function parseWisdomDistillResult(text: string): WisdomDistillResult | null {
             }
             const body = typeof r.body === "string" ? r.body : "";
             if (!body.trim()) continue;
-            const sourcesIn = Array.isArray(r.sources)
-                ? (r.sources as unknown[]).filter(
-                      (s): s is string => typeof s === "string" && s.length > 0,
-                  )
+            // Accept both legacy `sources: ["uri", ...]` and the new
+            // structured form `sources: [{uri, summary?, from?, lines?}, ...]`.
+            // We only need the URIs at this layer — `wiki.stub`/`append`
+            // re-attach enrichment on the way into the page.
+            const sourcesIn: string[] = Array.isArray(r.sources)
+                ? ((r.sources as unknown[])
+                      .map((s): string | null => {
+                          if (typeof s === "string" && s.length > 0) return s;
+                          if (s && typeof s === "object") {
+                              const u = (s as Record<string, unknown>).uri;
+                              if (typeof u === "string" && u.length > 0) return u;
+                          }
+                          return null;
+                      })
+                      .filter((s): s is string => s !== null))
                 : [];
             if (sourcesIn.length === 0) continue;
             promotions.push({

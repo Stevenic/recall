@@ -44,8 +44,15 @@ harness:
   factory: createRecallAdapter
   config:
     name: Recall (dreaming)
-    # Model used for compaction, dreaming, and query-time agent loops.
+    # Model used for compaction and query-time agent loops.
     model: azure:gpt-5.4-mini
+    # Stronger model for dreaming — its cross-cutting wiki_op decisions
+    # (when to create vs update vs supersede, picking the right slug,
+    # spotting topic overlaps with existing pages) reward extra reasoning
+    # capability more than per-turn synthesis does. Costs more per
+    # checkpoint but only fires once per checkpoint vs the agent loop
+    # which fires per question.
+    dreamingModel: azure:gpt-5.4
     # Identity threaded into compaction/synthesis prompts.
     identityName: Jordan
     identity: |
@@ -71,7 +78,13 @@ harness:
     # Default answer pipeline. Agent drives memory_search /
     # memory_get / memory_timeline tool calls over multiple turns.
     answerMode: agent
-    agentMaxIterations: 6
+    # Bumped from 6 → 12. With the wiki/dailies-verification discipline
+    # turned on, 6 iterations frequently bottoms out on early dailies
+    # without ever reaching the later daily that holds a revised fact.
+    # 12 gives the agent room to: read wiki preamble, memory_timeline to
+    # locate the chronologically-latest match, memory_get that daily,
+    # and still have turns to spare for cross-checking.
+    agentMaxIterations: 12
     # Synthesis-side LLM via Azure (matches OpenClaw 180d baseline).
     synthesisProvider: azure
 

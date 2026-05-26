@@ -52,7 +52,7 @@ async function makePage(
         category: overrides.category ?? "concept",
         created: overrides.created ?? "2026-04-01",
         updated: overrides.updated ?? "2026-04-01",
-        sources: overrides.sources ?? [`memory/2026-04-01.md`],
+        sources: overrides.sources ?? [{ uri: `memory/2026-04-01.md` }],
         related: overrides.related ?? [],
         body,
         ...overrides,
@@ -193,7 +193,7 @@ describe("WikiEngine.merge", () => {
         expect(dst!.body).toContain("Destination body");
         expect(dst!.body).toContain("Source body content");
         expect(dst!.body).toContain("merged from `src`");
-        expect(dst!.sources.sort()).toEqual([
+        expect(dst!.sources.map((s) => s.uri).sort()).toEqual([
             "memory/2026-04-01.md",
             "memory/2026-04-02.md",
         ]);
@@ -218,13 +218,13 @@ describe("WikiEngine.merge", () => {
 
     it("dedupes source URIs when merging", async () => {
         const shared = "memory/2026-04-01.md";
-        await makePage(engine, "src", "S", { sources: [shared, "memory/2026-04-03.md"] });
-        await makePage(engine, "dst", "D", { sources: [shared, "memory/2026-04-02.md"] });
+        await makePage(engine, "src", "S", { sources: [{ uri: shared }, { uri: "memory/2026-04-03.md" }] });
+        await makePage(engine, "dst", "D", { sources: [{ uri: shared }, { uri: "memory/2026-04-02.md" }] });
         await engine.merge("src", "dst");
         const dst = await engine.read("dst");
-        expect(dst!.sources.filter((s) => s === shared)).toHaveLength(1);
-        expect(dst!.sources).toContain("memory/2026-04-02.md");
-        expect(dst!.sources).toContain("memory/2026-04-03.md");
+        expect(dst!.sources.filter((s) => s.uri === shared)).toHaveLength(1);
+        expect(dst!.sources.map((s) => s.uri)).toContain("memory/2026-04-02.md");
+        expect(dst!.sources.map((s) => s.uri)).toContain("memory/2026-04-03.md");
     });
 });
 

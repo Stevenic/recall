@@ -1,0 +1,96 @@
+# Run the executive-assistant 500-day persona against the Recall harness
+# WITH dreaming enabled. Companion to ea-180d-recall-dreaming, scaled to
+# the full 500d corpus with finer-grained checkpoints (every 10 days
+# instead of 6).
+#
+# Stack at the time of writing:
+#   - Reranker on (skipped for date-pinned queries)
+#   - Wiki dedup-before-create + merge-with-supersession
+#   - Trajectory companion pages for any wiki page with >=2 supersedes
+#   - Entity rename detection (post-trajectory) — capped at 3
+#     verifications per dream session, Jaccard >= 0.5 trigger
+#   - Query decomposition for multi-fact questions
+#   - Recency-cue ranking ("latest" / "kickoff" boosts)
+#   - Per-slug locking → dreaming concurrency 4 (race-safe)
+#   - irrelevant_after eligibility filter (7 fields in qa-500d)
+#
+# To run:
+#   recall-bench run --profile packages/recall-bench/profiles/ea-500d-recall-dreaming.yaml \
+#                    --json-out bench-results/drafts/ea-500d-recall-dreaming/result.json
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-500d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  judge: azure:gpt-5.4-mini
+  appellateJudge: azure:gpt-5.4
+  generation: azure:gpt-5.4-mini
+
+harness:
+  adapter: ../../../bench-harnesses/recall/dist/index.js
+  factory: createRecallAdapter
+  config:
+    name: Recall (dreaming, 500d)
+    model: azure:gpt-5.4-mini
+    identityName: Jordan
+    identity: |
+      Jordan is an AI executive assistant for the CFO of a mid-cap technology
+      company. Trusted operator: anticipatory, discreet, calm under pressure,
+      protective of the principal's time and confidentiality. Drafts but does
+      not send sensitive (HR, legal, board, customer-escalation)
+      communications without principal review.
+    # Aligned to OpenClaw production defaults (maxSearchResults=6,
+    # SNIPPET_MAX_CHARS=700, maxIterations=6) so the bench compares
+    # memory systems, not context-budget configuration.
+    #
+    # `searchK: 6` covers dailies/typed memories. Because Recall also
+    # has a wiki layer that OpenClaw doesn't, the harness runs a
+    # SEPARATE wiki-only second pass — `wikiSearchK: 3` — so wiki and
+    # dailies don't compete for the same 6 slots. Net effect: Recall's
+    # agent sees 6 dailies + 3 wiki pages per `memory_search` call;
+    # OpenClaw's agent sees 6 dailies. This keeps the daily-recall
+    # budget identical across systems while letting Recall's wiki
+    # layer contribute the bonus context that's its design point.
+    searchK: 6
+    wikiSearchK: 3
+    # 24,000 chars matches OpenClaw's `MAX_CONTEXT_CHARS` (bench harness
+    # `synthesis.ts`). Only applies to `answerMode: synthesis`; agent mode
+    # is bounded by `searchK × SEARCH_SNIPPET_CHARS × maxIterations`.
+    # Holding it here for parity if we ever flip back to synthesis mode.
+    contextBudget: 24000
+    enableCompaction: true
+    enableDreaming: true
+    answerMode: agent
+    # 20 vs the prior 6: production OpenClaw has no per-turn iteration
+    # cap (it's an interactive REPL), so 20 is the bench's
+    # "production-like" budget. Both harnesses match this so the cap
+    # stays symmetric across runs. Synthesis-heavy questions that
+    # previously hit the cap at 6 now have headroom to chase the right
+    # daily through several search/get cycles.
+    agentMaxIterations: 20
+    synthesisProvider: azure
+    # Stronger model for dreaming — once per checkpoint, capability matters
+    # more than cost.
+    dreamingModel: azure:gpt-5.4
+
+run:
+  # 50 checkpoints every 10 days from day 10 through day 500. Matches the
+  # cadence of `ea-500d-vector.yaml` so heatmaps are directly comparable
+  # across harnesses.
+  ranges:
+    start: 10
+    end: 500
+    step: 10
+  seed: 42
+  # Dreaming + agent loop + longer corpus → bump timeout to 240s for the
+  # deepest synthesis questions.
+  timeout: 240000
+  parallelism: 1
+  sample: 50
+  judgeMemoryWindow: 1
+  groupsEnabled: false

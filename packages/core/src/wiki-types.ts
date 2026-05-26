@@ -44,12 +44,54 @@ export const DEFAULT_WIKI_CONFIG: Required<
     Omit<WikiConfig, "shared" | "enabled">
 > & { enabled: boolean; shared: SharedWikiConfig[] } = {
     enabled: false,
-    scoreBoost: 1.5,
+    // Score-boost tuning history (failure-driven):
+    //   1.5 — too aggressive; wiki routinely outranked dailies even when
+    //         the daily contained the asked-about specific fact.
+    //   1.1 — softer tiebreaker for synthesized pages, but run 18's
+    //         500d failures (22 appellate-reviewed misses) showed the
+    //         right daily at pos #1 in 0/22 cases, and a wiki page at
+    //         pos #1 in 13/22 cases. Even 10% was enough for wiki to
+    //         consistently displace dailies that carried the answer.
+    //   0.9 — current. De-boost: a wiki page must beat the daily on its
+    //         own retrieval score by ~10% before it wins position #1.
+    //         Wiki pages are still findable (they index normally) and
+    //         the agent can still cite them; they just don't get a
+    //         tiebreaker that costs specific-fact recall. Matches the
+    //         "neutral treatment of all sources" stance OpenClaw uses
+    //         by default.
+    scoreBoost: 0.9,
     minSourcesForStub: 1,
     minSourcesForSynthesis: 3,
     stalenessThresholdDays: 90,
     shared: [],
 };
+
+/**
+ * A reference into a contributing memory source. The `uri` is mandatory;
+ * `range` and `summary` are optional enrichments emitted by dreaming
+ * when it can. Daily logs are immutable, so `range` captured at write
+ * time stays valid forever — the agent can use it to issue targeted
+ * `memory_get` calls. Pages on disk that predate the enrichment store
+ * just the URI; the parser upgrades them to this shape with `summary`
+ * / `range` undefined.
+ */
+export interface SourceContribution {
+    /** Memory URI of the contributing source (e.g. `memory/2026-01-14.md`). */
+    uri: string;
+    /**
+     * Optional 1-based line window of the source that supports this
+     * contribution. When set, the agent can issue
+     * `memory_get(uri, from, lines)` to read just the relevant span.
+     */
+    range?: { from: number; lines: number };
+    /**
+     * Optional one-sentence description of what this source contributed
+     * to the page's current claim. Transition-form ("Revised X from $18M
+     * to $28M") is preferred over current-state ("Added the $28M case")
+     * since it tells the agent both the new value and the prior one.
+     */
+    summary?: string;
+}
 
 export interface WikiPage {
     slug: string;
@@ -60,8 +102,15 @@ export interface WikiPage {
     created: string;
     /** ISO date the page was last updated */
     updated: string;
-    /** Raw memory URIs the page was synthesized from (one entry for stubs) */
-    sources: string[];
+    /**
+     * Contributors that shaped the page's current claim. Older pages on
+     * disk may store just URIs (`string[]`); the parser upgrades them
+     * to {@link SourceContribution} with `summary` / `range` undefined.
+     * The serializer emits the compact URI-only form for pages whose
+     * every contribution lacks both fields so legacy pages stay
+     * bit-identical until dreaming next touches them.
+     */
+    sources: SourceContribution[];
     /** Other wiki slugs explicitly linked from this page */
     related: string[];
     /** Synthesis confidence; defaults to "low" for stubs */
@@ -80,8 +129,44 @@ export interface WikiPage {
     supersedes?: SupersedesEntry[];
     /** Optional redirect to another slug (for merge / rename / promote stubs) */
     redirectTo?: string;
+    /**
+     * Quality flags from the post-write grounding verifier. Searchable
+     * by retrieval so pages with unverified or stale claims get demoted
+     * relative to fully-grounded pages on the same topic. Absent when
+     * verification didn't run.
+     */
+    grounding?: GroundingReport;
     /** Page body (markdown, no frontmatter) */
     body: string;
+}
+
+/**
+ * Verification summary attached to a wiki page after dreaming writes it.
+ * Produced by `WikiEngine.verifyGrounding` (or the dream-engine post-
+ * write hook). Treat the fields as advisory: zero counts mean the
+ * verifier didn't find issues, but it may also have skipped checks it
+ * couldn't make (no LLM available, no sources to compare against).
+ */
+export interface GroundingReport {
+    /** ISO date the verification ran. */
+    verifiedOn: string;
+    /** Count of claims in the body the verifier found supporting evidence for. */
+    grounded: number;
+    /**
+     * Claims in the body that no cited source mentions. These are
+     * either hallucinations the synthesis model invented, or values
+     * the verifier failed to match (e.g. paraphrased differently).
+     * Strict-mode retrieval should demote pages with any unverified
+     * claims.
+     */
+    unverified: string[];
+    /**
+     * Claims whose supporting source is older than the page's most-
+     * recent cited source. Indicates the body may be carrying a stale
+     * value that a later daily already revised — the merge-with-
+     * supersession step should have caught it but didn't.
+     */
+    stale: string[];
 }
 
 /**
@@ -110,8 +195,11 @@ export interface WikiPageStubInput {
     name: string;
     description: string;
     category: WikiCategory;
-    /** Source URI for the stub (typically today's daily log path) */
-    source: string;
+    /**
+     * Source URI for the stub (typically today's daily log path). Either
+     * a bare URI or the structured form with optional range + summary.
+     */
+    source: string | SourceContribution;
     /** Body content. May be a pre-rendered template or freeform markdown */
     body: string;
     /** Optional related slugs */

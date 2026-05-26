@@ -368,6 +368,125 @@ After each pass, do the cheap check before moving on:
 
 ---
 
+## Your role as the ultimate grader (run-time)
+
+**Read this before kicking off any bench run.** The judge models (`models.judge` and `models.appellateJudge`) are LLMs — they make calibration errors in both directions. A primary `gpt-5.4-mini` judge skipping a valid hedge as "hallucination"; an appellate judge missing that the agent's answer paraphrased the reference and giving it credit anyway; either judge being thrown off by formatting differences. Left alone, the bench measures the judge as much as the system.
+
+You are the audit layer. After **every checkpoint emits a `type: "checkpoint"` record into `progress.jsonl`**, you read that checkpoint's questions out of `questions.jsonl` (the per-question log siblings `progress.jsonl` in the same run dir) and re-grade. Don't wait until the whole run finishes — by then a misgrade has compounded into the running average and you can't easily separate signal from grading noise.
+
+### The re-grade loop
+
+For each checkpoint:
+
+1. **Pull this checkpoint's questions** from `questions.jsonl`. They're the records whose `timestamp` falls between this checkpoint's `progress.jsonl` entry and the previous one. (Or just take the last `questionsEvaluated` entries.)
+2. **Re-grade every non-perfect question** (composite < 6). For each one decide independently:
+   - Does the system's answer actually contain the facts the reference asks for?
+   - Are there hallucinated facts (claims not in the corpus)? Compare against the dailies in `qa.relevant_days`.
+   - Is the question itself answerable from the corpus? Sometimes the ref is wrong.
+3. **Sample-re-grade a handful of perfect (6/6) scores.** ~10% sample. Look specifically for false positives — answers the judge let pass that contain a wrong number, a wrong name, or a wrong date. The judge under-penalizes paraphrased mistakes more often than it over-penalizes correct ones.
+4. **Classify each disagreement:**
+   - **Judge false negative** — system answered correctly, judge missed it. Note the question id; do not let the failure bias the headline score.
+   - **Judge false positive** — system answered wrong, judge let it pass. Same — note the id; the headline score is overstating by some amount.
+   - **Q&A defect** — the reference is wrong or the question is ambiguous. Add to the cleanup queue for `verify-qa-corpus.mjs` + `deep-verify-qa.mjs` follow-up.
+   - **Real system failure** — judge was right; the system genuinely missed. This is the only category that should drive product/bench iteration.
+
+### What to write down
+
+Per checkpoint, after the re-grade:
+
+```
+ckpt N (Xd):
+  judge says:       <overall %>  · <perfect/total>
+  re-grade verdict: <ANSWERABLE/DEFECTIVE breakdown>
+  judge errors:     <FN count>   <FP count>
+  Q&A defects:      <ids>
+  real failures:    <ids>
+```
+
+Track this in your running notes for the user. When a judge-error rate exceeds ~5%, escalate — at that point the bench needs a stronger judge model or a sharper grading rubric before the score number is meaningful.
+
+### How to re-grade without burning context
+
+You don't need to load every daily file. The per-question record already contains:
+
+- `qa.referenceAnswer` — what the ref claims
+- `systemAnswer` — what the system said
+- `retrieval` — the snippets the system actually consulted
+- `score.{correctness, completeness, hallucination}` — the judge's component scores
+
+For most disagreements, comparing `referenceAnswer` against `systemAnswer` is enough. Open the cited dailies (`packages/recall-bench/personas/<id>/memories-NNNd/day-XXXX.md`) only when the reference itself is in question.
+
+### Why this is your job and not the bench's
+
+Adding a third-tier grader to the bench harness itself would be tempting but wrong: you'd just be stacking LLM verdicts. The audit layer needs an out-of-band check. You — the agent running the program — have full access to the corpus, can spot Q&A defects the judge can't, and can decide when to stop the run vs. when a single bad checkpoint is just noise. The bench provides the artifacts; you provide judgment.
+
+### Per-run notes file
+
+Every run gets a `notes.md` written into its results directory alongside `result.json` / `progress.jsonl` / `failures.jsonl` / `heatmap.png`. You own it. The user reads it. It's the durable record of what you found that the artifacts alone can't capture.
+
+Create it the moment the run starts (or as soon as you see the first checkpoint land), keep it updated continuously, and finalize it when the run ends. The full path is:
+
+```
+bench-results/drafts/<run-id>/notes.md
+```
+
+Structure:
+
+```markdown
+# Run notes — <run-id>
+
+## Config snapshot
+- Profile: <path>
+- Persona / corpus: <id> / <suffix>
+- Stack: <one-liner describing what's on this run — rerank on/off, dreaming model, etc.>
+- Started: <ISO timestamp>
+
+## Per-checkpoint log
+### ckpt N (Xd)  →  overall <Y%>
+- judge: <perfect/total> · <hallucination rate>
+- re-grade verdict: <FN count, FP count, defects, real failures>
+- new issues spotted: <bullets, one line each>
+- noteworthy retrieval traces: <ids if any are illustrative>
+
+(one section per checkpoint)
+
+## Issues observed (running)
+- [judge FN] q017 ckpt 3 — agent gave the multi-part answer, judge dinged completeness; manual re-grade says 6/6
+- [Q&A defect] q060 — ref says "No" but Tess parent-teacher conf IS on 2026-02-04; question/ref disagree
+- [real failure] q022 ckpt 4 — wiki staleness; agent reads day 5 instead of day 14 revision
+- [prompt issue] agent's preamble shows day 5 as "newest cited daily" when it isn't — adapter sort bug in index.ts:372
+- ...
+
+## End-of-run analysis
+(filled in after the run completes)
+- Final score: <X%> across <N> evals
+- Per-category scorecard: ...
+- Top failure patterns: ...
+- Code-level findings — bugs / prompt issues / architectural gaps you spotted while triaging
+- Recommended next changes, ordered by expected lift
+```
+
+The "Issues observed (running)" list grows as you triage each checkpoint. Each item is one line + a code reference when applicable (file:line). When the same issue shows up across multiple checkpoints, don't duplicate — add a checkpoint count to the existing line.
+
+### The bar for the end-of-run analysis
+
+The analysis section is what makes the run worth more than the heatmap. The heatmap shows what happened; the analysis explains *why*. Concretely, **before you mark a run "done" you must have done at least one of these:**
+
+- Opened the relevant source file (e.g. `agent-loop.ts`, `dream-engine.ts`, `search.ts`) for at least one failure cluster and named a specific line / prompt section that's involved.
+- Found a Q&A defect that should be fixed and named the id + fix (rewrite the ref, add `irrelevant_after`, retire the pair).
+- Identified a prompt that consistently misfires (e.g. "agent reads first cited daily without considering recency") and proposed a rewording.
+- Spotted an architectural smell (e.g. "wiki preamble shows N pages but only the top-1 ever gets used") and proposed a structural change.
+
+Listing "scores were bad" is not analysis; "scores were bad because the cross-encoder over-promotes token-similar dailies on date-pinned queries, see search.ts:495" is. Cite line numbers.
+
+At end of run:
+
+1. Verify `heatmap.png` rendered.
+2. Verify `notes.md` has a non-empty "End-of-run analysis" section.
+3. Both files sit in the run's results directory — easy for the user to skim.
+
+---
+
 ## When things go wrong
 
 - **Day generation hangs.** Lower `--timeout` so it fails fast (300000ms is reasonable for CLI agents). Re-run with the same `--start`; failures are skipped silently and you can backfill.

@@ -162,13 +162,43 @@ export class VectraIndex implements MemoryIndex {
             );
             const combinedText = sections.map((s) => s.text).join("\n\n...\n\n");
 
-            searchResults.push({
+            // Compute a 1-based line-range hint from the matched chunks'
+            // character positions so the agent can do targeted ranged
+            // memory_get calls (matches OpenClaw production's
+            // `MemorySearchResult.startLine` / `endLine` affordance).
+            // Best-effort: skip silently if anything goes wrong.
+            let startLine: number | undefined;
+            let endLine: number | undefined;
+            try {
+                if (result.chunks.length > 0) {
+                    let minStart = Infinity;
+                    let maxEnd = -Infinity;
+                    for (const c of result.chunks) {
+                        const sp = c.item.metadata.startPos;
+                        const ep = c.item.metadata.endPos;
+                        if (typeof sp === "number" && sp < minStart) minStart = sp;
+                        if (typeof ep === "number" && ep > maxEnd) maxEnd = ep;
+                    }
+                    if (Number.isFinite(minStart) && Number.isFinite(maxEnd)) {
+                        const docText = await result.loadText();
+                        startLine = charPosToLine(docText, minStart);
+                        endLine = charPosToLine(docText, maxEnd);
+                    }
+                }
+            } catch {
+                // Position info unavailable — return without line range.
+            }
+
+            const sr: SearchResult = {
                 uri: result.uri,
                 text: combinedText,
                 score: result.score,
                 metadata: {},
                 partial: sections.length > 0,
-            });
+            };
+            if (startLine != null) sr.startLine = startLine;
+            if (endLine != null) sr.endLine = endLine;
+            searchResults.push(sr);
         }
 
         return searchResults;
@@ -231,4 +261,20 @@ export class VectraIndex implements MemoryIndex {
             metadata: flatMeta,
         });
     }
+}
+
+/**
+ * Convert a 0-based character offset into a 1-based line number for the
+ * given text. Walks the prefix counting newlines — O(charPos) but
+ * usually small relative to chunk sizes. Used to translate Vectra's
+ * char-offset chunk metadata into the line-range affordance the agent
+ * needs for ranged memory_get calls.
+ */
+function charPosToLine(text: string, charPos: number): number {
+    const limit = Math.min(Math.max(0, charPos), text.length);
+    let line = 1;
+    for (let i = 0; i < limit; i++) {
+        if (text.charCodeAt(i) === 10 /* '\n' */) line++;
+    }
+    return line;
 }

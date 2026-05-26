@@ -1,0 +1,92 @@
+# MemPalace tuned variant — all 3 harness improvements enabled:
+#
+#   1. tightenSynthesis: anti-elaboration clause in the system prompt
+#      (recovers verbosity-driven failures like the baseline q009/q032).
+#   2. dayRollup: after the initial top-K search, fetch every chunk from the
+#      top-N unique rooms via room-scoped follow-up searches
+#      (addresses the "right day, wrong chunk" failure mode — q010/q019/q021/q028
+#      in the baseline analysis).
+#   3. answerMode: agent — multi-turn tool-use loop with `memory_search` exposed
+#      as an OpenAI tool. Mirrors OpenClaw's +agent advantage and closes the
+#      synthesis (-12pp) and cross-reference (-13.5pp) gaps from the baseline.
+#
+# Token cost is meaningfully higher than the baseline profile:
+#   - dayRollup adds 4 extra mempalace_search calls per question (free in tokens
+#     but real wall-clock against MiniLM-L6).
+#   - answerMode=agent runs up to 6 LLM turns per question instead of 1, with
+#     larger context per turn (chunks of up to 1500 chars × N hits).
+#   - Expect ~3-5x the synthesis tokens of the baseline.
+#
+# To run a smoke:
+#   recall-bench run --profile packages/recall-bench/profiles/ea-180d-mempalace-tuned.yaml \
+#                    --ranges 30d \
+#                    --json-out bench-results/drafts/mempalace-30d-tuned-<id>/result.json
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  judge: azure:gpt-5.4-mini
+  appellateJudge: azure:gpt-5.4
+  generation: azure:gpt-5.4-mini
+
+harness:
+  adapter: ../../../bench-harnesses/mempalace/dist/index.js
+  factory: createMempalaceAdapter
+  config:
+    name: MemPalace (tuned)
+    mempalaceCommand:
+      - C:/source/mempalace/.venv/Scripts/mempalace-mcp.exe
+    requestTimeoutMs: 120000
+    synthesisProvider: azure
+    synthesisModel: gpt-5.4-mini
+    identityName: Jordan
+    identity: |
+      Jordan is an AI executive assistant for the CFO of a mid-cap technology
+      company. Trusted operator: anticipatory, discreet, calm under pressure,
+      protective of the principal's time and confidentiality. Drafts but does
+      not send sensitive (HR, legal, board, customer-escalation)
+      communications without principal review.
+
+    # Retrieval knobs. With agent mode + dayRollup the initial K matters less —
+    # the agent itself decides whether to widen — but a non-trivial first round
+    # still keeps the agent from doing a cold-start broad search.
+    searchK: 10
+    contextBudget: 12000
+    maxDistance: 1.5
+
+    # Change 1: anti-elaboration synthesis clause.
+    tightenSynthesis: true
+
+    # Change 2: day-rollup retrieval. Applies in synthesis mode; the agent
+    # path uses room-scoped follow-ups directly, so these knobs are
+    # essentially documentation for the synthesis-mode fallback.
+    dayRollup: true
+    dayRollupTopN: 4
+    dayRollupPerRoomK: 50
+
+    # Change 3: agent answer mode. memory_search is exposed as a tool; the
+    # LLM iterates up to agentMaxIterations turns refining its query before
+    # answering.
+    answerMode: agent
+    agentMaxIterations: 6
+
+    env:
+      MEMPALACE_MCP_IDLE_HOURS: "0"
+
+run:
+  ranges:
+    start: 6
+    end: 180
+    step: 6
+  seed: 42
+  timeout: 60000
+  parallelism: 1
+  sample: 50
+  judgeMemoryWindow: 1
+  groupsEnabled: false

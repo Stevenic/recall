@@ -109,6 +109,7 @@ export async function loadPersona(
         if (q.query_session !== undefined) pair.querySession = q.query_session;
         if (q.forbidden_sessions !== undefined) pair.forbiddenSessions = q.forbidden_sessions;
         if (q.expected_disclosure !== undefined) pair.expectedDisclosure = q.expected_disclosure;
+        if (q.irrelevant_after !== undefined) pair.irrelevantAfter = q.irrelevant_after;
         return pair;
     });
 
@@ -117,10 +118,28 @@ export async function loadPersona(
 
 /**
  * Filter Q&A pairs to only those answerable within a given time range.
- * A pair is included if ALL of its relevant_days fall within the cutoff.
+ *
+ * A pair is included when:
+ *   - All of its `relevant_days` fall within the cutoff (the answer's
+ *     supporting evidence is in the corpus by this checkpoint), AND
+ *   - Its `irrelevant_after` (when set) is not exceeded by the cutoff.
+ *
+ * `irrelevant_after` lets a Q&A author mark a pair as obsolete once the
+ * corpus has revised the fact the reference encodes. Without it, an
+ * unpinned question like "what was the working valuation range?" with
+ * a day-3-7 reference would be tested at later checkpoints where the
+ * agent (correctly) surfaces the revised value and so "fails" against
+ * the now-stale reference. Use it for questions that test a transient
+ * state that the corpus later supersedes.
  */
 export function filterQAByRange(pairs: QAPair[], range: TimeRange): QAPair[] {
-    return pairs.filter(qa => qa.relevantDays.every(d => d <= range.days));
+    return pairs.filter(qa => {
+        if (!qa.relevantDays.every(d => d <= range.days)) return false;
+        if (qa.irrelevantAfter !== undefined && range.days > qa.irrelevantAfter) {
+            return false;
+        }
+        return true;
+    });
 }
 
 /**
@@ -164,6 +183,12 @@ interface QAFile {
     query_session?: string;
     forbidden_sessions?: string[];
     expected_disclosure?: NonNullable<QAPair['expectedDisclosure']>;
+    /**
+     * Optional day-number cutoff after which this Q&A becomes obsolete
+     * because the corpus has superseded the fact the reference encodes.
+     * See `filterQAByRange` for the rationale.
+     */
+    irrelevant_after?: number;
 }
 
 function getActiveArcs(arcsData: ArcFile, dayNumber: number): string[] {

@@ -23,6 +23,19 @@ export interface SignalCollectorConfig {
 
 /**
  * Collect signals and produce scored dream candidates.
+ *
+ * The "now" reference for windowing is computed from the latest daily on
+ * disk (not the real wall clock). This matters for two cases:
+ *
+ *   1. Bench runs that ingest dated corpora from months in the past. With
+ *      a wall-clock reference, every daily falls outside the signal
+ *      window and zero candidates are gathered — dreaming silently
+ *      does nothing.
+ *   2. Agents that have been idle for a few weeks. The window should
+ *      slide relative to the agent's own latest activity, not the
+ *      observer's.
+ *
+ * Falls back to the wall clock when there are no dailies (cold-start).
  */
 export async function collectSignals(
     files: MemoryFiles,
@@ -32,6 +45,8 @@ export async function collectSignals(
     const windowDays = config?.signalWindowDays ?? DEFAULT_SIGNAL_WINDOW_DAYS;
     const stalenessThreshold = config?.stalenessThresholdDays ?? DEFAULT_STALENESS_THRESHOLD_DAYS;
     const weights = { ...DEFAULT_SCORING_WEIGHTS, ...config?.scoringWeights };
+
+    const referenceDate = await resolveReferenceDate(files);
 
     // Read search log for the signal window
     const entries = await logger.readLogWindow(windowDays);
@@ -47,10 +62,10 @@ export async function collectSignals(
     ] = await Promise.all([
         collectHitFrequencySignals(entries),
         collectGapSignals(entries, config?.nullQueryScoreThreshold ?? 0.3),
-        collectEntitySignals(files, windowDays, config?.entityMinDays ?? 3),
-        collectStalenessSignals(files, stalenessThreshold),
+        collectEntitySignals(files, windowDays, config?.entityMinDays ?? 3, referenceDate),
+        collectStalenessSignals(files, stalenessThreshold, referenceDate),
         collectWisdomDriftSignals(files, entries),
-        collectSupersessionSignals(files, windowDays),
+        collectSupersessionSignals(files, windowDays, referenceDate),
     ]);
 
     // Combine and score all candidates
@@ -209,8 +224,10 @@ export async function collectEntitySignals(
     files: MemoryFiles,
     windowDays: number,
     minDays: number,
+    referenceDate?: Date,
 ): Promise<DreamCandidate[]> {
-    const cutoffDate = new Date();
+    const ref = referenceDate ?? await resolveReferenceDate(files);
+    const cutoffDate = new Date(ref);
     cutoffDate.setDate(cutoffDate.getDate() - windowDays);
     const cutoffStr = cutoffDate.toISOString().split("T")[0];
 
@@ -267,9 +284,11 @@ export async function collectEntitySignals(
 export async function collectStalenessSignals(
     files: MemoryFiles,
     thresholdDays: number,
+    referenceDate?: Date,
 ): Promise<DreamCandidate[]> {
+    const ref = referenceDate ?? await resolveReferenceDate(files);
     const typedMemories = await files.listTypedMemories();
-    const cutoff = new Date();
+    const cutoff = new Date(ref);
     cutoff.setDate(cutoff.getDate() - thresholdDays);
     const cutoffStr = cutoff.toISOString().split("T")[0];
 
@@ -346,11 +365,14 @@ const SUPERSESSION_MARKERS = [
 export async function collectSupersessionSignals(
     files: MemoryFiles,
     windowDays: number,
+    referenceDate?: Date,
 ): Promise<DreamCandidate[]> {
     const dailies = await files.listDailies();
     if (dailies.length === 0) return [];
 
-    const cutoff = new Date();
+    const ref = referenceDate ?? await resolveReferenceDate(files);
+    const refMs = ref.getTime();
+    const cutoff = new Date(ref);
     cutoff.setDate(cutoff.getDate() - windowDays);
     const cutoffStr = cutoff.toISOString().split("T")[0];
 
@@ -369,10 +391,11 @@ export async function collectSupersessionSignals(
         // Marker count → 0..1 score; 3+ markers saturates.
         const markerScore = Math.min(1, markers / 3);
         // Recency multiplier — most recent dailies inside the window score
-        // 1.0; oldest in-window scores ~0.5.
+        // 1.0; oldest in-window scores ~0.5. Measured against the corpus's
+        // own latest date, not the wall clock.
         const ageDays = Math.max(
             0,
-            (Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24),
+            (refMs - new Date(date).getTime()) / (1000 * 60 * 60 * 24),
         );
         const recency = Math.max(0.5, 1 - ageDays / (windowDays * 2));
         candidates.push({
@@ -465,6 +488,22 @@ export function extractEntitiesLightweight(text: string): string[] {
 function extractDateFromContent(content: string): string | null {
     const match = content.match(/\b(\d{4}-\d{2}-\d{2})\b/);
     return match ? match[1] : null;
+}
+
+/**
+ * Pick the "now" reference date for windowing. The latest daily on disk
+ * wins; fall back to the wall clock for an empty corpus. This lets
+ * dreaming run correctly on backdated bench corpora (where the wall
+ * clock is months ahead of the latest memory) and on idle agents whose
+ * windowing should slide with their own activity.
+ */
+async function resolveReferenceDate(files: MemoryFiles): Promise<Date> {
+    const dailies = await files.listDailies();
+    if (dailies.length === 0) return new Date();
+    const latest = dailies[dailies.length - 1];
+    const parsed = new Date(latest + "T00:00:00Z");
+    if (isNaN(parsed.getTime())) return new Date();
+    return parsed;
 }
 
 interface WisdomEntry {

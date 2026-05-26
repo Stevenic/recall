@@ -9,12 +9,17 @@ import type { MemoryFiles } from "./files.js";
 import type { HierarchicalMemoryConfig } from "./hierarchical-config.js";
 import type { SearchLogger } from "./search-logger.js";
 import type { WikiEngine } from "./wiki-engine.js";
+import type { WikiPage } from "./wiki-types.js";
+import type { Reranker } from "./interfaces/reranker.js";
 import { parseCatalogEntry, matchCatalog, type CatalogEntry } from "./catalog.js";
 import { expandQuery } from "./query-expansion.js";
 import {
     extractTemporalReference,
     temporalAffinity,
     extractDateFromUri,
+    extractRecencyCue,
+    recencyBoost,
+    type RecencyCue,
 } from "./temporal.js";
 
 export interface SearchOptions {
@@ -52,6 +57,37 @@ export interface SearchOptions {
      * When false, skip wiki pages entirely (raw + parents only). Default true.
      */
     includeWiki?: boolean;
+    /**
+     * Enable cross-encoder reranking of first-stage results. When a
+     * Reranker is wired into the SearchService, the service pulls a
+     * larger candidate set (see {@link rerankPool}), reranks via the
+     * cross-encoder, and returns the top `maxResults`. Set to `false`
+     * to bypass for a single query. Default: true when a reranker is
+     * available.
+     */
+    rerank?: boolean;
+    /**
+     * Number of first-stage candidates to feed the reranker. The
+     * cross-encoder lifts top-K precision but you don't want to score
+     * the entire candidate set — a small head (top-20) captures the
+     * relevant hits and finishes in ~100ms. Default: 20.
+     */
+    rerankPool?: number;
+    /**
+     * Cap on the number of WHOLE wiki entries the wiki-side path emits.
+     * Each entry returned by `_wikiSearch` is a hydrated page composed
+     * with its frontmatter pointer header — not a raw chunk. The cap is
+     * a ceiling, not a target: byte budget can also short-circuit it.
+     * Default: 3.
+     */
+    maxWikiEntries?: number;
+    /**
+     * Soft cap on total chars of wiki content returned. Once filled, no
+     * additional entries are added — except the always-1-whole-entry
+     * invariant: the highest-scoring entry is returned even if it alone
+     * exceeds the budget. Default: 12000 (~3K tokens).
+     */
+    wikiByteBudget?: number;
 }
 
 export interface MultiSearchOptions extends SearchOptions {
@@ -59,13 +95,24 @@ export interface MultiSearchOptions extends SearchOptions {
     catalogMatches?: SearchResult[];
 }
 
-/** Search-time view of wiki config — just the score-boost knob today. */
+/** Search-time view of wiki config. */
 export interface SearchWikiConfig {
     /** Default multiplier applied to wiki page scores during ranking. */
     scoreBoost?: number;
+    /** Default cap on whole wiki entries returned per query. */
+    maxWikiEntries?: number;
+    /** Default soft byte budget for wiki entries returned per query. */
+    wikiByteBudget?: number;
 }
 
-const DEFAULT_WIKI_SCORE_BOOST = 1.5;
+// Search-time fallback when neither call options nor service-level wiki
+// config supplies a boost. Matches the DEFAULT_WIKI_CONFIG default —
+// keep these two in sync so tests + integration paths agree.
+const DEFAULT_WIKI_SCORE_BOOST = 1.1;
+/** Cap on whole wiki entries returned per query when nothing overrides. */
+const DEFAULT_MAX_WIKI_ENTRIES = 3;
+/** Soft byte budget for wiki entries (chars, not tokens). ~3K tokens. */
+const DEFAULT_WIKI_BYTE_BUDGET = 12_000;
 
 /**
  * Two-phase hierarchical search:
@@ -81,6 +128,7 @@ export class SearchService {
     private readonly _config: HierarchicalMemoryConfig;
     private readonly _wikiConfig: SearchWikiConfig;
     private readonly _wiki: WikiEngine | undefined;
+    private readonly _reranker: Reranker | undefined;
     private _searchLogger: SearchLogger | null = null;
 
     constructor(
@@ -89,12 +137,55 @@ export class SearchService {
         config?: HierarchicalMemoryConfig,
         wikiConfig?: SearchWikiConfig,
         wiki?: WikiEngine,
+        reranker?: Reranker,
     ) {
         this._index = index;
         this._files = files;
         this._config = config ?? {};
         this._wikiConfig = wikiConfig ?? {};
         this._wiki = wiki;
+        this._reranker = reranker;
+    }
+
+    /**
+     * Two-stage reranking: take the first-stage merged result list (already
+     * scored by embedding + BM25 + boosts) and reorder by cross-encoder
+     * relevance. Best-effort: any failure falls back to first-stage order so
+     * search stays available even when the reranker model can't load.
+     *
+     * The cross-encoder is invoked on the top {@link rerankPool} candidates
+     * (default 20). Reranking a larger pool wastes inference; reranking a
+     * smaller one wastes the cross-encoder's accuracy lift. Returns the same
+     * SearchResult shape; only the `score` field changes (replaced by the
+     * cross-encoder relevance) and the array order is updated.
+     */
+    private async _rerank(
+        query: string,
+        results: SearchResult[],
+        rerankPool: number,
+        topK: number,
+    ): Promise<SearchResult[]> {
+        if (!this._reranker || results.length <= 1) return results;
+        const pool = results.slice(0, rerankPool);
+        const tail = results.slice(rerankPool);
+        try {
+            const ordered = await this._reranker.rerank(
+                query,
+                pool.map((r) => `${r.uri}\n${(r.text ?? "").slice(0, 1500)}`),
+                { topK: Math.min(topK, pool.length) },
+            );
+            const reranked = ordered.map((o) => ({
+                ...pool[o.index],
+                score: o.score,
+            }));
+            // Anything below the rerank pool keeps its first-stage score
+            // and lands after the reranked head. Useful when the caller
+            // asked for topK > pool size (rare).
+            return [...reranked, ...tail];
+        } catch {
+            // Reranker fault — return first-stage results unchanged.
+            return results;
+        }
     }
 
     /**
@@ -127,17 +218,43 @@ export class SearchService {
         const includeWiki = options?.includeWiki !== false;
         const wikiOnly = options?.wikiOnly === true;
 
+        // Reranker on/off + pool size — pool=20 by default, lifts top-3
+        // precision via cross-encoder attention without re-scoring the
+        // whole index. Off when no Reranker is wired.
+        //
+        // Skip rerank when the query has an explicit date pin
+        // (`on YYYY-MM-DD`, `recorded on 2026-01-07`, `as of …`). The
+        // cross-encoder ranks token-similar dailies above date-anchored
+        // ones and the agent prompt already routes pinned questions
+        // directly to that date's daily. Rerank stays on for the much
+        // larger non-pinned set where it consistently lifts top-3
+        // precision.
+        const queryHasDatePin =
+            options?.temporalReference != null ||
+            extractTemporalReference(query) != null;
+        const rerankEnabled =
+            options?.rerank !== false &&
+            this._reranker != null &&
+            !queryHasDatePin;
+        const rerankPool = options?.rerankPool ?? 20;
+
         // Wiki-only mode short-circuits — no catalog, no parent, no recency.
         if (wikiOnly) {
             const wikiResults = await this._wikiSearch(query, {
-                maxResults,
+                maxResults: rerankEnabled ? Math.max(maxResults, rerankPool) : maxResults,
                 maxChunks,
                 maxTokens,
                 wikiBoost,
+                maxWikiEntries:
+                    options?.maxWikiEntries ?? this._wikiConfig.maxWikiEntries,
+                wikiByteBudget:
+                    options?.wikiByteBudget ?? this._wikiConfig.wikiByteBudget,
             });
-            const sliced = wikiResults
-                .sort((a, b) => b.score - a.score)
-                .slice(0, maxResults);
+            let sliced = wikiResults.sort((a, b) => b.score - a.score);
+            if (rerankEnabled) {
+                sliced = await this._rerank(query, sliced, rerankPool, maxResults);
+            }
+            sliced = sliced.slice(0, maxResults);
             await this._logSearchResults(query, sliced, maxResults);
             return sliced;
         }
@@ -147,7 +264,7 @@ export class SearchService {
 
         if (isHierarchical) {
             const results = await this._hierarchicalSearch(query, {
-                maxResults,
+                maxResults: rerankEnabled ? Math.max(maxResults, rerankPool) : maxResults,
                 maxChunks,
                 maxTokens,
                 recencyDepth,
@@ -158,8 +275,12 @@ export class SearchService {
                 includeWiki,
                 ...options,
             });
-            await this._logSearchResults(query, results, maxResults);
-            return results;
+            const reranked = rerankEnabled
+                ? await this._rerank(query, results, rerankPool, maxResults)
+                : results;
+            const sliced = reranked.slice(0, maxResults);
+            await this._logSearchResults(query, sliced, maxResults);
+            return sliced;
         }
 
         // Legacy path: catalog + semantic + recency
@@ -178,6 +299,10 @@ export class SearchService {
                 maxChunks,
                 maxTokens,
                 wikiBoost,
+                maxWikiEntries:
+                    options?.maxWikiEntries ?? this._wikiConfig.maxWikiEntries,
+                wikiByteBudget:
+                    options?.wikiByteBudget ?? this._wikiConfig.wikiByteBudget,
             });
             merged = this._mergeResults(merged, wikiResults, 1.0);
         }
@@ -303,6 +428,8 @@ export class SearchService {
                       maxChunks: opts.maxChunks,
                       maxTokens: opts.maxTokens,
                       wikiBoost: 1.0,
+                      maxWikiEntries: this._wikiConfig.maxWikiEntries,
+                      wikiByteBudget: this._wikiConfig.wikiByteBudget,
                   })
                 : Promise.resolve<SearchResult[]>([]),
         ]);
@@ -393,6 +520,31 @@ export class SearchService {
         const enableTemporal =
             this._config.temporalAffinity !== false && temporalRef !== null;
 
+        // Recency cue ("latest" / "earliest" / null). When the query
+        // explicitly asks for current state or original state, we apply
+        // a recency boost to candidates based on their position in the
+        // corpus's date span. Without a cue, the multiplier is 1.0 so
+        // ranking is unchanged.
+        const recencyCue: RecencyCue = extractRecencyCue(query);
+        let cueSpan: { start: Date; end: Date } | null = null;
+        if (recencyCue !== null) {
+            // Compute the date span from the candidate set itself so the
+            // boost is meaningful within whatever the index currently
+            // holds (the corpus may not start at 1970 or end at today).
+            let minMs = Infinity;
+            let maxMs = -Infinity;
+            for (const c of candidates) {
+                const d = extractDateFromUri(c.uri);
+                if (!d) continue;
+                const t = d.getTime();
+                if (t < minMs) minMs = t;
+                if (t > maxMs) maxMs = t;
+            }
+            if (Number.isFinite(minMs) && Number.isFinite(maxMs) && maxMs > minMs) {
+                cueSpan = { start: new Date(minMs), end: new Date(maxMs) };
+            }
+        }
+
         // `embedding` and `parent` weights are what actually drive ranking.
         // `bm25` stays in the type for backward compatibility and is folded
         // into the embedding signal at search time: `_index.query` runs in
@@ -427,6 +579,35 @@ export class SearchService {
                     finalScore *= temporalAffinity(memDate, temporalRef, sigma);
                 }
             }
+
+            // Apply recency-cue boost when the query explicitly asks
+            // about latest/earliest state and the candidate has a date.
+            // This catches cases the temporalAffinity branch misses —
+            // queries like "what is the current X?" have no explicit
+            // date pin but do want the latest matching memory.
+            if (cueSpan) {
+                const memDate = extractDateFromUri(c.uri);
+                if (memDate) {
+                    finalScore *= recencyBoost(memDate, recencyCue, cueSpan.start, cueSpan.end);
+                }
+            }
+
+            // Grounding-penalty path: temporarily DISABLED while we
+            // collect data on what the verifier flags. The verifier
+            // still runs (its output lands in the page frontmatter +
+            // index metadata) but search ignores the flags here. Run
+            // 16 showed the penalty was downranking wiki pages that
+            // the agent was previously following into the right
+            // dailies — the cure was worse than the disease until we
+            // know which flag-counts correlate with actual wrongness.
+            //
+            // Re-enable once we have data from `wikiUnverified` /
+            // `wikiStale` correlated against question outcomes, with
+            // calibrated multipliers.
+            //
+            // const wUnverified = Number(c.metadata?.wikiUnverified ?? 0);
+            // const wStale = Number(c.metadata?.wikiStale ?? 0);
+            // if (wUnverified > 0 || wStale > 0) { ... }
 
             return {
                 ...c,
@@ -541,16 +722,89 @@ export class SearchService {
             maxChunks: number;
             maxTokens: number;
             wikiBoost: number;
+            maxWikiEntries?: number;
+            wikiByteBudget?: number;
         },
     ): Promise<SearchResult[]> {
-        const results = await this._index.query(query, {
-            maxResults: opts.maxResults,
+        // Oversample at the chunk level — Vectra returns chunk-by-chunk
+        // hits, and a single wiki page may contribute several chunks.
+        // Groups-by-URI later pick the best chunk per page; we need
+        // enough headroom that the top-K pages are all represented.
+        const chunkHits = await this._index.query(query, {
+            maxResults: Math.max(opts.maxResults * 4, 12),
             maxChunks: opts.maxChunks,
             maxTokens: opts.maxTokens,
             filter: { contentType: "wiki" },
         });
-        if (opts.wikiBoost === 1.0) return results;
-        return results.map((r) => ({ ...r, score: r.score * opts.wikiBoost }));
+        if (chunkHits.length === 0) return [];
+
+        // Group by URI; keep the best-scoring chunk per page.
+        const bestByUri = new Map<string, SearchResult>();
+        for (const hit of chunkHits) {
+            const prev = bestByUri.get(hit.uri);
+            if (!prev || prev.score < hit.score) bestByUri.set(hit.uri, hit);
+        }
+        const ranked = [...bestByUri.values()]
+            .map((r) =>
+                opts.wikiBoost === 1.0 ? r : { ...r, score: r.score * opts.wikiBoost },
+            )
+            .sort((a, b) => b.score - a.score);
+
+        // Hydrate full pages + render pointer-header views. When no wiki
+        // engine is wired, fall back to the chunk-level hits unchanged.
+        if (!this._wiki) return ranked.slice(0, opts.maxResults);
+
+        const maxEntries = opts.maxWikiEntries ?? DEFAULT_MAX_WIKI_ENTRIES;
+        const budget = opts.wikiByteBudget ?? DEFAULT_WIKI_BYTE_BUDGET;
+        const out: SearchResult[] = [];
+        let used = 0;
+        for (const cand of ranked) {
+            if (out.length >= maxEntries) break;
+            const slug = extractWikiSlugFromUri(cand.uri);
+            const composed = slug
+                ? await this._composeWikiPageView(slug, cand)
+                : null;
+            const entry = composed ?? cand;
+            const size = entry.text.length;
+            // Always-1-whole-entry: the highest-scoring entry comes back
+            // even if it alone exceeds the budget. Subsequent entries
+            // respect both the budget and the maxEntries cap.
+            if (out.length === 0) {
+                out.push(entry);
+                used += size;
+                continue;
+            }
+            if (used + size > budget) break;
+            out.push(entry);
+            used += size;
+        }
+        return out;
+    }
+
+    /**
+     * Hydrate a wiki slug into a `SearchResult` whose `text` is the page's
+     * pointer-header (cited dailies + supersedes + related links) followed
+     * by the full body. Returns null when the page can't be read so the
+     * caller can fall back to the chunk-level hit.
+     */
+    private async _composeWikiPageView(
+        slug: string,
+        chunkHit: SearchResult,
+    ): Promise<SearchResult | null> {
+        if (!this._wiki) return null;
+        try {
+            const page = await this._wiki.read(slug, "private");
+            if (!page) return null;
+            const text = renderWikiPointerHeader(page) + page.body.trimEnd() + "\n";
+            return {
+                uri: chunkHit.uri,
+                text,
+                score: chunkHit.score,
+                metadata: { ...chunkHit.metadata, contentType: "wiki" },
+            };
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -681,4 +935,79 @@ export class SearchService {
 
         return [...byUri.values()];
     }
+}
+
+/**
+ * Extract a wiki slug from a `memory/wiki/<slug>.md` URI. Returns null
+ * when the URI doesn't match the wiki path shape.
+ */
+function extractWikiSlugFromUri(uri: string): string | null {
+    const m = /(?:^|\/)memory\/wiki\/([^/]+)\.md$/.exec(uri);
+    return m ? m[1] : null;
+}
+
+/**
+ * Format a {@link SourceContribution.range} as `[from..to]` with `to`
+ * end-inclusive. Empty when the range is unset or malformed.
+ */
+function formatSourceRange(range?: { from: number; lines: number }): string {
+    if (!range || range.from < 1 || range.lines < 1) return "";
+    const to = range.from + range.lines - 1;
+    return `[${range.from}..${to}]`;
+}
+
+/**
+ * Render the per-page pointer header that prefixes every whole wiki
+ * entry returned by `_wikiSearch`. The agent sees the page's
+ * contributors (with optional range + summary annotations), prior
+ * claims via `supersedes`, and sibling pages via `related` — turning
+ * the wiki page into an explicit walk target for `memory_get` rather
+ * than opaque prose.
+ *
+ * Format mirrors the wiki preamble that the bench harness has emitted
+ * since the early runs, so existing agent prompts already know how to
+ * read it.
+ */
+function renderWikiPointerHeader(page: WikiPage): string {
+    const lines: string[] = [];
+    const updated = page.updated ?? "(unknown)";
+    const confidence = page.confidence ? `, confidence ${page.confidence}` : "";
+    lines.push(`=== Wiki: ${page.slug} (updated ${updated}${confidence}) ===`);
+    if (page.name) lines.push(page.name);
+    if (page.description) lines.push(page.description);
+
+    if (page.sources.length > 0) {
+        lines.push("");
+        lines.push(`Cited dailies (${page.sources.length}):`);
+        for (const src of page.sources) {
+            const range = formatSourceRange(src.range);
+            const summary = src.summary ? ` — ${src.summary}` : "";
+            lines.push(`- ${src.uri}${range}${summary}`);
+        }
+    }
+
+    if (page.supersedes && page.supersedes.length > 0) {
+        lines.push("");
+        lines.push("Superseded claims:");
+        for (const sup of page.supersedes) {
+            const fact = sup.fact ? `"${sup.fact}"` : "(prior claim)";
+            lines.push(
+                `- ${fact} (was in ${sup.source}, superseded ${sup.supersededOn})`,
+            );
+        }
+    }
+
+    if (page.related.length > 0) {
+        lines.push("");
+        lines.push("Related: " + page.related.map((s) => `[[${s}]]`).join(", "));
+    }
+
+    if (page.redirectTo) {
+        lines.push("");
+        lines.push(`Redirects to: [[${page.redirectTo}]]`);
+    }
+
+    lines.push("");
+    lines.push("--- body ---");
+    return lines.join("\n") + "\n";
 }

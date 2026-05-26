@@ -17,6 +17,8 @@ import type { FileStorage } from "./interfaces/storage.js";
 import { SearchLogger } from "./search-logger.js";
 import { collectSignals } from "./signal-collector.js";
 import type { WikiEngine } from "./wiki-engine.js";
+import type { SourceContribution, WikiPage, WikiTarget } from "./wiki-types.js";
+import { withTemporalTag } from "./temporal-tag.js";
 import type {
     DreamingConfig,
     DreamCandidate,
@@ -29,9 +31,15 @@ import type {
     DreamWikiUpdate,
 } from "./dreaming-config.js";
 import {
+    DEFAULT_DREAM_ANALYZE_CONCURRENCY,
     DEFAULT_MAX_CANDIDATES,
     DEFAULT_SIGNAL_WINDOW_DAYS,
     DEFAULT_STALENESS_THRESHOLD_DAYS,
+    DEFAULT_WIKI_DEDUP_THRESHOLD,
+    DEFAULT_MAX_ENTITY_RENAMES_PER_SESSION,
+    DEFAULT_ENTITY_RENAME_OVERLAP,
+    DEFAULT_WISDOM_MAX_ENTRIES,
+    DEFAULT_WISDOM_MAX_CHARS,
 } from "./dreaming-config.js";
 
 export interface DreamEngineDeps {
@@ -48,6 +56,31 @@ export class DreamEngine {
     private readonly _logger: SearchLogger;
     private readonly _config: DreamingConfig;
     private readonly _wiki: WikiEngine | undefined;
+    /**
+     * Per-slug serialization for the wiki apply path. Concurrent analyze
+     * workers can race on shared wiki state when they touch the same
+     * slug: worker A's `_findDedupTarget` read can predate worker B's
+     * write, both then perform overlapping merges, and one's body
+     * clobbers the other. We lock per slug so ops on the same wiki page
+     * serialize while ops on different pages parallelize freely. Map
+     * entries are removed eagerly once the lock chain drains so the map
+     * doesn't grow without bound.
+     */
+    private readonly _slugLocks = new Map<string, Promise<void>>();
+    /**
+     * Per-session counter for the entity-rename detector. Reset at the
+     * start of every `dream()` call. Bounds LLM cost: at most
+     * `DEFAULT_MAX_ENTITY_RENAMES_PER_SESSION` verifier calls per pass.
+     */
+    private _entityRenameVerifications = 0;
+    /**
+     * Per-session memo of candidate page pairs already judged by the
+     * entity-rename verifier. Keyed by `"${slugA}|${slugB}"` with
+     * lexicographically sorted slugs so order doesn't matter. Reset at
+     * the start of every `dream()` call. Avoids re-verifying the same
+     * pair as a write touches each page in turn.
+     */
+    private readonly _entityRenameSeen = new Set<string>();
 
     constructor(
         files: MemoryFiles,
@@ -84,6 +117,9 @@ export class DreamEngine {
         const phases = options?.phases ?? ["gather", "analyze", "write"];
         const maxCandidates = options?.maxCandidates ?? this._config.maxCandidates ?? DEFAULT_MAX_CANDIDATES;
         const dryRun = options?.dryRun ?? false;
+        // Fresh per-session state for the entity-rename detector.
+        this._entityRenameVerifications = 0;
+        this._entityRenameSeen.clear();
 
         let candidates: DreamCandidate[] = [];
         let analysisResults: AnalysisResult[] = [];
@@ -137,6 +173,21 @@ export class DreamEngine {
             result = aggregateResults(analysisResults, toAnalyze.length);
         }
 
+        // Phase 4: Wisdom distillation. Read current WISDOM.md, propose
+        // patches based on this dream's insights + wiki changes, write
+        // back. Best-effort; failures don't invalidate the rest of the
+        // pass. Skipped when no wiki engine is wired (the LLM has too
+        // little to draw on without a wiki state to summarize).
+        const wisdomEnabled =
+            this._config.wisdom?.enabled !== false && this._wikiActive(options?.skipWiki);
+        if (wisdomEnabled && phases.includes("write")) {
+            try {
+                await this._distillWisdom(result);
+            } catch {
+                // Best-effort: never fail the pass on a wisdom-distill error.
+            }
+        }
+
         // Persist carry-over candidates and state
         await this._logger.writeCandidates(overflow);
         await this._logger.writeState({
@@ -164,29 +215,45 @@ export class DreamEngine {
     // ─── Phase 2: Analyze Candidates ─────────────────────
 
     async analyze(candidates: DreamCandidate[]): Promise<AnalysisResult[]> {
-        const results: AnalysisResult[] = [];
         const templates = this._getTemplates();
-
-        for (const candidate of candidates) {
-            try {
-                const result = await this._analyzeCandidate(candidate, templates);
-                results.push(result);
-            } catch {
-                // Skip candidates that fail analysis
-                results.push({
-                    candidate,
-                    insights: [],
-                    promotions: [],
-                    contradictions: [],
-                    gaps: [],
-                    wikiOps: [],
-                    modelCalls: 0,
-                    inputTokens: 0,
-                    outputTokens: 0,
-                });
-            }
-        }
-
+        const concurrency = this._config.analyzeConcurrency ?? DEFAULT_DREAM_ANALYZE_CONCURRENCY;
+        // Pre-allocate so results stay in candidate order (matters for
+        // downstream merging + diary writes).
+        const results: AnalysisResult[] = new Array(candidates.length);
+        const emptyFor = (candidate: DreamCandidate): AnalysisResult => ({
+            candidate,
+            insights: [],
+            promotions: [],
+            contradictions: [],
+            gaps: [],
+            wikiOps: [],
+            modelCalls: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+        });
+        // Worker-pool concurrency: K workers each pull from a shared
+        // index. Each analyze call is one LLM round-trip + a few file
+        // reads; with 20 candidates × ~5-15s each, sequential burns
+        // 100-300s per dream pass while K=4 cuts to 25-75s. Errors are
+        // swallowed per-candidate so a single bad analysis can't drop
+        // the whole pass.
+        let next = 0;
+        await Promise.all(
+            Array.from({ length: Math.max(1, concurrency) }, async () => {
+                while (true) {
+                    const idx = next++;
+                    if (idx >= candidates.length) return;
+                    try {
+                        results[idx] = await this._analyzeCandidate(
+                            candidates[idx],
+                            templates,
+                        );
+                    } catch {
+                        results[idx] = emptyFor(candidates[idx]);
+                    }
+                }
+            }),
+        );
         return results;
     }
 
@@ -449,6 +516,49 @@ export class DreamEngine {
             }
         }
 
+        // For candidate types that can emit wiki_ops (cross-reference,
+        // entity-cluster, theme synthesis, typed-memory extraction), include
+        // the top existing wiki pages on related topics so the LLM can
+        // prefer UPDATE over CREATE. Without this, dreaming creates a fresh
+        // page each time it encounters the same topic with new facts —
+        // resulting in 7 Condor pages by day 30 of the EA bench. The
+        // supersession_signal branch already does this above; this block
+        // generalizes it to the other create-emitting templates.
+        const createEmittingTypes = new Set<typeof candidate.type>([
+            "high_frequency",
+            "entity_cluster",
+            "stale_memory",
+            "wisdom_drift",
+        ]);
+        if (
+            createEmittingTypes.has(candidate.type) &&
+            this._wiki?.enabled
+        ) {
+            try {
+                const probe = candidate.description || parts[0] || "";
+                const wikiHits = await this._index.query(probe, {
+                    maxResults: 4,
+                    filter: { contentType: "wiki" },
+                });
+                if (wikiHits.length > 0) {
+                    parts.push(
+                        "## Existing wiki pages on related topics " +
+                            "(prefer UPDATE over CREATE — use the existing slug " +
+                            "rather than emitting a duplicate page on the same topic)\n\n" +
+                            wikiHits
+                                .map(
+                                    (h) =>
+                                        `### ${h.uri}\n${(h.text ?? "").trim().slice(0, 600)}`,
+                                )
+                                .join("\n\n"),
+                    );
+                }
+            } catch {
+                // Wiki search failed — proceed without context (apply-time
+                // dedup is the safety net).
+            }
+        }
+
         if (parts.length === 0) return null;
         return parts.join("\n\n---\n\n");
     }
@@ -659,15 +769,840 @@ export class DreamEngine {
             contradictionDetection: this._config.analysisTemplates?.contradictionDetection ?? CONTRADICTION_TEMPLATE,
             typedMemoryExtraction: this._config.analysisTemplates?.typedMemoryExtraction ?? TYPED_MEMORY_TEMPLATE,
             themeSynthesis: this._config.analysisTemplates?.themeSynthesis ?? THEME_SYNTHESIS_TEMPLATE,
+            entityRename: this._config.analysisTemplates?.entityRename ?? ENTITY_RENAME_TEMPLATE,
+            wisdomDistillation:
+                this._config.analysisTemplates?.wisdomDistillation ??
+                WISDOM_DISTILLATION_TEMPLATE,
         };
+    }
+
+    /**
+     * Merge new content into an existing wiki page's body, detecting which
+     * existing claims are superseded by the new content. Returns the
+     * rewritten body plus a list of `SupersedesEntry`-shaped records for
+     * each replaced claim.
+     *
+     * The merge step is what unlocks supersession in the dedup path.
+     * Without it, dedup just appends new paragraphs to the existing body —
+     * the page accumulates contradictory claims and the agent grabs the
+     * first paragraph it sees (typically the older one). With it, when
+     * day-14 revises a synergy value from $18M to $28M, the wiki body is
+     * rewritten so the page's claim is $28M and the prior $18M claim is
+     * recorded in `supersedes:` for traceability.
+     *
+     * Falls back to a plain append when the LLM response is unparseable
+     * or absent, so a flaky completion never drops the new content.
+     */
+    private async _mergeWithSupersession(
+        existing: WikiPage,
+        newBody: string,
+        newSource: string,
+    ): Promise<{
+        mode: "replace" | "append" | "merge";
+        body: string;
+        supersedes: { source: string; fact: string }[];
+    }> {
+        const prompt = MERGE_PROMPT_TEMPLATE
+            .replace("{{EXISTING_BODY}}", existing.body.trim())
+            .replace("{{NEW_BODY}}", newBody.trim())
+            .replace("{{NEW_SOURCE}}", newSource)
+            .replace("{{PAGE_NAME}}", existing.name);
+        const fallback = (): {
+            mode: "append";
+            body: string;
+            supersedes: { source: string; fact: string }[];
+        } => {
+            const sep = existing.body.endsWith("\n\n") ? "" : "\n\n";
+            return {
+                mode: "append",
+                body: existing.body.replace(/\s+$/, "") +
+                    sep +
+                    newBody.trim() +
+                    "\n",
+                supersedes: [],
+            };
+        };
+        let completion;
+        try {
+            completion = await this._model.complete(prompt, {
+                systemPrompt:
+                    "You are a wiki-merge engine. Output JSON only — no prose.",
+                temperature: 0,
+            });
+        } catch {
+            return fallback();
+        }
+        if (completion.error || !completion.text.trim()) return fallback();
+        const cleaned = completion.text
+            .replace(/^```json?\s*/m, "")
+            .replace(/\s*```\s*$/m, "")
+            .trim();
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(cleaned);
+        } catch {
+            return fallback();
+        }
+        if (!parsed || typeof parsed !== "object") return fallback();
+        const p = parsed as {
+            mode?: unknown;
+            body?: unknown;
+            supersedes?: unknown;
+        };
+        const mode =
+            p.mode === "replace" || p.mode === "append" || p.mode === "merge"
+                ? (p.mode as "replace" | "append" | "merge")
+                : "append";
+        const body =
+            typeof p.body === "string" && p.body.trim().length > 0
+                ? p.body
+                : fallback().body;
+        const supersedes: { source: string; fact: string }[] = [];
+        if (Array.isArray(p.supersedes)) {
+            for (const raw of p.supersedes) {
+                if (!raw || typeof raw !== "object") continue;
+                const r = raw as { fact?: unknown; source?: unknown };
+                const fact = typeof r.fact === "string" ? r.fact.trim() : "";
+                // Default the source to the existing page's earliest
+                // source — that's where the old claim lived. The model
+                // can override per entry.
+                const source =
+                    typeof r.source === "string" && r.source.trim().length > 0
+                        ? r.source.trim()
+                        : (existing.sources[0]?.uri ?? "");
+                if (fact && source) supersedes.push({ source, fact });
+            }
+        }
+        return { mode, body, supersedes };
+    }
+
+    /**
+     * Upsert a wiki page into the index immediately after it's written.
+     *
+     * Without this, pages created earlier in the same dream session aren't
+     * visible to `_findDedupTarget` until the next `service.sync()`. That
+     * defeats dedup: when day-N dreaming creates `condor-synergy-case` and
+     * then later proposes `condor-valuation-frame`, the second create
+     * can't see the first one to dedup against. Mirrors the temporal-tag
+     * + metadata shape used by `MemoryService._indexWikiPages` so search
+     * results are consistent regardless of which path indexed the page.
+     */
+    private async _upsertWikiPageInIndex(
+        page: WikiPage,
+        target: WikiTarget,
+    ): Promise<void> {
+        const slug = page.slug;
+        const uri =
+            target === "private"
+                ? `memory/wiki/${slug}.md`
+                : `memory/wiki/${target}/${slug}.md`;
+        const embeddedText = withTemporalTag(
+            [`# ${page.name}`, page.description, "", page.body.trim()]
+                .filter((line) => line.length > 0 || line === "")
+                .join("\n"),
+            page.updated,
+        );
+        try {
+            await this._index.upsertDocument(uri, embeddedText, {
+                contentType: "wiki",
+                period: page.updated,
+                wikiCategory: page.category,
+                wikiSlug: page.slug,
+                wikiTarget: String(target),
+                wikiSources: page.sources.length,
+                // Mirror the service-level _indexWikiPages metadata so
+                // either indexing path produces compatible metadata for
+                // the search scorer's grounding penalty.
+                wikiUnverified: page.grounding?.unverified.length ?? 0,
+                wikiStale: page.grounding?.stale.length ?? 0,
+            });
+        } catch {
+            // Indexing failures are non-fatal; the next service.sync() will
+            // pick up the page. Worst case we miss one dedup opportunity.
+        }
+    }
+
+    /**
+     * Decide whether a `create` op should be transparently converted to an
+     * `update` against an existing topically-overlapping wiki page.
+     *
+     * Uses pure-semantic retrieval (BM25 disabled) so the score is a
+     * normalized cosine similarity in [0, 1]; the configured threshold
+     * (`wikiDedupThreshold`, default 0.8) controls how aggressive the
+     * dedup is. Returns null when no candidate clears the threshold or
+     * when wiki search fails — the caller proceeds with a plain create.
+     *
+     * Probe text combines name + description + a body excerpt to
+     * approximate the page's overall topic signature.
+     */
+    private async _findDedupTarget(
+        op: Extract<DreamWikiOp, { op: "create" }>,
+    ): Promise<{ slug: string; score: number } | null> {
+        if (!this._wiki) return null;
+        const threshold =
+            this._config.wikiDedupThreshold ?? DEFAULT_WIKI_DEDUP_THRESHOLD;
+        const probe = [
+            op.name,
+            op.description,
+            op.body.slice(0, 600),
+        ]
+            .filter((s) => s && s.trim().length > 0)
+            .join("\n\n");
+        if (!probe.trim()) return null;
+        const selfUri = `memory/wiki/${op.slug}.md`;
+        try {
+            const hits = await this._index.query(probe, {
+                maxResults: 3,
+                filter: { contentType: "wiki" },
+                // Semantic-only: scores are normalized cosine similarity
+                // in [0, 1] so the threshold is meaningful. The hybrid
+                // path adds BM25 hits with un-normalized scores, which
+                // makes thresholding unreliable.
+                enableBM25: false,
+            });
+            for (const hit of hits) {
+                if (hit.uri === selfUri) continue;
+                if (!hit.uri.startsWith("memory/wiki/")) continue;
+                if (hit.score >= threshold) {
+                    const slug = hit.uri
+                        .replace(/^memory\/wiki\//, "")
+                        .replace(/\.md$/, "");
+                    return { slug, score: hit.score };
+                }
+                // Hits are sorted desc by score; once we see a sub-
+                // threshold hit, none of the rest will clear either.
+                break;
+            }
+        } catch {
+            // Index not ready or query failed — fall through to create.
+        }
+        return null;
     }
 
     /**
      * Apply a single wiki op against the bound WikiEngine. Errors are caught
      * and surfaced in the returned `DreamWikiUpdate` so a malformed model
      * response can't fail the whole session.
+     *
+     * After a successful op, immediately upserts the affected wiki page
+     * into the index so subsequent dedup checks within the same dream
+     * session can find it. Without this, the dedup runs against a stale
+     * index and creates duplicate pages.
      */
+    /**
+     * Acquire a per-slug lock, run `fn`, then release. The lock is a
+     * promise chain — each acquirer awaits the prior one and replaces
+     * the tail. When the chain drains (no waiters), we drop the map
+     * entry. Safe for nested ops on the same slug from a single async
+     * task since each acquire pushes a new tail (this isn't a reentrant
+     * mutex; don't nest the same slug inside itself).
+     */
+    private async _withSlugLock<T>(
+        slug: string,
+        fn: () => Promise<T>,
+    ): Promise<T> {
+        const prev = this._slugLocks.get(slug) ?? Promise.resolve();
+        let release!: () => void;
+        const next = new Promise<void>((r) => {
+            release = r;
+        });
+        // Tail this acquirer's release onto the chain so the next
+        // waiter unblocks when we finish.
+        const chained = prev.then(() => next);
+        this._slugLocks.set(slug, chained);
+        try {
+            await prev;
+            return await fn();
+        } finally {
+            release();
+            // Drain the map entry once we're the tail and there are no
+            // more pending waiters. The check is best-effort — if a new
+            // acquirer slips in between the get + delete, the map will
+            // still be correct since they're now writing their own tail.
+            if (this._slugLocks.get(slug) === chained) {
+                this._slugLocks.delete(slug);
+            }
+        }
+    }
+
     private async _applyWikiOp(op: DreamWikiOp): Promise<DreamWikiUpdate> {
+        // Resolve the effective slug BEFORE locking so we lock the right
+        // one. For create ops the effective slug might be a dedup
+        // target's slug (a different page that already exists); for
+        // update / contradict it's just op.slug. We do the read-only
+        // dedup probe outside the lock — it may race with parallel
+        // writers, but the lock-then-recompute inside `_executeWikiOp`
+        // converges to the right page.
+        let effectiveSlug = op.slug;
+        if (op.op === "create" && this._wiki) {
+            try {
+                const dedupTarget = await this._findDedupTarget(op);
+                if (dedupTarget) effectiveSlug = dedupTarget.slug;
+            } catch {
+                // Index not ready or query failed — fall through with
+                // the original op.slug; the inner path will retry.
+            }
+        }
+        return this._withSlugLock(effectiveSlug, () =>
+            this._applyWikiOpLocked(op),
+        );
+    }
+
+    private async _applyWikiOpLocked(op: DreamWikiOp): Promise<DreamWikiUpdate> {
+        const update = await this._executeWikiOp(op);
+        if (update.ok && this._wiki) {
+            // Grounding verification is parked. The verifier costs ~1
+            // LLM call per wiki write (so ~30/checkpoint for a typical
+            // dream pass) but the downstream penalty in SearchService
+            // is currently no-op, so we're paying without benefit. The
+            // method `_verifyGrounding` is still defined and the
+            // `grounding` frontmatter shape is still parsed — turn this
+            // call back on once the penalty is recalibrated.
+            //
+            // try { await this._verifyGrounding(update.slug, "private"); } catch { ... }
+            const page = await this._wiki.read(update.slug, "private");
+            if (page) {
+                await this._upsertWikiPageInIndex(page, "private");
+                // Maintain a trajectory companion page when this page
+                // accumulates ≥2 supersession records. Synthesis-flavored
+                // questions ("how did X evolve") then have a dedicated
+                // chronological page to retrieve instead of needing the
+                // agent to stitch a timeline by hand. Best-effort: a
+                // failure here doesn't invalidate the underlying write.
+                try {
+                    await this._maintainTrajectoryPage(page, "private");
+                } catch {
+                    // Trajectory generation is purely additive; skip on error.
+                }
+                // Entity-rename detection. Looks for OTHER wiki pages whose
+                // sources overlap heavily with this one but whose names
+                // don't share a dominant proper noun — the "Northstar
+                // Components → Northstar Gridworks" rename case that
+                // merge-with-supersession can't catch because the two pages
+                // live separately. Gated to ≥3 sources + a per-session cap
+                // so the LLM cost stays bounded. Best-effort: never
+                // invalidates the underlying write.
+                try {
+                    await this._detectAndApplyEntityRename(page, "private");
+                } catch {
+                    // Rename detection is best-effort; never block the write.
+                }
+            }
+        }
+        return update;
+    }
+
+    /**
+     * Generate or refresh the trajectory companion for a wiki page that
+     * has been revised at least twice. The companion page collects each
+     * supersession entry in chronological order so retrieval of "how did
+     * X change over time" questions lands on a single page that already
+     * has the answer.
+     *
+     * Trigger is purely structural — `supersedes.length >= 2` — so this
+     * applies equally to any topic that accumulates revisions, not just
+     * the EA corpus's Condor pages. Trajectory pages never themselves
+     * trigger trajectory companions (the slug-suffix gates that).
+     */
+    private async _maintainTrajectoryPage(
+        sourcePage: WikiPage,
+        target: WikiTarget,
+    ): Promise<void> {
+        if (!this._wiki) return;
+        // Trajectory pages must not bootstrap recursively. Skip when the
+        // page is itself a trajectory companion.
+        if (/-trajectory$/.test(sourcePage.slug)) return;
+        if (!sourcePage.supersedes || sourcePage.supersedes.length < 2) return;
+        const trajectorySlug = `${sourcePage.slug}-trajectory`;
+        const body = renderTrajectoryBody(sourcePage, trajectorySlug);
+        const sources = collectTrajectorySources(sourcePage);
+        const existing = await this._wiki.read(trajectorySlug, target);
+        let written: WikiPage;
+        if (existing) {
+            written = {
+                ...existing,
+                body: ensureTrailingNewline(body),
+                sources,
+                related: existing.related.includes(sourcePage.slug)
+                    ? existing.related
+                    : [...existing.related, sourcePage.slug],
+                updated: todayIso(),
+            };
+        } else {
+            written = {
+                slug: trajectorySlug,
+                name: `${sourcePage.name} — trajectory`,
+                description: `Chronological evolution of ${sourcePage.name}'s claims. See [[${sourcePage.slug}]] for the current state.`,
+                category: "reference",
+                created: todayIso(),
+                updated: todayIso(),
+                sources,
+                related: [sourcePage.slug],
+                confidence: "high",
+                body: ensureTrailingNewline(body),
+            };
+        }
+        await this._wiki.write(written, target);
+        await this._upsertWikiPageInIndex(written, target);
+        // Cross-link from the source page back to its trajectory.
+        if (!sourcePage.related.includes(trajectorySlug)) {
+            const linked: WikiPage = {
+                ...sourcePage,
+                related: [...sourcePage.related, trajectorySlug],
+            };
+            await this._wiki.write(linked, target);
+            await this._upsertWikiPageInIndex(linked, target);
+        }
+    }
+
+    /**
+     * Detect that this wiki page and another existing page describe the
+     * same underlying entity that has been renamed. The structural
+     * pre-filter is intentionally light — both pages need ≥3 cited
+     * sources and a source-set Jaccard ≥ `DEFAULT_ENTITY_RENAME_OVERLAP`.
+     * A "names must diverge" pre-filter was tempting but would miss the
+     * canonical case ("Northstar Components" → "Northstar Gridworks"
+     * share "Northstar"), so the LLM verifier carries the load with a
+     * bias-toward-false prompt.
+     *
+     * Per-session caps and a per-pair memo bound LLM cost. When the
+     * verifier returns `same: true`, the page with the LATER most-recent
+     * source is treated as canonical; the older page is converted to a
+     * redirect stub and a `supersedes` entry is appended to the canonical
+     * page noting the rename.
+     */
+    private async _detectAndApplyEntityRename(
+        page: WikiPage,
+        target: WikiTarget,
+    ): Promise<void> {
+        if (!this._wiki) return;
+        if (this._entityRenameVerifications >= DEFAULT_MAX_ENTITY_RENAMES_PER_SESSION) {
+            return;
+        }
+        if (page.redirectTo) return; // already a redirect — nothing to merge
+        if (/-trajectory$/.test(page.slug)) return; // trajectory companions don't rename
+        if ((page.sources ?? []).length < 3) return;
+
+        // Build the candidate pool: pages other than `page` that share
+        // enough source URIs.
+        const pageSources = new Set(page.sources.map((s) => s.uri));
+        const otherSlugs = await this._wiki.list(target);
+        const candidates: {
+            other: WikiPage;
+            jaccard: number;
+            sharedSources: number;
+        }[] = [];
+        for (const slug of otherSlugs) {
+            if (slug === page.slug) continue;
+            if (/-trajectory$/.test(slug)) continue;
+            const other = await this._wiki.read(slug, target);
+            if (!other) continue;
+            if (other.redirectTo) continue;
+            if ((other.sources ?? []).length < 3) continue;
+            // Source-set Jaccard (by URI only — range/summary don't affect identity).
+            const otherSources = new Set(other.sources.map((s) => s.uri));
+            let intersect = 0;
+            for (const s of pageSources) {
+                if (otherSources.has(s)) intersect++;
+            }
+            const unionSize = pageSources.size + otherSources.size - intersect;
+            if (unionSize === 0) continue;
+            const jaccard = intersect / unionSize;
+            if (jaccard < DEFAULT_ENTITY_RENAME_OVERLAP) continue;
+            // Memoize per session so a repeated write to either page
+            // doesn't re-verify the same pair.
+            const memoKey = pairKey(page.slug, other.slug);
+            if (this._entityRenameSeen.has(memoKey)) continue;
+            candidates.push({ other, jaccard, sharedSources: intersect });
+        }
+        if (candidates.length === 0) return;
+        // Take the highest-overlap candidate first. False positives at the
+        // top of the list are the most damaging because they trigger an
+        // actual page redirect; if the verifier rejects, we still cap the
+        // session via the counter so the next write can try a different
+        // pair next round.
+        candidates.sort((a, b) => b.jaccard - a.jaccard);
+        const best = candidates[0];
+        const memoKey = pairKey(page.slug, best.other.slug);
+        this._entityRenameSeen.add(memoKey);
+        this._entityRenameVerifications++;
+
+        const templates = this._getTemplates();
+        const prompt = templates.entityRename
+            .replace("{{PAGE_A_NAME}}", page.name)
+            .replace("{{PAGE_A_SLUG}}", page.slug)
+            .replace("{{PAGE_A_DESCRIPTION}}", page.description)
+            .replace("{{PAGE_A_BODY_HEAD}}", page.body.split("\n").slice(0, 20).join("\n"))
+            .replace("{{PAGE_A_SOURCES}}", page.sources.map((s) => s.uri).join("\n"))
+            .replace("{{PAGE_B_NAME}}", best.other.name)
+            .replace("{{PAGE_B_SLUG}}", best.other.slug)
+            .replace("{{PAGE_B_DESCRIPTION}}", best.other.description)
+            .replace("{{PAGE_B_BODY_HEAD}}", best.other.body.split("\n").slice(0, 20).join("\n"))
+            .replace("{{PAGE_B_SOURCES}}", best.other.sources.map((s) => s.uri).join("\n"))
+            .replace("{{JACCARD}}", best.jaccard.toFixed(2))
+            .replace("{{SHARED_SOURCES}}", String(best.sharedSources));
+
+        let completion;
+        try {
+            completion = await this._model.complete(prompt, {
+                systemPrompt:
+                    "You decide whether two wiki pages describe the same entity that has been renamed. Output JSON only — no prose.",
+                temperature: 0,
+            });
+        } catch {
+            return;
+        }
+        if (completion.error || !completion.text.trim()) return;
+        const cleaned = completion.text
+            .replace(/^```json?\s*/m, "")
+            .replace(/\s*```\s*$/m, "")
+            .trim();
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(cleaned);
+        } catch {
+            return;
+        }
+        if (!parsed || typeof parsed !== "object") return;
+        const r = parsed as {
+            same?: unknown;
+            canonical_slug?: unknown;
+            old_name?: unknown;
+            confidence?: unknown;
+        };
+        if (r.same !== true) return;
+        // Pick canonical: prefer the LLM's choice when it matches one of
+        // the two slugs; otherwise fall back to "page with the latest
+        // dated source".
+        let canonicalSlug: string;
+        if (
+            typeof r.canonical_slug === "string" &&
+            (r.canonical_slug === page.slug || r.canonical_slug === best.other.slug)
+        ) {
+            canonicalSlug = r.canonical_slug;
+        } else {
+            canonicalSlug = pickCanonicalByLatestSource(page, best.other);
+        }
+        const obsoletePage =
+            canonicalSlug === page.slug ? best.other : page;
+        const canonicalPage =
+            canonicalSlug === page.slug ? page : best.other;
+        // Apply the rename:
+        //   1. Convert obsoletePage to a redirect stub: clear body, set
+        //      redirectTo, advance updated.
+        //   2. MERGE the obsolete page's `sources` into the canonical
+        //      page's `sources`. The canonical now owns the full
+        //      contributor set across both names. This is what makes the
+        //      wiki-anchored `memory_timeline` walk usable across
+        //      renames — without it, the dailies that fed the old name
+        //      get orphaned when their original page becomes a stub.
+        //   3. Append a supersedes entry on the canonical capturing the
+        //      old name as a renamed entity (uses the obsolete page's
+        //      slug as a wiki: URI so traceability remains).
+        const oldName =
+            typeof r.old_name === "string" && r.old_name.trim().length > 0
+                ? r.old_name.trim()
+                : obsoletePage.name;
+        try {
+            const redirected: WikiPage = {
+                ...obsoletePage,
+                body: ensureTrailingNewline(
+                    `This page has been merged into [[${canonicalSlug}]] as the result of an entity rename.\n\nPreviously known as: ${oldName}`,
+                ),
+                redirectTo: canonicalSlug,
+                updated: todayIso(),
+            };
+            await this._wiki.write(redirected, target);
+            await this._upsertWikiPageInIndex(redirected, target);
+
+            // Source merge: union canonical's existing sources with the
+            // obsolete page's sources (deduped by URI, original order
+            // preserved). Range/summary from the canonical entry wins
+            // when both pages cite the same URI.
+            const mergedSources = [...canonicalPage.sources];
+            const knownUris = new Set(mergedSources.map((s) => s.uri));
+            for (const src of obsoletePage.sources) {
+                if (!knownUris.has(src.uri)) {
+                    mergedSources.push(src);
+                    knownUris.add(src.uri);
+                }
+            }
+            if (mergedSources.length > canonicalPage.sources.length) {
+                const canonicalWithSources: WikiPage = {
+                    ...canonicalPage,
+                    sources: mergedSources,
+                    updated: todayIso(),
+                };
+                await this._wiki.write(canonicalWithSources, target);
+            }
+
+            await this._wiki.recordSupersession(
+                canonicalSlug,
+                {
+                    source: `wiki:${obsoletePage.slug}`,
+                    fact: `Previously known as "${oldName}" (entity renamed)`,
+                    supersededOn: todayIso(),
+                },
+                target,
+            );
+            // Re-index the canonical so the new sources + supersedes entry are searchable.
+            const refreshedCanonical = await this._wiki.read(canonicalSlug, target);
+            if (refreshedCanonical) {
+                await this._upsertWikiPageInIndex(refreshedCanonical, target);
+            }
+        } catch {
+            // Best-effort: leave state alone if anything fails.
+        }
+    }
+
+    /**
+     * Distill / patch WISDOM.md at the end of a dream session. Reads the
+     * current wisdom file, the dream's recent activity (new insights,
+     * contradictions, wiki updates), and an MRU rollup of wiki-page hits
+     * from the search log. The LLM proposes a JSON list of `add` /
+     * `update` / `remove` patches (or `keep_all` when nothing has
+     * materially changed) against the current entries. The result is an
+     * always-loadable pointer table the agent's host can pre-stuff into
+     * its context on every turn.
+     *
+     * Best-effort: the caller catches errors. Hard caps (entry count,
+     * char count) are enforced post-LLM in case the model overshoots.
+     */
+    private async _distillWisdom(result: DreamResult): Promise<void> {
+        const cfg = this._config.wisdom ?? {};
+        const maxEntries = cfg.maxEntries ?? DEFAULT_WISDOM_MAX_ENTRIES;
+        const maxChars = cfg.maxChars ?? DEFAULT_WISDOM_MAX_CHARS;
+
+        // Parse current wisdom.
+        const existing = (await this._files.readWisdom()) ?? "";
+        const currentEntries = parseWisdomEntries(existing);
+
+        // MRU rollup over the dreaming signal window.
+        const windowDays =
+            this._config.signalWindowDays ?? DEFAULT_SIGNAL_WINDOW_DAYS;
+        let mru: Array<{
+            slug: string;
+            hits: number;
+            bestScore: number;
+            lastHit: string;
+            uniqueQueries: number;
+        }> = [];
+        try {
+            mru = await this._logger.getWikiPageHitsByWindow(windowDays);
+        } catch {
+            // Search log unavailable — proceed with empty MRU.
+        }
+        const mruHot = mru.slice(0, 30);
+        const hotSlugs = new Set(mruHot.map((m) => m.slug));
+        const coldSlugs: string[] = [];
+        for (const entry of currentEntries) {
+            // Cold = wisdom entry referencing a slug that hasn't been
+            // retrieved within the window. Surface to the LLM as a
+            // removal candidate (signal, not directive).
+            for (const slug of extractSlugLinks(entry.content)) {
+                if (!hotSlugs.has(slug)) coldSlugs.push(`${entry.id} → ${slug}`);
+            }
+        }
+
+        // Recent wiki updates + insights from this dream pass.
+        const wikiUpdateSlugs = result.wikiUpdates
+            .filter((u) => u.ok)
+            .map((u) => u.slug);
+        const insightThemes = result.insights.map((i) => i.theme);
+        const contradictionThemes = result.contradictions.map((c) => c.wisdomEntry);
+
+        // Build prompt.
+        const templates = this._getTemplates();
+        const prompt = templates.wisdomDistillation
+            .replace("{{MAX_ENTRIES}}", String(maxEntries))
+            .replace("{{MAX_CHARS}}", String(maxChars))
+            .replace(
+                "{{CURRENT_WISDOM}}",
+                currentEntries.length > 0
+                    ? currentEntries
+                          .map((e) => `- **${e.id}** — ${e.content}`)
+                          .join("\n")
+                    : "(WISDOM.md is currently empty.)",
+            )
+            .replace(
+                "{{MRU_HOT}}",
+                mruHot.length > 0
+                    ? mruHot
+                          .map(
+                              (m) =>
+                                  `- [[${m.slug}]] — ${m.hits} hits, ${m.uniqueQueries} unique queries, last hit ${m.lastHit.slice(0, 10)}, best score ${m.bestScore.toFixed(2)}`,
+                          )
+                          .join("\n")
+                    : "(no wiki hits in window — fresh corpus or no searches yet)",
+            )
+            .replace(
+                "{{COLD_ENTRIES}}",
+                coldSlugs.length > 0
+                    ? coldSlugs.map((s) => `- ${s}`).join("\n")
+                    : "(no cold entries)",
+            )
+            .replace(
+                "{{NEW_WIKI_UPDATES}}",
+                wikiUpdateSlugs.length > 0
+                    ? wikiUpdateSlugs.map((s) => `- [[${s}]]`).join("\n")
+                    : "(no wiki updates this pass)",
+            )
+            .replace(
+                "{{NEW_INSIGHTS}}",
+                insightThemes.length > 0
+                    ? insightThemes.map((t) => `- ${t}`).join("\n")
+                    : "(no new insights this pass)",
+            )
+            .replace(
+                "{{NEW_CONTRADICTIONS}}",
+                contradictionThemes.length > 0
+                    ? contradictionThemes.map((t) => `- ${t}`).join("\n")
+                    : "(no new contradictions this pass)",
+            )
+            .replace("{{WINDOW_DAYS}}", String(windowDays));
+
+        let completion;
+        try {
+            completion = await this._model.complete(prompt, {
+                systemPrompt:
+                    "You maintain WISDOM.md — a curated pointer table of patterns and lessons. Output JSON only — no prose, no markdown fences.",
+                temperature: 0.2,
+            });
+        } catch {
+            return;
+        }
+        if (completion.error || !completion.text.trim()) return;
+        const cleaned = completion.text
+            .replace(/^```json?\s*/m, "")
+            .replace(/\s*```\s*$/m, "")
+            .trim();
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(cleaned);
+        } catch {
+            return;
+        }
+        if (!parsed || typeof parsed !== "object") return;
+        const r = parsed as { patches?: unknown };
+        if (!Array.isArray(r.patches)) return;
+
+        const updated = applyWisdomPatches(currentEntries, r.patches, {
+            maxEntries,
+            maxChars,
+            mru: mruHot,
+        });
+        if (updated === null) return; // keep_all or invalid
+
+        const serialized = serializeWisdom(updated);
+        await this._files.writeWisdom(serialized);
+    }
+
+    /**
+     * Post-write grounding check: ask the LLM whether each factual claim
+     * in the wiki body is supported by at least one cited source, and
+     * whether a later cited source contradicts it. Writes the result back
+     * to the page's `grounding` frontmatter so retrieval can demote
+     * pages with unverified or stale claims.
+     *
+     * Uses the dreaming model (typically gpt-5.4) since this runs once
+     * per wiki write, not per query — quality matters more than cost.
+     * Best-effort: any LLM error leaves the page's prior grounding (or
+     * absence thereof) unchanged.
+     */
+    private async _verifyGrounding(
+        slug: string,
+        target: "private",
+    ): Promise<void> {
+        if (!this._wiki) return;
+        const page = await this._wiki.read(slug, target);
+        if (!page) return;
+        if (page.sources.length === 0) return; // no sources to ground against
+
+        // Load up to 6 cited sources (most-recent-first when datable) so
+        // the verifier sees both the originating dailies and any later
+        // ones that would supersede.
+        const dateRe = /(\d{4}-\d{2}-\d{2})/;
+        const sortedSources = [...page.sources].sort((a, b) => {
+            const da = a.uri.match(dateRe)?.[1] ?? "";
+            const db = b.uri.match(dateRe)?.[1] ?? "";
+            if (da && db) return db.localeCompare(da);
+            if (da) return -1;
+            if (db) return 1;
+            return 0;
+        });
+        const sourceContents: { uri: string; content: string }[] = [];
+        for (const src of sortedSources.slice(0, 6)) {
+            const date = src.uri.match(dateRe)?.[1];
+            if (!date) continue;
+            try {
+                const c = await this._files.readDaily(date);
+                if (c) sourceContents.push({ uri: src.uri, content: c });
+            } catch {
+                // ignore
+            }
+        }
+        if (sourceContents.length === 0) return;
+
+        const prompt = GROUNDING_PROMPT_TEMPLATE
+            .replace("{{PAGE_NAME}}", page.name)
+            .replace("{{PAGE_BODY}}", page.body.trim())
+            .replace(
+                "{{SOURCES}}",
+                sourceContents
+                    .map((s) => `<source ${s.uri}>\n${s.content.trim()}\n</source>`)
+                    .join("\n\n"),
+            );
+        let completion;
+        try {
+            completion = await this._model.complete(prompt, {
+                systemPrompt:
+                    "You verify wiki claims against cited sources. Output JSON only.",
+                temperature: 0,
+            });
+        } catch {
+            return;
+        }
+        if (completion.error || !completion.text.trim()) return;
+        const cleaned = completion.text
+            .replace(/^```json?\s*/m, "")
+            .replace(/\s*```\s*$/m, "")
+            .trim();
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(cleaned);
+        } catch {
+            return;
+        }
+        if (!parsed || typeof parsed !== "object") return;
+        const r = parsed as {
+            grounded?: unknown;
+            unverified?: unknown;
+            stale?: unknown;
+        };
+        const grounded =
+            typeof r.grounded === "number" && r.grounded >= 0 ? r.grounded : 0;
+        const unverified = Array.isArray(r.unverified)
+            ? (r.unverified as unknown[])
+                  .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+                  .slice(0, 10)
+            : [];
+        const stale = Array.isArray(r.stale)
+            ? (r.stale as unknown[])
+                  .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+                  .slice(0, 10)
+            : [];
+        const verifiedOn = new Date().toISOString().slice(0, 10);
+        const next: WikiPage = {
+            ...page,
+            grounding: { verifiedOn, grounded, unverified, stale },
+            // Keep `updated` unchanged — verification didn't change the
+            // body or sources; bumping `updated` would shift retrieval
+            // recency boosts misleadingly.
+        };
+        await this._wiki.write(next, target);
+    }
+
+    private async _executeWikiOp(op: DreamWikiOp): Promise<DreamWikiUpdate> {
         if (!this._wiki) {
             return {
                 op: op.op,
@@ -678,6 +1613,81 @@ export class DreamEngine {
         }
         try {
             if (op.op === "create") {
+                // Apply-time dedup: before creating, search the wiki for an
+                // existing topically-overlapping page. If one exists above
+                // the cosine-similarity threshold, treat this create as an
+                // update against that page. This catches near-duplicates
+                // the LLM missed even with the related-pages context, and
+                // it's what unlocks supersession — without dedup, day-14
+                // synergy revisions create a SECOND page instead of
+                // updating the original, so `recordSupersession` is never
+                // invoked. See dreaming-config.ts for the threshold rationale.
+                const dedupTarget = await this._findDedupTarget(op);
+                if (dedupTarget) {
+                    const existing = await this._wiki.read(
+                        dedupTarget.slug,
+                        "private",
+                    );
+                    if (existing) {
+                        const merge = await this._mergeWithSupersession(
+                            existing,
+                            op.body,
+                            op.sources[0] ?? `dream:${todayIso()}`,
+                        );
+                        // Union sources (existing + new). Op sources are
+                        // bare URIs from the dreaming proposal; wrap them
+                        // into SourceContribution shape on the way into
+                        // the page.
+                        const nextSources = [...existing.sources];
+                        for (const s of op.sources) {
+                            if (!nextSources.some((c) => c.uri === s)) {
+                                nextSources.push({ uri: s });
+                            }
+                        }
+                        await this._wiki.write(
+                            {
+                                ...existing,
+                                body: ensureTrailingNewline(merge.body),
+                                sources: nextSources,
+                                updated: todayIso(),
+                            },
+                            "private",
+                        );
+                        for (const s of merge.supersedes) {
+                            await this._wiki.recordSupersession(
+                                dedupTarget.slug,
+                                s,
+                                "private",
+                            );
+                        }
+                        // If the original op itself carried supersedes (rare
+                        // — it's the supersession-signal path), also record
+                        // that to keep both signals.
+                        if (op.supersedes) {
+                            await this._wiki.recordSupersession(
+                                dedupTarget.slug,
+                                op.supersedes,
+                                "private",
+                            );
+                        }
+                        const detail =
+                            `deduped onto [[${dedupTarget.slug}]] ` +
+                            `(cosine ${dedupTarget.score.toFixed(2)}); ` +
+                            `mode=${merge.mode}` +
+                            (merge.supersedes.length > 0
+                                ? `; superseded ${merge.supersedes.length} fact${merge.supersedes.length === 1 ? "" : "s"}`
+                                : "") +
+                            (op.supersedes ? `; +op.supersedes ${op.supersedes.source}` : "");
+                        return {
+                            op: op.op,
+                            slug: dedupTarget.slug,
+                            ok: true,
+                            detail,
+                        };
+                    }
+                    // Existing page disappeared between dedup-find and now
+                    // — defensive fallthrough to the standard create path.
+                }
                 const existing = await this._wiki.read(op.slug, "private");
                 if (existing) {
                     // Treat create-on-existing as an append rather than a hard
@@ -716,7 +1726,7 @@ export class DreamEngine {
                             category: op.category,
                             created: todayIso(),
                             updated: todayIso(),
-                            sources: op.sources,
+                            sources: op.sources.map((s) => ({ uri: s })),
                             related: op.related ?? [],
                             confidence: op.confidence ?? "medium",
                             body: ensureTrailingNewline(op.body),
@@ -816,6 +1826,73 @@ export class DreamEngine {
 }
 
 // ─── Helpers ─────────────────────────────────────────────
+
+/**
+ * Render the markdown body of a trajectory companion page. Entries are
+ * sorted by `supersededOn` ascending so a reader walks the timeline in
+ * the obvious direction.
+ */
+function renderTrajectoryBody(page: WikiPage, _selfSlug: string): string {
+    const sorted = [...(page.supersedes ?? [])].sort((a, b) =>
+        a.supersededOn.localeCompare(b.supersededOn),
+    );
+    const lines: string[] = [];
+    lines.push(`# Trajectory: ${page.name}`);
+    lines.push("");
+    lines.push(
+        `This page tracks how ${page.name} has evolved. The most ` +
+            `current claim lives in [[${page.slug}]]; superseded ` +
+            `claims are preserved here in chronological order so ` +
+            `"how did X change?" questions can land on a single page.`,
+    );
+    lines.push("");
+    lines.push(`## Current state`);
+    lines.push(
+        `As of ${page.updated}, see [[${page.slug}]] for the full ` +
+            `current body. Brief excerpt:`,
+    );
+    lines.push("");
+    const firstPara = (page.body ?? "").trim().split(/\n\n/)[0] ?? "";
+    lines.push(firstPara || "(no current body recorded)");
+    lines.push("");
+    lines.push(`## Superseded claims (oldest first)`);
+    if (sorted.length === 0) {
+        lines.push(`(none recorded)`);
+    } else {
+        for (const s of sorted) {
+            const fact = s.fact?.trim() || "(no summary recorded)";
+            lines.push(`- **Until ${s.supersededOn}:** ${fact}`);
+            lines.push(`  - Source: ${s.source}`);
+        }
+    }
+    return lines.join("\n");
+}
+
+/**
+ * Collect the union of the page's own sources plus every URI named in
+ * its `supersedes` entries. The trajectory page's `sources` field then
+ * covers everything the timeline references, so retrieval that lands
+ * on the trajectory page can drill into any era. Preserves the source
+ * page's range/summary metadata for entries that have it; supersession
+ * URIs are added as bare {uri} entries (no enrichment).
+ */
+function collectTrajectorySources(page: WikiPage): SourceContribution[] {
+    const seen = new Set<string>();
+    const out: SourceContribution[] = [];
+    for (const s of page.sources) {
+        if (!seen.has(s.uri)) {
+            seen.add(s.uri);
+            out.push(s);
+        }
+    }
+    for (const sup of page.supersedes ?? []) {
+        if (sup.source && !seen.has(sup.source)) {
+            seen.add(sup.source);
+            out.push({ uri: sup.source });
+        }
+    }
+    return out;
+}
 
 function aggregateResults(
     analysisResults: AnalysisResult[],
@@ -1040,6 +2117,7 @@ Respond with a JSON object:
 
 <RULES>
 - Only emit wiki_ops when the pattern is reusable, named knowledge — not just a daily-log highlight.
+- **Prefer UPDATE over CREATE when an existing page covers the topic.** If an "Existing wiki pages on related topics" section appears above, scan it before emitting a create op. If any listed page already covers the same topic (same project, same entity, same recurring theme), emit an UPDATE op against its slug instead of a CREATE op for a near-duplicate. The wiki only stays useful if one topic = one page; duplicate pages with conflicting facts crowd each other out at search time.
 - Concept and project pages SHOULD lead with a rule/fact followed by **Why:** and **How to apply:** lines.
 - Entity pages capture stable facts about a person, system, or organization.
 - Theme pages synthesize a recurring topic across many sources.
@@ -1201,3 +2279,388 @@ Respond with a JSON object:
 - Synthesize, don't summarize — the value is in connecting dots across time
 - Identify inflection points where direction changed
 - Note if the theme is still active or resolved`;
+
+/**
+ * Prompt used by `_mergeWithSupersession` to fold new content into an
+ * existing wiki body. The model picks one of three modes:
+ *
+ *   - "replace": new content overrides specific claims in the existing
+ *     body. Rewrites the body so the new claim is the page's current
+ *     claim and emits `supersedes` entries for each replaced fact.
+ *   - "merge":   new content is partly new, partly overlapping. Produces
+ *     a coherent rewrite that keeps non-conflicting old material and
+ *     records supersedes for anything replaced.
+ *   - "append":  new content adds to the existing body without
+ *     contradicting it. No supersedes.
+ *
+ * The output must be a single JSON object — no prose, no markdown
+ * fences. Body markdown should be a clean rewrite, NOT a diff or
+ * change-log.
+ *
+ * Why this matters: without this merge step, dedup converts every
+ * duplicate create into an append. The wiki body becomes a chronological
+ * accretion of old + new claims, and the agent grabs whichever paragraph
+ * the LLM happens to read first — typically the older one. With it, the
+ * wiki page is genuinely "current state of record" and the supersedes
+ * frontmatter preserves the audit trail.
+ */
+/**
+ * Prompt for the post-write grounding verifier.
+ *
+ * The verifier scores the wiki body against the cited sources and
+ * returns three lists: `grounded` (a count of claims that match a
+ * source verbatim or as a clear paraphrase), `unverified` (claims the
+ * body makes that no source supports — likely synthesis hallucinations),
+ * and `stale` (claims supported by an earlier source but contradicted
+ * by a later one — the supersession step missed these). The retrieval
+ * layer downranks pages with non-empty `unverified` / `stale`.
+ *
+ * The model sees sources in newest-first order so it can naturally
+ * spot the "earlier source says X, later source says Y" pattern.
+ */
+const GROUNDING_PROMPT_TEMPLATE = `You verify a wiki page's claims against its cited sources.
+
+<WIKI PAGE: {{PAGE_NAME}}>
+{{PAGE_BODY}}
+</WIKI PAGE>
+
+<CITED SOURCES (newest first)>
+{{SOURCES}}
+</CITED SOURCES>
+
+<TASK>
+Walk every numeric value, named entity, date, and decision in the wiki body. For each:
+1. Find the source(s) that mention it. If a source uses different wording, count it as a match when the underlying claim is the same.
+2. Decide:
+   - GROUNDED: at least one source supports the claim. No earlier-vs-later contradiction.
+   - UNVERIFIED: no cited source mentions this claim. It's either a synthesis invention or a claim the verifier can't match. Flag it.
+   - STALE: an earlier cited source supports it but a later cited source contradicts it. The body should reflect the latest, but it's holding the older value. Flag with the latest source's value so the merge step knows what to rewrite to.
+
+<OUTPUT_FORMAT>
+Respond with one JSON object — no prose, no fences:
+
+{
+  "grounded": <integer count of claims that passed verification>,
+  "unverified": [
+    "<short description of the unverified claim, e.g. 'walkaway floor of $500M EV'>"
+  ],
+  "stale": [
+    "<short description of the stale claim and its latest contradicting value, e.g. 'synergy base $18M (latest source says $28M)'>"
+  ]
+}
+
+<RULES>
+- Be conservative: when in doubt, count as grounded.
+- Only flag UNVERIFIED for specific values that the synthesis model could plausibly have invented — not for paraphrased framing.
+- STALE requires an explicit later contradiction. "Source A says X" + "Source B doesn't mention X" is NOT stale; it's just grounded by A.
+- Quantitative claims (money, percentages, leverage, dates, names) are the primary targets. Skip generic framing like "the workstream stayed isolated."`;
+
+const MERGE_PROMPT_TEMPLATE = `You are merging new content into an existing wiki page.
+
+<EXISTING PAGE: {{PAGE_NAME}}>
+{{EXISTING_BODY}}
+</EXISTING PAGE>
+
+<NEW CONTENT (from {{NEW_SOURCE}})>
+{{NEW_BODY}}
+</NEW CONTENT>
+
+<TASK>
+The new content has been routed to this page because they cover the same topic. Decide how to fold it in:
+
+1. Identify SUPERSEDED claims — facts the existing body asserts that the new content contradicts or revises (e.g. existing says "base case $18M", new content says "base case $28M" — the $18M claim is superseded).
+2. Identify ADDITIVE claims — facts in the new content that don't contradict the existing body (e.g. existing covers valuation, new content adds a financing detail not in the old body).
+3. Rewrite the body so it reflects the CURRENT state — for each superseded fact, the body now says the new value (the old value is preserved in the supersedes frontmatter, not the body).
+
+Pick a mode:
+- "replace": the new content contradicts existing claims; rewrite the body so it reflects the new facts, and record supersedes for the old facts.
+- "merge":   some claims are replaced and some are additive; produce a clean rewrite that integrates both.
+- "append":  the new content is purely additive (no contradictions); the body keeps existing material and adds the new content as a coherent extension.
+
+<OUTPUT_FORMAT>
+Respond with a single JSON object. No prose, no markdown fences.
+
+{
+  "mode": "replace" | "merge" | "append",
+  "body": "the new wiki page body in markdown, using ## headings, no frontmatter, no H1. Should read as a coherent current-state-of-record page, NOT a change log.",
+  "supersedes": [
+    {
+      "fact": "one-line summary of the OLD claim that is no longer current (e.g. 'Base-case synergy was $18M annual run-rate cost synergies')",
+      "source": "URI of the daily where the old claim originated (e.g. 'memory/2026-01-03.md'); when uncertain, use the page's earliest source"
+    }
+  ]
+}
+
+<RULES>
+- supersedes entries describe what the page USED to say, not what the new content says
+- One supersedes entry per superseded fact (numeric values, dates, names, statuses, decisions)
+- mode="append" means an empty supersedes array
+- The body should be self-contained — a reader who sees only the body should get the current truth, with no stale claims left behind
+- Be conservative: if you're not sure whether a fact is contradicted, treat it as additive
+- Quantitative changes (money, percentages, leverage ratios, dates) almost always go in supersedes when revised`;
+
+const ENTITY_RENAME_TEMPLATE = `You are deciding whether two wiki pages describe the same underlying real-world entity that has been renamed (or rebranded), versus two distinct entities that happen to share sources.
+
+<PAGE_A>
+slug: {{PAGE_A_SLUG}}
+name: {{PAGE_A_NAME}}
+description: {{PAGE_A_DESCRIPTION}}
+sources:
+{{PAGE_A_SOURCES}}
+body (first ~20 lines):
+{{PAGE_A_BODY_HEAD}}
+</PAGE_A>
+
+<PAGE_B>
+slug: {{PAGE_B_SLUG}}
+name: {{PAGE_B_NAME}}
+description: {{PAGE_B_DESCRIPTION}}
+sources:
+{{PAGE_B_SOURCES}}
+body (first ~20 lines):
+{{PAGE_B_BODY_HEAD}}
+</PAGE_B>
+
+<SIGNAL>
+The pages share {{SHARED_SOURCES}} cited source URIs (Jaccard {{JACCARD}}). Their names don't share a dominant proper-noun token, which is why dedup-by-similarity didn't merge them.
+</SIGNAL>
+
+<TASK>
+Decide whether the two pages describe the SAME real-world entity (a project, person, company, product, team, etc.) that was renamed between the earlier and later sources, OR whether they describe DIFFERENT entities that merely share context.
+
+Output JSON only. No prose, no markdown fences:
+
+{
+  "same": true | false,
+  "canonical_slug": "the slug of whichever page carries the CURRENT name (typically the page with the LATER most-recent source). Must be exactly PAGE_A_SLUG or PAGE_B_SLUG. null when same=false.",
+  "old_name": "the prior name of the entity (taken from the non-canonical page's name). null when same=false.",
+  "confidence": "high" | "medium" | "low",
+  "reasoning": "one short sentence"
+}
+
+<RULES>
+- Bias HARD toward false. False positives merge two distinct entities and corrupt the wiki; false negatives just leave two findable pages.
+- Set same=true only when at least one source EXPLICITLY signals the rename (e.g. "renamed from X to Y", "rebranded as Y", "X (now Y)"), OR when the body of one page explicitly references the other's name as a prior identity.
+- Shared people, shared workstreams, or shared project codes are NOT enough on their own — the SAME ENTITY has to be the subject of both pages.
+- When in doubt about which name is canonical, pick the slug whose page has the more-recent most-recent source.`;
+
+/** Stable per-pair key for the rename memo, regardless of arg order. */
+function pairKey(a: string, b: string): string {
+    return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/**
+ * Pick which of two pages is the canonical (current-name) page. Uses
+ * the most-recent ISO date embedded in any source URI; falls back to
+ * the page with the later `updated` field, then the alphabetically-
+ * first slug when everything else ties.
+ */
+function pickCanonicalByLatestSource(a: WikiPage, b: WikiPage): string {
+    const dateRe = /(\d{4}-\d{2}-\d{2})/;
+    const latestOf = (p: WikiPage): string => {
+        let best = "";
+        for (const s of p.sources) {
+            const m = s.uri.match(dateRe);
+            if (m && m[1] > best) best = m[1];
+        }
+        return best;
+    };
+    const da = latestOf(a);
+    const db = latestOf(b);
+    if (da !== db) return da > db ? a.slug : b.slug;
+    if (a.updated !== b.updated) return a.updated > b.updated ? a.slug : b.slug;
+    return a.slug < b.slug ? a.slug : b.slug;
+}
+
+// ─── Wisdom distillation ─────────────────────────────────
+
+/**
+ * A single line in WISDOM.md. The `id` is a stable kebab-case key the
+ * LLM uses for patching; the `content` is the human-readable claim with
+ * its embedded `[[slug]]` / `memory/YYYY-MM-DD.md` pointers.
+ */
+interface WisdomEntry {
+    id: string;
+    content: string;
+}
+
+/**
+ * Parse a WISDOM.md file into structured entries. Tolerant: ignores
+ * non-matching lines (headers, paragraphs, footer). The entry shape on
+ * disk is one line per entry:
+ *
+ *     - **kebab-id** — One-sentence pattern. See [[slug]].
+ */
+function parseWisdomEntries(content: string): WisdomEntry[] {
+    const out: WisdomEntry[] = [];
+    const re = /^\s*-\s+\*\*([a-z0-9][a-z0-9-]{0,80})\*\*\s*[—–-]\s*(.+?)\s*$/i;
+    for (const line of content.split("\n")) {
+        const m = re.exec(line);
+        if (!m) continue;
+        out.push({ id: m[1].toLowerCase(), content: m[2] });
+    }
+    return out;
+}
+
+/** Serialize WisdomEntry[] back into the canonical WISDOM.md shape. */
+function serializeWisdom(entries: WisdomEntry[]): string {
+    const today = new Date().toISOString().slice(0, 10);
+    const lines: string[] = [
+        "# Wisdom",
+        "",
+        "Curated patterns and lessons (auto-maintained during dreaming). Each entry points to a wiki slug or daily for grounding. Use `memory_search` or `memory_get` to drill in.",
+        "",
+        "## Patterns and lessons",
+        "",
+    ];
+    for (const e of entries) {
+        lines.push(`- **${e.id}** — ${e.content}`);
+    }
+    const totalChars = lines.join("\n").length;
+    lines.push("");
+    lines.push(
+        `_Updated ${today} during dreaming · ${entries.length} entries · ${totalChars} chars._`,
+    );
+    return lines.join("\n") + "\n";
+}
+
+/** Extract `[[slug]]` references from a wisdom entry's content. */
+function extractSlugLinks(content: string): string[] {
+    const out: string[] = [];
+    for (const m of content.matchAll(/\[\[([a-z0-9][a-z0-9-]{0,80})\]\]/gi)) {
+        out.push(m[1].toLowerCase());
+    }
+    return out;
+}
+
+/**
+ * Apply the LLM's patch list to the current entries. Returns the new
+ * entry list, or `null` when the patch set is empty / `keep_all` /
+ * malformed enough that we shouldn't touch the file.
+ *
+ * Budget enforcement post-LLM: if the result exceeds `maxEntries`,
+ * trim from the tail. If it exceeds `maxChars` after serialization,
+ * keep trimming until under budget — the LLM was supposed to leave
+ * room; the post-trim is a safety net.
+ */
+function applyWisdomPatches(
+    current: WisdomEntry[],
+    patches: unknown[],
+    opts: {
+        maxEntries: number;
+        maxChars: number;
+        mru: Array<{ slug: string; hits: number }>;
+    },
+): WisdomEntry[] | null {
+    if (patches.length === 0) return null;
+    // Single sentinel: keep_all means do nothing.
+    if (
+        patches.length === 1 &&
+        (patches[0] as Record<string, unknown>)?.op === "keep_all"
+    ) {
+        return null;
+    }
+    const byId = new Map(current.map((e) => [e.id, { ...e }]));
+    let mutated = false;
+    for (const raw of patches) {
+        if (!raw || typeof raw !== "object") continue;
+        const p = raw as Record<string, unknown>;
+        const op = typeof p.op === "string" ? p.op : "";
+        const id =
+            typeof p.id === "string" ? p.id.toLowerCase().trim() : "";
+        const content =
+            typeof p.content === "string" ? p.content.trim() : "";
+        if (op === "keep_all") continue;
+        if (!id) continue;
+        if (op === "remove") {
+            if (byId.delete(id)) mutated = true;
+            continue;
+        }
+        if (op === "add" || op === "update") {
+            if (!content) continue;
+            // Validate id shape — kebab-case, ≤ 80 chars.
+            if (!/^[a-z0-9][a-z0-9-]{0,80}$/.test(id)) continue;
+            byId.set(id, { id, content });
+            mutated = true;
+            continue;
+        }
+    }
+    if (!mutated) return null;
+
+    let result = [...byId.values()];
+
+    // Enforce maxEntries by dropping the entries whose pointer wiki
+    // pages have NOT been retrieved recently. The MRU rollup is the
+    // ground-truth for "which entries are still earning their slot." If
+    // an entry references no slugs (pure principle), keep it last-out.
+    if (result.length > opts.maxEntries) {
+        const hotness = new Map(opts.mru.map((m) => [m.slug, m.hits]));
+        const scored = result.map((e) => {
+            const slugs = extractSlugLinks(e.content);
+            const maxHits = slugs.length === 0
+                ? 0
+                : Math.max(...slugs.map((s) => hotness.get(s) ?? 0));
+            return { e, score: maxHits };
+        });
+        scored.sort((a, b) => b.score - a.score);
+        result = scored.slice(0, opts.maxEntries).map((x) => x.e);
+    }
+
+    // Enforce maxChars by trimming from the tail (lowest priority
+    // already at the tail post-MRU sort). Re-serialize to check.
+    while (result.length > 1 && serializeWisdom(result).length > opts.maxChars) {
+        result.pop();
+    }
+
+    return result;
+}
+
+const WISDOM_DISTILLATION_TEMPLATE = `You maintain WISDOM.md — a curated, pre-stuffed pointer table that the agent loads on every turn. It must stay compact: up to {{MAX_ENTRIES}} entries and ~{{MAX_CHARS}} chars. Each entry is a one-sentence pattern or lesson with at least one \`[[wiki-slug]]\` or \`memory/YYYY-MM-DD.md\` pointer.
+
+You are reviewing the file at the end of a dreaming session. Decide whether to add, update, remove, or keep-all entries. Bias toward stability: only propose changes when you have real evidence.
+
+<CURRENT_WISDOM>
+{{CURRENT_WISDOM}}
+</CURRENT_WISDOM>
+
+<MRU_HOT — top wiki pages by retrieval over last {{WINDOW_DAYS}} days>
+{{MRU_HOT}}
+</MRU_HOT>
+
+<COLD_ENTRIES — wisdom entries pointing at wiki pages with no recent retrieval (removal candidates)>
+{{COLD_ENTRIES}}
+</COLD_ENTRIES>
+
+<NEW_WIKI_UPDATES — wiki pages touched in THIS dream pass>
+{{NEW_WIKI_UPDATES}}
+</NEW_WIKI_UPDATES>
+
+<NEW_INSIGHTS — themes the dreaming model surfaced this pass>
+{{NEW_INSIGHTS}}
+</NEW_INSIGHTS>
+
+<NEW_CONTRADICTIONS — superseded prior claims this pass>
+{{NEW_CONTRADICTIONS}}
+</NEW_CONTRADICTIONS>
+
+<TASK>
+Propose a JSON patch list. Output JSON only:
+
+{
+  "patches": [
+    {"op": "add",    "id": "kebab-id-here",     "content": "Pattern claim. See [[slug]] or memory/YYYY-MM-DD.md."},
+    {"op": "update", "id": "existing-id",       "content": "Revised claim with updated pointers."},
+    {"op": "remove", "id": "stale-id"},
+    {"op": "keep_all"}
+  ],
+  "reasoning": "one short sentence on the changes (or why nothing changed)"
+}
+
+<RULES>
+- Bias toward stability: prefer the single \`{"op": "keep_all"}\` patch when nothing has materially changed. This is the most common outcome.
+- Add an entry only when MRU evidence shows a pattern is sustained (≥ a few hits across distinct queries) OR a new wiki update + insight together reveal a recurring lesson.
+- Update when an entry's claim has shifted (new contradicting evidence) — keep the same id, replace the content.
+- Remove when an entry points only at cold wiki pages that haven't been hit recently and the dream's signals don't reinforce it. Cold ≠ automatic remove; remove when both MRU is cold AND the wisdom claim is no longer load-bearing.
+- ids are kebab-case (lowercase a-z, 0-9, hyphens), ≤ 80 chars, descriptive (\`compliance-drives-refactors\`, not \`pattern-1\`).
+- Each \`content\` should include at least one \`[[slug]]\` pointer to ground the claim. Optionally cite a daily for the founding event.
+- Stay under {{MAX_ENTRIES}} entries total. If you propose adds that would exceed the cap, include enough removes to make room.`;

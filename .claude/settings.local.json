@@ -1,15 +1,1 @@
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node -e \"\" /* teammates-activity */"
-          }
-        ]
-      }
-    ]
-  }
-}
+{}

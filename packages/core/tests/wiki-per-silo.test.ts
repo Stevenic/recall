@@ -147,7 +147,7 @@ describe("Per-silo wiki — wisdom distillation reads wiki pages by default", ()
                     name: "New project",
                     description: "Just promoted from wisdom distillation.",
                     body: "Body.\n\n**Why:** w.\n\n**How to apply:** h.",
-                    sources: ["memory/2026-04-01.md"],
+                    sources: [{ uri: "memory/2026-04-01.md" }],
                 },
             ],
         });

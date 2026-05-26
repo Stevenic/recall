@@ -18,6 +18,7 @@ import { spawnSync } from 'node:child_process';
 import { createMempalaceAdapter } from '../src/index.js';
 import type { DayMetadata } from '../src/types.js';
 import type { SynthesisModel } from '../src/synthesis.js';
+import type { ChatCompleter } from '../src/agent-loop.js';
 
 function resolveCommand(): string[] | null {
     const fromEnv = process.env['RECALL_MP_COMMAND'];
@@ -107,6 +108,60 @@ describeIfAvailable('MempalaceAdapter — lifecycle', () => {
             // Same wing/room/content → mempalace returns reason: already_exists.
             await expect(adapter.ingestDay(2, content, metaFor(2))).resolves.toBeUndefined();
             await adapter.finalizeIngestion();
+        },
+        TEST_TIMEOUT,
+    );
+
+    it(
+        'answerMode=agent drives memory_search via tool calls and returns the final assistant text',
+        async () => {
+            // Stubbed two-turn agent: first turn calls memory_search, second
+            // turn returns the literal answer. The bench's queryDetail must
+            // surface the second-turn content as the answer and the searched
+            // chunks as retrieval entries.
+            const calls: Array<{ tools?: number; toolChoice?: string }> = [];
+            const completer: ChatCompleter = async (params) => {
+                calls.push({
+                    ...(params.tools !== undefined && { tools: params.tools.length }),
+                    ...(params.toolChoice !== undefined && { toolChoice: params.toolChoice }),
+                });
+                if (calls.length === 1) {
+                    return {
+                        content: null,
+                        toolCalls: [
+                            {
+                                id: 'call_1',
+                                name: 'memory_search',
+                                argumentsJson: JSON.stringify({ query: 'SOC 2 audit vendor' }),
+                            },
+                        ],
+                    };
+                }
+                return { content: 'The SOC 2 audit follow-up was with the vendor on day 2.', toolCalls: [] };
+            };
+
+            adapter = createMempalaceAdapter({
+                mempalaceCommand: command!,
+                answerMode: 'agent',
+                agentMaxIterations: 4,
+                searchK: 5,
+                chatCompleterImpl: completer,
+            });
+            await adapter.setup();
+            await adapter.ingestDay(
+                2,
+                '# Day 2\n\nFollowed up on the SOC 2 audit with vendor.',
+                metaFor(2),
+            );
+            await adapter.finalizeIngestion();
+
+            const detail = await adapter.queryDetail!('What was the day 2 SOC 2 follow-up about?');
+            expect(detail.answer).toMatch(/SOC 2 audit/);
+            expect(calls).toHaveLength(2);
+            // Tool description threaded through to the LLM call.
+            expect(calls[0]?.tools).toBe(1);
+            // Retrieval should reflect the agent's actual search trajectory.
+            expect((detail.retrieval ?? []).length).toBeGreaterThan(0);
         },
         TEST_TIMEOUT,
     );

@@ -28,6 +28,7 @@ import * as path from 'node:path';
 import {
     MemoryService,
     CliAgentModel,
+    decomposeQuery,
     type MemoryModel,
     type CompleteOptions,
     type CompletionResult,
@@ -94,6 +95,19 @@ export interface RecallAdapterConfig {
     searchK?: number;
 
     /**
+     * Number of additional wiki-only search results to retrieve per query,
+     * surfaced alongside the `searchK` daily/typed-memory hits. Lets the
+     * agent see both specific-fact dailies and topic-pivoted wiki pages
+     * in one tool call without the two sources competing for slots in a
+     * single ranked pool. Default: 3.
+     *
+     * Set to 0 to disable the wiki-only second pass entirely (the agent
+     * then sees only what comes through the unified `searchK` pool, in
+     * which wiki pages still appear but compete with dailies for slots).
+     */
+    wikiSearchK?: number;
+
+    /**
      * Maximum number of characters of memory excerpts assembled into the
      * answer-synthesis prompt. Default: 8000.
      */
@@ -110,6 +124,14 @@ export interface RecallAdapterConfig {
      * Turning this on dramatically increases the model-call count.
      */
     enableDreaming?: boolean;
+
+    /**
+     * Optional model spec for dreaming. When set, dreaming uses this model
+     * while compaction + agent loop continue to use `model`. Useful when
+     * dreaming benefits from a stronger reasoning model (e.g. `azure:gpt-5.4`)
+     * than the cheaper model driving everything else (e.g. `azure:gpt-5.4-mini`).
+     */
+    dreamingModel?: string;
 
     /**
      * Answer mode. Default 'agent'. When 'agent' the harness exposes
@@ -144,7 +166,11 @@ export interface RecallAdapterConfig {
 
 const DEFAULT_NAME = 'Recall';
 const DEFAULT_SEARCH_K = 8;
-const DEFAULT_CONTEXT_BUDGET = 8000;
+const DEFAULT_WIKI_SEARCH_K = 3;
+// Matches OpenClaw bench harness `MAX_CONTEXT_CHARS = 24_000` so the
+// legacy single-shot synthesis path (`answerMode: synthesis`) sees the
+// same budget across systems. Agent mode is not bounded by this.
+const DEFAULT_CONTEXT_BUDGET = 24000;
 const DEFAULT_MODEL = 'openai:gpt-4o-mini';
 
 const SYSTEM_PROMPT_PREFIX = [
@@ -216,6 +242,7 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
     const modeTag = (cfg.answerMode ?? 'agent') === 'agent' ? '+agent' : '+synthesis';
     const name = `${baseName}${modeTag}`;
     const searchK = cfg.searchK ?? DEFAULT_SEARCH_K;
+    const wikiSearchK = cfg.wikiSearchK ?? DEFAULT_WIKI_SEARCH_K;
     const contextBudget = cfg.contextBudget ?? DEFAULT_CONTEXT_BUDGET;
     const enableCompaction = cfg.enableCompaction ?? true;
     const enableDreaming = cfg.enableDreaming ?? false;
@@ -295,6 +322,11 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
     async function runQueryDetail(question: string): Promise<QueryDetail> {
         if (!service) throw new Error('Adapter not set up.');
         if (!memoryRoot) throw new Error('Adapter memory root missing.');
+        // Capture as non-null locals so inner closures (Promise.all
+        // mappers in the wiki preamble) don't re-trip the strict null
+        // check — `service` and `memoryRoot` are module-scoped lets and
+        // TS can't prove they stay non-null inside an async closure.
+        const svc = service;
 
         if (answerMode === 'agent') {
             const openai = await resolveAgentClient();
@@ -306,6 +338,27 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
                     ? modelSpec.replace(/^azure:/i, '')
                     : modelSpec.replace(/^openai:/i, '');
 
+            // WISDOM.md pre-stuff. The wisdom file is a curated pointer
+            // table of patterns / lessons distilled during dreaming.
+            // It's always-loaded — the agent sees it on turn 1 alongside
+            // the wiki preamble. Empty when dreaming hasn't run yet or
+            // hasn't surfaced anything wisdom-worthy.
+            let wisdomBlock = '';
+            try {
+                const wisdomText = await svc.files.readWisdom();
+                if (wisdomText && wisdomText.trim().length > 0) {
+                    wisdomBlock =
+                        '## Wisdom (always loaded)\n\n' +
+                        'The agent has curated this pointer table during dreaming. ' +
+                        'Use it as a hint about where to look first — every entry ' +
+                        'points to a wiki slug (or daily URI) you can `memory_get`.\n\n' +
+                        wisdomText.trim() +
+                        '\n\n---\n\n';
+                }
+            } catch {
+                // Wisdom file absent or unreadable — proceed without.
+            }
+
             // Wiki-first pre-pass. Pull the top wiki page matches for the
             // question and surface them to the agent loop as a preamble.
             // Wiki pages are the architectural answer to "what is
@@ -313,6 +366,14 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
             // to anchor on them rather than reconstructing from
             // chronologically-scattered dailies. Best-effort — if wiki
             // search fails or returns nothing, the loop still runs.
+            //
+            // For each wiki hit we also pull the page's cited dailies +
+            // any supersedes records so the agent has the next-hop
+            // memory_get paths visible without an extra search round. This
+            // is what makes the "verify specifics in dailies" instruction
+            // actually actionable — the agent sees the daily URIs right
+            // alongside the wiki snippet and can read them in one tool
+            // call instead of guessing.
             let wikiPreamble = '';
             const wikiPrior: RetrievalEntry[] = [];
             try {
@@ -321,15 +382,101 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
                     { maxResults: 3, wikiOnly: true, skipSync: true },
                 );
                 if (wikiHits.length > 0) {
-                    const blocks = wikiHits.map(
-                        (h) =>
-                            `${h.uri} (score: ${h.score.toFixed(2)})\n${(h.text ?? '').trim().slice(0, 600)}`,
+                    const dateRe = /(\d{4}-\d{2}-\d{2})/;
+                    // Build each hit's block in parallel: wiki.read +
+                    // top-2 daily snippet reads. Per-hit serial calls
+                    // serialize to ~5-9 file reads; parallel it's one
+                    // round-trip per hit (3 round-trips total). Errors
+                    // are caught per-hit so one bad page can't break the
+                    // preamble.
+                    const blocks = await Promise.all(
+                        wikiHits.map(async (h) => {
+                            let citedLine = '';
+                            let supersededLine = '';
+                            const slugMatch = h.uri.match(
+                                /^memory\/wiki\/(?:[^/]+\/)?(.+?)\.md$/,
+                            );
+                            if (slugMatch) {
+                                try {
+                                    const page = await svc.wiki.read(
+                                        slugMatch[1],
+                                        'private',
+                                    );
+                                    if (page) {
+                                        if (page.sources.length > 0) {
+                                            // Sort newest-first so the
+                                            // agent's first memory_get
+                                            // hits the most recently-
+                                            // cited daily (where any
+                                            // revision lives).
+                                            const sorted = [...page.sources].sort((a, b) => {
+                                                const da = a.uri.match(dateRe)?.[1] ?? '';
+                                                const db = b.uri.match(dateRe)?.[1] ?? '';
+                                                if (da && db) return db.localeCompare(da);
+                                                if (da) return -1;
+                                                if (db) return 1;
+                                                return 0;
+                                            });
+                                            const top = sorted.slice(0, 6).map((s) => s.uri);
+                                            // Inline the top 2 cited
+                                            // dailies in parallel.
+                                            const snippetTargets = top.slice(0, 2);
+                                            const snippetBlocks = (
+                                                await Promise.all(
+                                                    snippetTargets.map(async (src) => {
+                                                        const dateMatch = src.match(dateRe);
+                                                        if (!dateMatch) return null;
+                                                        try {
+                                                            const dailyContent =
+                                                                await svc.files.readDaily(dateMatch[1]);
+                                                            if (!dailyContent) return null;
+                                                            return `[${src}]\n${dailyContent.trim().slice(0, 700)}`;
+                                                        } catch {
+                                                            return null;
+                                                        }
+                                                    }),
+                                                )
+                                            ).filter((s): s is string => s !== null);
+                                            citedLine =
+                                                '\n\nCited dailies (memory_get these to verify specifics — NEWEST FIRST): ' +
+                                                top.join(', ');
+                                            if (snippetBlocks.length > 0) {
+                                                citedLine +=
+                                                    '\n\nInline snippets of top cited dailies (full read via memory_get if you need more):\n\n' +
+                                                    snippetBlocks.join('\n\n· · ·\n\n');
+                                            }
+                                        }
+                                        if (page.supersedes && page.supersedes.length > 0) {
+                                            const facts = page.supersedes
+                                                .slice(0, 4)
+                                                .map((s) =>
+                                                    s.fact
+                                                        ? `${s.fact} (was in ${s.source})`
+                                                        : `prior claim in ${s.source}`,
+                                                );
+                                            supersededLine =
+                                                '\n\nThis page has SUPERSEDED prior claims (do not surface as current): ' +
+                                                facts.join('; ');
+                                        }
+                                    }
+                                } catch {
+                                    // Wiki read failure is non-fatal — keep
+                                    // the bare hit.
+                                }
+                            }
+                            return `${h.uri} (score: ${h.score.toFixed(2)})\n${(h.text ?? '').trim().slice(0, 600)}${citedLine}${supersededLine}`;
+                        }),
                     );
                     wikiPreamble =
-                        'Likely-relevant wiki pages for this question ' +
-                        '(current state of record — prefer these for ' +
-                        '"what is X" questions; use the dailies they ' +
-                        'cite for evidence):\n\n' +
+                        'Likely-relevant wiki pages for this question. ' +
+                        'Wiki bodies are SYNTHESES — they summarize across ' +
+                        'many dailies and can lag behind the latest daily. ' +
+                        'For any question asking for a specific value, date, ' +
+                        'name, quantity, or quote, treat the wiki page as a ' +
+                        'pointer and memory_get one of its cited dailies to ' +
+                        'verify the specific value before answering. Synthesis ' +
+                        'questions ("how does X work overall?") can answer ' +
+                        'from the wiki directly.\n\n' +
                         blocks.join('\n\n---\n\n') +
                         '\n\n---\n\n';
                     for (const h of wikiHits) {
@@ -344,14 +491,55 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
                 // Wiki layer may be disabled or empty — proceed without.
             }
 
+            // Query decomposition: multi-fact questions ("what was X
+            // and what was Y") split into per-fact sub-queries. We run
+            // each sub-query as a memory_search in parallel and surface
+            // both result sets in the preamble. Catches the partial-
+            // completeness failure cluster where the agent's single
+            // search finds X but misses Y entirely.
+            const subQueries = decomposeQuery(question);
+            if (subQueries && subQueries.length >= 2) {
+                try {
+                    const subResults = await Promise.all(
+                        subQueries.map((sq) =>
+                            svc.search(sq, { maxResults: 3, skipSync: true }),
+                        ),
+                    );
+                    const subBlocks: string[] = [];
+                    for (let i = 0; i < subQueries.length; i++) {
+                        const hits = subResults[i];
+                        if (hits.length === 0) continue;
+                        const lines = hits
+                            .slice(0, 3)
+                            .map(
+                                (h) =>
+                                    `  ${h.uri} (${h.score.toFixed(2)}): ${(h.text ?? '').trim().slice(0, 300).replace(/\n/g, ' ')}`,
+                            )
+                            .join('\n');
+                        subBlocks.push(`Sub-query: "${subQueries[i]}"\n${lines}`);
+                    }
+                    if (subBlocks.length > 0) {
+                        wikiPreamble +=
+                            'This question contains multiple distinct asks. ' +
+                            'Pre-computed top hits for each sub-query so you ' +
+                            'can cover both topics without re-searching:\n\n' +
+                            subBlocks.join('\n\n') +
+                            '\n\n---\n\n';
+                    }
+                } catch {
+                    // Sub-query path is best-effort; the agent loop still has full tools.
+                }
+            }
+
             const result = await runAgentLoop(question, {
                 openai,
                 model: modelId,
                 service,
                 memoryRoot,
                 maxSearchResults: searchK,
+                maxWikiSearchResults: wikiSearchK,
                 maxIterations: agentMaxIterations,
-                wikiPreamble,
+                wikiPreamble: wisdomBlock + wikiPreamble,
             });
             // Merge the wiki-prior retrieval into the agent's reported
             // retrieval so the failure log surfaces the full set of
@@ -430,6 +618,9 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
                 model,
                 wiki: { enabled: true },
             };
+            if (cfg.dreamingModel) {
+                serviceConfig.dreamingModel = resolveModel(cfg.dreamingModel);
+            }
             if (enableDreaming) {
                 serviceConfig.dreaming = { enabled: true };
             }

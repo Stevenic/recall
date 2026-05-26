@@ -5,8 +5,10 @@ import type { MemoryModel } from "./interfaces/model.js";
 import {
     DEFAULT_WIKI_CONFIG,
     isStub,
+    type GroundingReport,
     type ResolvedWikiTarget,
     type SharedWikiConfig,
+    type SourceContribution,
     type SupersedesEntry,
     type WikiCategory,
     type WikiConfig,
@@ -188,7 +190,11 @@ export class WikiEngine {
             category: input.category,
             created: today,
             updated: today,
-            sources: [input.source],
+            sources: [
+                typeof input.source === "string"
+                    ? { uri: input.source }
+                    : input.source,
+            ],
             related: input.related ?? [],
             confidence: "low",
             body: ensureTrailingNewline(input.body),
@@ -240,7 +246,7 @@ export class WikiEngine {
      */
     async append(
         slug: string,
-        source: string,
+        source: string | SourceContribution,
         bodyFragment: string,
         target: WikiTarget = "private",
     ): Promise<WikiPage> {
@@ -251,8 +257,10 @@ export class WikiEngine {
                 `Wiki page "${slug}" does not exist (target: ${target}).`,
             );
         }
-        if (!existing.sources.includes(source)) {
-            existing.sources.push(source);
+        const newContrib =
+            typeof source === "string" ? { uri: source } : source;
+        if (!existing.sources.some((s) => s.uri === newContrib.uri)) {
+            existing.sources.push(newContrib);
         }
         const trimmedFragment = bodyFragment.trim();
         if (trimmedFragment.length > 0) {
@@ -517,12 +525,13 @@ export class WikiEngine {
         const dst = await this.read(dstSlug, target);
         if (!dst) throw new Error(`merge: destination page "${dstSlug}" does not exist.`);
 
-        // Union sources, deduping while preserving order.
-        const seen = new Set(dst.sources);
+        // Union sources, deduping by URI while preserving order. Dst's
+        // contribution metadata (range/summary) wins for shared URIs.
+        const seen = new Set(dst.sources.map((s) => s.uri));
         const mergedSources = [...dst.sources];
         for (const s of src.sources) {
-            if (!seen.has(s)) {
-                seen.add(s);
+            if (!seen.has(s.uri)) {
+                seen.add(s.uri);
                 mergedSources.push(s);
             }
         }
@@ -643,10 +652,10 @@ export class WikiEngine {
         }
 
         const sourceTexts: { uri: string; content: string }[] = [];
-        for (const sourceUri of page.sources) {
-            const content = await this._readSource(sourceUri, target);
+        for (const src of page.sources) {
+            const content = await this._readSource(src.uri, target);
             if (content !== null) {
-                sourceTexts.push({ uri: sourceUri, content });
+                sourceTexts.push({ uri: src.uri, content });
             }
         }
         if (sourceTexts.length === 0) {
@@ -759,10 +768,11 @@ export class WikiEngine {
                     slug = collisionSlug;
                     report.renamedOnCollision[slugBase] = collisionSlug;
                 }
-                const sources = inferSourcesFromBody(parsed.content);
-                if (sources.length === 0) {
-                    sources.push(`migration:${todayIso()}:${filename}`);
+                const sourceUris = inferSourcesFromBody(parsed.content);
+                if (sourceUris.length === 0) {
+                    sourceUris.push(`migration:${todayIso()}:${filename}`);
                 }
+                const sources: SourceContribution[] = sourceUris.map((uri) => ({ uri }));
                 const page: WikiPage = {
                     slug,
                     name:
@@ -902,7 +912,9 @@ export class WikiEngine {
                     category: "theme",
                     created: created_at,
                     updated: todayIso(),
-                    sources: sources.length > 0 ? sources : [`memory/dreams/insights/${f.name}`],
+                    sources: (sources.length > 0
+                        ? sources
+                        : [`memory/dreams/insights/${f.name}`]).map((uri) => ({ uri })),
                     related: [],
                     confidence:
                         data.confidence === "high" ||
@@ -1082,9 +1094,7 @@ export function parseWikiPage(content: string, expectedSlug: string): WikiPage {
     if (!category) {
         throw new Error(`Wiki page "${slug}" missing category in frontmatter.`);
     }
-    const sources = Array.isArray(data.sources)
-        ? (data.sources as string[])
-        : [];
+    const sources = parseSources(data.sources);
     const related = Array.isArray(data.related)
         ? (data.related as string[])
         : [];
@@ -1092,6 +1102,7 @@ export function parseWikiPage(content: string, expectedSlug: string): WikiPage {
         ? (data.contradicts as string[])
         : undefined;
     const supersedes = parseSupersedes(data.supersedes);
+    const grounding = parseGrounding(data.grounding);
     return {
         slug,
         name: (data.name as string | undefined) ?? slug,
@@ -1110,9 +1121,102 @@ export function parseWikiPage(content: string, expectedSlug: string): WikiPage {
         confidence: data.confidence as WikiPage["confidence"],
         contradicts,
         supersedes,
+        grounding,
         redirectTo: data.redirect_to as string | undefined,
         body: parsed.content,
     };
+}
+
+function parseGrounding(raw: unknown): GroundingReport | undefined {
+    if (!raw || typeof raw !== "object") return undefined;
+    const r = raw as Record<string, unknown>;
+    const verifiedOn = typeof r.verifiedOn === "string"
+        ? r.verifiedOn
+        : typeof r.verified_on === "string"
+          ? r.verified_on
+          : "";
+    if (!verifiedOn) return undefined;
+    const grounded = typeof r.grounded === "number" ? r.grounded : 0;
+    const unverified = Array.isArray(r.unverified)
+        ? (r.unverified as unknown[]).filter((x): x is string => typeof x === "string")
+        : [];
+    const stale = Array.isArray(r.stale)
+        ? (r.stale as unknown[]).filter((x): x is string => typeof x === "string")
+        : [];
+    return { verifiedOn, grounded, unverified, stale };
+}
+
+/**
+ * Parse the `sources:` frontmatter field. Accepts both shapes for
+ * backward compatibility:
+ *   - legacy: `sources: ["memory/2026-01-14.md", ...]`  — string[]
+ *   - new:    `sources: [{ uri, from?, lines?, summary? }, ...]`
+ * Both forms upgrade to {@link SourceContribution} in memory. Range
+ * fields are silently dropped if they're malformed (lines<=0, from<1)
+ * so a bad LLM emit doesn't poison the page.
+ */
+function parseSources(raw: unknown): SourceContribution[] {
+    if (!Array.isArray(raw)) return [];
+    const out: SourceContribution[] = [];
+    for (const item of raw) {
+        if (typeof item === "string" && item.length > 0) {
+            out.push({ uri: item });
+            continue;
+        }
+        if (!item || typeof item !== "object") continue;
+        const r = item as Record<string, unknown>;
+        const uri = typeof r.uri === "string" ? r.uri : typeof r.source === "string" ? r.source : "";
+        if (!uri) continue;
+        const entry: SourceContribution = { uri };
+        const fromN = typeof r.from === "number" ? r.from : undefined;
+        const linesN = typeof r.lines === "number" ? r.lines : undefined;
+        if (
+            typeof fromN === "number" &&
+            typeof linesN === "number" &&
+            Number.isFinite(fromN) &&
+            Number.isFinite(linesN) &&
+            fromN >= 1 &&
+            linesN >= 1
+        ) {
+            entry.range = { from: Math.floor(fromN), lines: Math.floor(linesN) };
+        }
+        if (typeof r.summary === "string" && r.summary.trim().length > 0) {
+            entry.summary = r.summary.trim();
+        }
+        out.push(entry);
+    }
+    return out;
+}
+
+/**
+ * Serialize a list of {@link SourceContribution} for frontmatter. Emits
+ * the compact URI-string form when ALL contributions lack both range
+ * and summary (keeps legacy pages bit-identical on re-write); otherwise
+ * emits the structured object form so the new metadata is preserved.
+ * Defensive: tolerates legacy in-memory pages whose `sources` array
+ * still has raw strings instead of {@link SourceContribution} objects.
+ */
+function serializeSources(sources: ReadonlyArray<SourceContribution | string>): unknown[] {
+    const normalized: SourceContribution[] = sources.map((s) =>
+        typeof s === "string" ? { uri: s } : s,
+    );
+    const hasEnrichment = normalized.some(
+        (s) => s.range != null || (s.summary != null && s.summary.length > 0),
+    );
+    if (!hasEnrichment) {
+        return normalized.map((s) => s.uri);
+    }
+    return normalized.map((s) => {
+        const o: Record<string, unknown> = { uri: s.uri };
+        if (s.range && s.range.from >= 1 && s.range.lines >= 1) {
+            o.from = s.range.from;
+            o.lines = s.range.lines;
+        }
+        if (s.summary && s.summary.length > 0) {
+            o.summary = s.summary;
+        }
+        return o;
+    });
 }
 
 function parseSupersedes(raw: unknown): SupersedesEntry[] | undefined {
@@ -1149,7 +1253,7 @@ export function serializeWikiPage(page: WikiPage): string {
         slug: page.slug,
         created: page.created,
         updated: page.updated,
-        sources: page.sources,
+        sources: serializeSources(page.sources),
     };
     if (page.related.length > 0) fm.related = page.related;
     if (page.confidence) fm.confidence = page.confidence;
@@ -1158,6 +1262,19 @@ export function serializeWikiPage(page: WikiPage): string {
     }
     if (page.supersedes && page.supersedes.length > 0) {
         fm.supersedes = page.supersedes;
+    }
+    if (page.grounding) {
+        // Serialize the whole report — even when counts are zero —
+        // because the verifiedOn date is the signal that verification
+        // actually ran. A missing `grounding` field means we never
+        // checked; an empty `unverified` + `stale` with a real date
+        // means we checked and the page passed.
+        fm.grounding = {
+            verifiedOn: page.grounding.verifiedOn,
+            grounded: page.grounding.grounded,
+            unverified: page.grounding.unverified,
+            stale: page.grounding.stale,
+        };
     }
     if (page.redirectTo) fm.redirect_to = page.redirectTo;
     return matter.stringify(ensureTrailingNewline(page.body), fm);

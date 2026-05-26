@@ -53,7 +53,10 @@ export const AGENT_SYSTEM_PROMPT =
   "Be concise. Extract specific facts, names, dates, and numbers verbatim " +
   "from memory when they appear. Never invent details that aren't in memory.";
 
-/** OpenAI tool definitions for the agent. */
+/** OpenAI tool definitions for the agent. Mirrors OpenClaw production
+ * `MemorySearchSchema` / `MemoryGetSchema` in
+ * `extensions/memory-core/src/index.ts` so the bench measures OpenClaw's
+ * intended tool surface, not a paraphrase. */
 export const AGENT_TOOLS = [
   {
     type: "function" as const,
@@ -63,7 +66,9 @@ export const AGENT_TOOLS = [
         "Search the agent's long-term memory for content relevant to a query. " +
         "Returns ranked memory snippets, each tagged with its source path. " +
         "Use this before answering questions about prior work, decisions, " +
-        "dates, people, preferences, or todos.",
+        "dates, people, preferences, or todos. Optional `corpus` filter " +
+        "restricts the source set (`memory` = daily logs, `wiki` = registered " +
+        "compiled-wiki supplements, `all` = both, `sessions` = session transcripts).",
       parameters: {
         type: "object",
         properties: {
@@ -73,7 +78,29 @@ export const AGENT_TOOLS = [
           },
           limit: {
             type: "integer",
-            description: "Max results to return. Default 8.",
+            description:
+              "Max results to return. Default 8. Capped at the harness's " +
+              "configured maxSearchResults.",
+          },
+          maxResults: {
+            type: "integer",
+            description:
+              "Alias for `limit` — OpenClaw's production schema names this " +
+              "field. When both are supplied, `limit` wins.",
+          },
+          minScore: {
+            type: "number",
+            description:
+              "Minimum similarity score for returned hits, in [0, 1]. " +
+              "Defaults to the harness's configured minScore.",
+          },
+          corpus: {
+            type: "string",
+            enum: ["memory", "wiki", "all", "sessions"],
+            description:
+              "Source filter. `memory` (default) = MEMORY.md + memory/*.md. " +
+              "`wiki` = registered compiled-wiki supplements. `all` = both. " +
+              "`sessions` = session transcripts (when indexed).",
           },
         },
         required: ["query"],
@@ -86,15 +113,35 @@ export const AGENT_TOOLS = [
     function: {
       name: "memory_get",
       description:
-        "Read the full content of a specific memory file by path. Use after " +
-        "memory_search when you need more context than the search snippet " +
-        "provides.",
+        "Read a specific memory file by path. Use after memory_search when " +
+        "you need more context than the search snippet provides. Supports " +
+        "ranged reads via `from` + `lines` to fetch a window without pulling " +
+        "the whole file.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
             description: "Path returned by memory_search (e.g. memory/2026-03-15.md).",
+          },
+          from: {
+            type: "integer",
+            description:
+              "Optional starting line (1-based). When omitted, reads from " +
+              "the beginning of the file.",
+          },
+          lines: {
+            type: "integer",
+            description:
+              "Optional number of lines to return starting from `from`. " +
+              "When omitted, reads to end of file.",
+          },
+          corpus: {
+            type: "string",
+            enum: ["memory", "wiki", "all"],
+            description:
+              "Optional source hint. Path already encodes the corpus; " +
+              "accepted for parity with the production schema.",
           },
         },
         required: ["path"],
@@ -135,7 +182,14 @@ export interface AgentLoopResult {
    * the harness's failure log can show the agent's actual search trajectory,
    * not just the chunks a non-agent synthesis would have seen.
    */
-  retrieval: Array<{ path: string; score: number; snippet: string }>;
+  retrieval: Array<{
+    path: string;
+    score: number;
+    snippet: string;
+    startLine?: number;
+    endLine?: number;
+    citation?: string;
+  }>;
   /** Tool-call trace for diagnostics. */
   trace: Array<{ tool: string; args: Record<string, unknown>; resultPreview: string }>;
   /** Number of completion calls (one per turn). */
@@ -160,7 +214,7 @@ export async function runAgentLoop(
     { role: "user", content: question },
   ];
 
-  const retrieval: Array<{ path: string; score: number; snippet: string }> = [];
+  const retrieval: AgentLoopResult["retrieval"] = [];
   const trace: AgentLoopResult["trace"] = [];
 
   for (let i = 0; i < maxIterations; i++) {
@@ -296,31 +350,78 @@ export async function runAgentLoop(
 async function executeMemorySearch(
   deps: AgentLoopDeps,
   args: Record<string, unknown>,
-): Promise<{ text: string; results: Array<{ path: string; score: number; snippet: string }> }> {
+): Promise<{ text: string; results: AgentLoopResult["retrieval"] }> {
   const query = typeof args.query === "string" ? args.query : "";
   if (!query.trim()) return { text: "memory_search: missing 'query' argument.", results: [] };
-  const requestedLimit = typeof args.limit === "number" ? args.limit : 8;
-  const limit = Math.min(Math.max(1, Math.floor(requestedLimit)), deps.maxSearchResults);
+  // `limit` is the historical bench field; `maxResults` is the OpenClaw
+  // production schema field. When both are present, `limit` wins.
+  const rawLimit =
+    typeof args.limit === "number"
+      ? args.limit
+      : typeof args.maxResults === "number"
+        ? args.maxResults
+        : 8;
+  const limit = Math.min(Math.max(1, Math.floor(rawLimit)), deps.maxSearchResults);
+  const minScore =
+    typeof args.minScore === "number" && Number.isFinite(args.minScore)
+      ? Math.max(0, Math.min(1, args.minScore))
+      : deps.minScore;
+
+  // Map the production-schema `corpus` field to the manager's `sources`
+  // filter. `sessions` is accepted but treated as `memory` since the
+  // bench harness doesn't index session transcripts.
+  const corpus = typeof args.corpus === "string" ? args.corpus : "memory";
+  let sources: Array<"memory" | "wiki" | "sessions">;
+  switch (corpus) {
+    case "wiki":
+      sources = ["wiki"];
+      break;
+    case "all":
+      sources = ["memory", "wiki"];
+      break;
+    case "sessions":
+    case "memory":
+    default:
+      sources = ["memory"];
+      break;
+  }
 
   const hits = await deps.manager.search(query, {
     maxResults: limit,
-    minScore: deps.minScore,
-    sources: ["memory"],
+    minScore,
+    sources,
   });
 
   if (hits.length === 0) {
     return { text: `memory_search("${query}") → no results.`, results: [] };
   }
 
+  // Production OpenClaw search results carry startLine/endLine and a
+  // citation (`<path>#<line>`) for every chunk hit. Surface them in the
+  // formatted output so the agent has the same line-range affordance
+  // production has — pull only the needed lines with memory_get, cite
+  // with `Source: <path>#<line>`. The retrieval array also gains the
+  // line info so the bench's failure log records where each hit landed.
   const results = hits.map((h: MemorySearchResult) => ({
     path: h.path,
     score: h.score,
     snippet: h.snippet,
+    startLine: h.startLine,
+    endLine: h.endLine,
+    citation: h.citation,
   }));
   const formatted = hits
-    .map((h: MemorySearchResult, idx) =>
-      `[${idx + 1}] ${h.path} (score: ${h.score.toFixed(2)})\n${h.snippet.trim()}`,
-    )
+    .map((h: MemorySearchResult, idx) => {
+      const range =
+        Number.isFinite(h.startLine) && Number.isFinite(h.endLine)
+          ? `[${h.startLine}..${h.endLine}]`
+          : "";
+      const cite = h.citation ? ` · cite=${h.citation}` : "";
+      return (
+        `[${idx + 1}] ${h.path}${range} (score: ${h.score.toFixed(2)})${cite}\n` +
+        h.snippet.trim()
+      );
+    })
     .join("\n\n");
   return { text: formatted, results };
 }
@@ -329,23 +430,52 @@ async function executeMemoryGet(
   deps: AgentLoopDeps,
   args: Record<string, unknown>,
 ): Promise<string> {
-  const path = typeof args.path === "string" ? args.path : "";
-  if (!path.trim()) return "memory_get: missing 'path' argument.";
+  const reqPath = typeof args.path === "string" ? args.path : "";
+  if (!reqPath.trim()) return "memory_get: missing 'path' argument.";
+  const fromArg =
+    typeof args.from === "number" && Number.isFinite(args.from)
+      ? Math.max(1, Math.floor(args.from))
+      : null;
+  const linesArg =
+    typeof args.lines === "number" && Number.isFinite(args.lines)
+      ? Math.max(1, Math.floor(args.lines))
+      : null;
 
   // Path is expected to be relative to the workspace (e.g. memory/2026-01-15.md).
-  const resolved = isAbsolute(path) ? path : join(deps.workspaceDir, path);
+  const resolved = isAbsolute(reqPath) ? reqPath : join(deps.workspaceDir, reqPath);
   // Refuse path traversal that escapes the workspace.
   if (!resolved.startsWith(deps.workspaceDir)) {
-    return `memory_get: path "${path}" resolves outside the workspace.`;
+    return `memory_get: path "${reqPath}" resolves outside the workspace.`;
   }
 
+  let content: string;
   try {
-    const content = await readFile(resolved, "utf-8");
-    return content;
+    content = await readFile(resolved, "utf-8");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return `memory_get: failed to read "${path}": ${msg}`;
+    return `memory_get: failed to read "${reqPath}": ${msg}`;
   }
+
+  if (fromArg == null && linesArg == null) {
+    return content;
+  }
+
+  const allLines = content.split("\n");
+  const start = (fromArg ?? 1) - 1;
+  if (start < 0 || start >= allLines.length) {
+    return (
+      `memory_get: requested 'from=${fromArg ?? 1}' is past end of ` +
+      `"${reqPath}" (file has ${allLines.length} lines).`
+    );
+  }
+  const end = linesArg == null ? allLines.length : Math.min(start + linesArg, allLines.length);
+  const window = allLines.slice(start, end).join("\n");
+  const truncatedAhead = end < allLines.length;
+  const header =
+    `(memory_get range from=${start + 1}, lines=${end - start}` +
+    (truncatedAhead ? `, more=${allLines.length - end} lines remain past line ${end}` : "") +
+    `)\n`;
+  return header + window;
 }
 
 // ---------------------------------------------------------------------------

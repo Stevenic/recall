@@ -195,6 +195,77 @@ export function temporalAffinity(
 }
 
 /**
+ * Recency cue carried by a query — does it ask for the LATEST state, the
+ * ORIGINAL state, or neither? Used by retrieval to apply asymmetric
+ * recency boosts so queries about current values get the revised daily
+ * and queries about prior values get the original.
+ *
+ * `null` is the safe default — most factual-recall questions don't have
+ * an explicit cue and shouldn't get a recency tilt either way.
+ */
+export type RecencyCue = "latest" | "earliest" | null;
+
+/**
+ * Cheap regex extraction of recency cues. False positives are fine — the
+ * downstream boost is small (~10-20%) and won't flip a confident match.
+ * Misses are also fine — no boost is the default. The goal is to nudge
+ * top-K when the agent or search would otherwise pick the wrong era.
+ */
+export function extractRecencyCue(query: string): RecencyCue {
+    const q = query.toLowerCase();
+    // "Latest" / "current" cues — questions asking about the present state
+    if (
+        /\b(?:latest|current|currently|now|as of (?:today|now)|at the end of|by the end of|stays? unchanged|kept (?:unchanged|the same)|recent(?:ly)?|today)\b/i.test(
+            q,
+        )
+    ) {
+        return "latest";
+    }
+    // "Original" / "initial" / "first" cues — questions about the
+    // original or earliest state, before any revision.
+    if (
+        /\b(?:original(?:ly)?|initial(?:ly)?|first (?:proposed|recorded|noted|established|set|captured)|at (?:first|the start|onset|kickoff)|kickoff|opening|inception|before .* (?:was|were) revised|earliest)\b/i.test(
+            q,
+        )
+    ) {
+        return "earliest";
+    }
+    return null;
+}
+
+/**
+ * Apply a recency boost based on the query's cue. Returns a multiplier
+ * in [0.85, 1.25] so the effect is meaningful but doesn't dominate the
+ * embedding/BM25 signal. Uses the spread between the corpus's earliest
+ * and latest dailies as the normalization window — a memory at the
+ * latest edge gets +25% under a "latest" cue and -15% under an
+ * "earliest" cue; vice-versa at the earliest edge.
+ *
+ * `null` cue → identity multiplier (1.0).
+ */
+export function recencyBoost(
+    memoryDate: Date,
+    cue: RecencyCue,
+    spanStart: Date,
+    spanEnd: Date,
+): number {
+    if (cue === null) return 1.0;
+    const totalMs = spanEnd.getTime() - spanStart.getTime();
+    if (totalMs <= 0) return 1.0;
+    // 0 = at spanStart, 1 = at spanEnd
+    const t = Math.max(
+        0,
+        Math.min(1, (memoryDate.getTime() - spanStart.getTime()) / totalMs),
+    );
+    if (cue === "latest") {
+        // Multiplier interpolates 0.85 (earliest) → 1.25 (latest)
+        return 0.85 + 0.4 * t;
+    }
+    // cue === "earliest"
+    return 1.25 - 0.4 * t;
+}
+
+/**
  * Extract a date from a memory URI or period string.
  * Returns null if no date can be inferred.
  */

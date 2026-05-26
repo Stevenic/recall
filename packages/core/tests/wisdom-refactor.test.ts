@@ -77,7 +77,7 @@ describe("Compactor.distillWisdom — wiki-aware path (§12 refactor)", () => {
                     name: "Ledger storage",
                     description: "Postgres-backed ledger; chosen for Q2.",
                     body: "Lede.\n\n**Why:** Throughput.\n\n**How to apply:** Use the new schema.",
-                    sources: ["memory/2026-04-15.md", "memory/monthly/2026-04.md"],
+                    sources: [{ uri: "memory/2026-04-15.md" }, { uri: "memory/monthly/2026-04.md" }],
                 },
             ],
         });
@@ -86,8 +86,8 @@ describe("Compactor.distillWisdom — wiki-aware path (§12 refactor)", () => {
         expect(page).not.toBeNull();
         expect(page!.category).toBe("project");
         expect(page!.name).toBe("Ledger storage");
-        expect(page!.sources).toContain("memory/2026-04-15.md");
-        expect(page!.sources).toContain("memory/monthly/2026-04.md");
+        expect(page!.sources.map((s) => s.uri)).toContain("memory/2026-04-15.md");
+        expect(page!.sources.map((s) => s.uri)).toContain("memory/monthly/2026-04.md");
     });
 
     it("appends to existing pages when the promotion's slug already exists", async () => {
@@ -108,7 +108,7 @@ describe("Compactor.distillWisdom — wiki-aware path (§12 refactor)", () => {
                     name: "Ledger storage",
                     description: "Update from wisdom distillation.",
                     body: "April update: rolled out to prod.",
-                    sources: ["memory/2026-04-15.md"],
+                    sources: [{ uri: "memory/2026-04-15.md" }],
                 },
             ],
         });
@@ -116,7 +116,7 @@ describe("Compactor.distillWisdom — wiki-aware path (§12 refactor)", () => {
         const page = await wiki.read("ledger-storage");
         expect(page!.body).toContain("Original");
         expect(page!.body).toContain("April update");
-        expect(page!.sources).toContain("memory/2026-04-15.md");
+        expect(page!.sources.map((s) => s.uri)).toContain("memory/2026-04-15.md");
     });
 
     it("writes WISDOM.md from the wisdom field and rebuilds the Knowledge Map", async () => {
@@ -129,7 +129,7 @@ describe("Compactor.distillWisdom — wiki-aware path (§12 refactor)", () => {
                     name: "Auth system",
                     description: "JWT-based auth layer.",
                     body: "Body.\n\n**Why:** w.\n\n**How to apply:** h.",
-                    sources: ["memory/2026-04-15.md"],
+                    sources: [{ uri: "memory/2026-04-15.md" }],
                 },
             ],
         });
@@ -151,7 +151,7 @@ describe("Compactor.distillWisdom — wiki-aware path (§12 refactor)", () => {
                     name: "A",
                     description: "x",
                     body: "Body.\n\n**Why:** w.\n\n**How to apply:** h.",
-                    sources: ["memory/2026-04-15.md"],
+                    sources: [{ uri: "memory/2026-04-15.md" }],
                 },
                 {
                     slug: "promo-b",
@@ -159,7 +159,7 @@ describe("Compactor.distillWisdom — wiki-aware path (§12 refactor)", () => {
                     name: "B",
                     description: "x",
                     body: "Body.\n\n**Why:** w.\n\n**How to apply:** h.",
-                    sources: ["memory/2026-04-15.md"],
+                    sources: [{ uri: "memory/2026-04-15.md" }],
                 },
             ],
         });
@@ -238,7 +238,7 @@ describe("Compactor.distillWisdom — wiki-aware path (§12 refactor)", () => {
                     name: "Valid",
                     description: "ok",
                     body: "Body.\n\n**Why:** w.\n\n**How to apply:** h.",
-                    sources: ["memory/2026-04-15.md"],
+                    sources: [{ uri: "memory/2026-04-15.md" }],
                 },
             ],
         });

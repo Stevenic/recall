@@ -1,0 +1,73 @@
+# Run the executive-assistant 180-day persona against the Recall harness
+# WITH dreaming enabled. Companion to ea-60d-recall-dreaming but at full
+# corpus length so we can compare apples-to-apples against MemPalace
+# (83.4% over 180d) and OpenClaw (90.8% over 180d).
+#
+# Stack at the time of writing:
+#   - Reranker on (skipped for date-pinned queries)
+#   - Wiki dedup-before-create + merge-with-supersession
+#   - Trajectory companion pages for any wiki page with >=2 supersedes
+#   - Query decomposition for multi-fact questions
+#   - Recency-cue ranking ("latest" / "kickoff" boosts)
+#   - Dreaming concurrency 1 (race-safe)
+#   - irrelevant_after on q007/q008/q009 (early-window Q&A pruning)
+#
+# To run:
+#   recall-bench run --profile packages/recall-bench/profiles/ea-180d-recall-dreaming.yaml \
+#                    --json-out bench-results/drafts/ea-180d-recall-dreaming/result.json
+
+persona:
+  id: executive-assistant
+  dir: ../personas/executive-assistant
+  arcs: arcs-180d.yaml
+
+env:
+  file: ../../../.env
+
+models:
+  judge: azure:gpt-5.4-mini
+  appellateJudge: azure:gpt-5.4
+  generation: azure:gpt-5.4-mini
+
+harness:
+  adapter: ../../../bench-harnesses/recall/dist/index.js
+  factory: createRecallAdapter
+  config:
+    name: Recall (dreaming)
+    model: azure:gpt-5.4-mini
+    identityName: Jordan
+    identity: |
+      Jordan is an AI executive assistant for the CFO of a mid-cap technology
+      company. Trusted operator: anticipatory, discreet, calm under pressure,
+      protective of the principal's time and confidentiality. Drafts but does
+      not send sensitive (HR, legal, board, customer-escalation)
+      communications without principal review.
+    searchK: 10
+    contextBudget: 9000
+    enableCompaction: true
+    enableDreaming: true
+    answerMode: agent
+    # Bumped from 6 → 12 to give the agent room to chase revisions across
+    # 180 days of corpus.
+    agentMaxIterations: 12
+    synthesisProvider: azure
+    # Stronger model for dreaming — cross-cutting wiki_op decisions
+    # reward extra reasoning capability. Fires once per checkpoint.
+    dreamingModel: azure:gpt-5.4
+
+run:
+  # 30 checkpoints every 6 days from day 6 through day 180 — matches the
+  # cadence used for the OpenClaw / MemPalace / Recall-baseline 180d runs
+  # so the heatmaps are directly comparable.
+  ranges:
+    start: 6
+    end: 180
+    step: 6
+  seed: 42
+  # Dreaming + agent loop need more headroom than the dreaming-off
+  # baseline; 180s per question covers the heaviest synthesis cases.
+  timeout: 180000
+  parallelism: 1
+  sample: 50
+  judgeMemoryWindow: 1
+  groupsEnabled: false

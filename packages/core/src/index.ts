@@ -66,7 +66,7 @@ export {
 } from "./catalog.js";
 export type { CatalogEntry } from "./catalog.js";
 
-export { expandQuery } from "./query-expansion.js";
+export { expandQuery, decomposeQuery } from "./query-expansion.js";
 
 export {
     computeSalienceWeights,

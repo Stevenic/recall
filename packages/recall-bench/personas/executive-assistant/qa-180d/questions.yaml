@@ -58,6 +58,13 @@
     - 5
     - 6
     - 7
+  # The Condor valuation is revised on 2026-01-14 to $620M-$760M / $650M
+  # floor. Once that revision is in the corpus, the unpinned question
+  # "what is the working valuation range" naturally resolves to the
+  # revised values — not the day-3-7 answer this reference encodes.
+  # Drop the question from the test set after day 13 to avoid testing
+  # the system against a value it correctly considers superseded.
+  irrelevant_after: 13
   requires_synthesis: false
 - id: executive-assistant-q008
   question: What were the base and stretch synergy assumptions for Condor?
@@ -70,6 +77,9 @@
     - 5
     - 6
     - 7
+  # Synergy case revised on 2026-01-14 to $28M/$38M. Drop the question
+  # after day 13 — see q007 for rationale.
+  irrelevant_after: 13
   requires_synthesis: false
 - id: executive-assistant-q009
   question: What financing structure was being kept in the Condor thread?
@@ -82,6 +92,9 @@
     - 5
     - 6
     - 7
+  # Financing structure revised on 2026-01-14 to $350M term loan +
+  # $150M bridge. Drop after day 13 — see q007 for rationale.
+  irrelevant_after: 13
   requires_synthesis: false
 - id: executive-assistant-q010
   question: Which Condor issue was treated as a gating diligence item because it could affect the deal path?

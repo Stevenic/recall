@@ -106,6 +106,63 @@ export class SearchLogger {
         return all.filter((e) => e.ts >= cutoffIso);
     }
 
+    /**
+     * Roll up wiki-page-level hits within a window. Counts how many times
+     * each wiki slug appeared in returned results, the best score it
+     * achieved, the most recent timestamp it was hit, and the number of
+     * distinct queries that surfaced it. Used by the dreaming wisdom-
+     * distillation step to feed an MRU signal to the LLM patcher — wiki
+     * pages with sustained retrieval pressure are wisdom-promotion
+     * candidates; pages that haven't been hit are removal candidates.
+     */
+    async getWikiPageHitsByWindow(windowDays: number): Promise<
+        Array<{
+            slug: string;
+            hits: number;
+            bestScore: number;
+            lastHit: string;
+            uniqueQueries: number;
+        }>
+    > {
+        const entries = await this.readLogWindow(windowDays);
+        const rollup = new Map<
+            string,
+            { hits: number; bestScore: number; lastHit: string; queries: Set<string> }
+        >();
+        for (const entry of entries) {
+            for (let i = 0; i < entry.results.length; i++) {
+                const uri = entry.results[i];
+                const m = /(?:^|\/)memory\/wiki\/([^/]+)\.md$/.exec(uri);
+                if (!m) continue;
+                const slug = m[1];
+                const score = entry.scores[i] ?? 0;
+                const existing = rollup.get(slug);
+                if (!existing) {
+                    rollup.set(slug, {
+                        hits: 1,
+                        bestScore: score,
+                        lastHit: entry.ts,
+                        queries: new Set([entry.query]),
+                    });
+                } else {
+                    existing.hits++;
+                    if (score > existing.bestScore) existing.bestScore = score;
+                    if (entry.ts > existing.lastHit) existing.lastHit = entry.ts;
+                    existing.queries.add(entry.query);
+                }
+            }
+        }
+        return [...rollup.entries()]
+            .map(([slug, v]) => ({
+                slug,
+                hits: v.hits,
+                bestScore: v.bestScore,
+                lastHit: v.lastHit,
+                uniqueQueries: v.queries.size,
+            }))
+            .sort((a, b) => b.hits - a.hits || b.bestScore - a.bestScore);
+    }
+
     // ─── Log Rotation ────────────────────────────────────
 
     /**
