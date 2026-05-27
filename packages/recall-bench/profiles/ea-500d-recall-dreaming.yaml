@@ -56,7 +56,12 @@ harness:
     # OpenClaw's agent sees 6 dailies. This keeps the daily-recall
     # budget identical across systems while letting Recall's wiki
     # layer contribute the bonus context that's its design point.
-    searchK: 6
+    # Bumped from 6+3 (parity with OpenClaw prod) to 9+3 (12 total) for
+    # run-21. Run-20 analysis showed the 6+3 budget was tight for date-pinned
+    # questions where the agent needed several near-date dailies in view.
+    # 9+3 preserves the wiki-second-pass design while ~doubling the daily
+    # surface.
+    searchK: 9
     wikiSearchK: 3
     # 24,000 chars matches OpenClaw's `MAX_CONTEXT_CHARS` (bench harness
     # `synthesis.ts`). Only applies to `answerMode: synthesis`; agent mode

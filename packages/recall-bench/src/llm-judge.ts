@@ -105,10 +105,13 @@ Scoring rubric:
     1 = partial (some key details from the reference are missing)
     0 = missing the bulk of the key information
 - hallucination (integer 0-1):
-    1 = grounded (every factual claim in the system answer is supported by the MEMORY CONTEXT, or the system correctly admits insufficient information)
-    0 = hallucinated (introduces facts, names, dates, or numbers NOT present in the MEMORY CONTEXT — even if they sound plausible)
+    1 = grounded — the main facts asked for are supported by the MEMORY CONTEXT (or the reference) and nothing in the answer contradicts the MEMORY CONTEXT, OR the system correctly admits insufficient information.
+    0 = hallucinated — the answer either CONTRADICTS the MEMORY CONTEXT / reference, OR fabricates a specific verifiable atom (a named person, a specific dollar amount, a specific date, a quoted statement) that's clearly inconsistent with what the MEMORY CONTEXT establishes.
 
-Important: a system answer that adds true detail from the MEMORY CONTEXT beyond what the reference mentions is still GROUNDED (hallucination=1). Reference answers are sometimes terse; richer answers that stay within MEMORY CONTEXT are fine.
+Important — extra details are NOT hallucination:
+- Reference answers are often terse. A richer answer that covers the main facts asked for is GROUNDED (hallucination=1) even if it adds context the reference doesn't mention.
+- The MEMORY CONTEXT shown to you is a narrow ±1-day window around the question's relevant days. The system may have legitimately retrieved memories from outside that window. Treat plausible narrative elaboration, characterization, light framing, or background details that you cannot directly verify as GROUNDED (hallucination=1) unless they contradict what you CAN see.
+- Only flag hallucination=0 when a specific, checkable atom (named person, specific number, specific date, direct quote) is clearly wrong relative to the MEMORY CONTEXT or the reference. "I cannot verify this from the excerpt I was shown" is NOT the same as "this is hallucinated."
 
 Also important: if the question expects a refusal (asks about content not in MEMORY CONTEXT) and the system correctly refuses to invent an answer, score hallucination=1.
 

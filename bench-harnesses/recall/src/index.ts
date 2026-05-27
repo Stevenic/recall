@@ -338,13 +338,17 @@ export function createRecallAdapter(rawCfg: unknown): MemorySystemAdapter {
                     ? modelSpec.replace(/^azure:/i, '')
                     : modelSpec.replace(/^openai:/i, '');
 
-            // WISDOM.md pre-stuff. The wisdom file is a curated pointer
-            // table of patterns / lessons distilled during dreaming.
-            // It's always-loaded — the agent sees it on turn 1 alongside
-            // the wiki preamble. Empty when dreaming hasn't run yet or
-            // hasn't surfaced anything wisdom-worthy.
+            // WISDOM.md pre-stuff. Disabled for run-21: run-20 analysis
+            // showed the always-loaded wisdom block biased the agent toward
+            // its distilled themes (e.g. communication-style summaries) and
+            // away from reading the specific daily. Hallucination rate jumped
+            // from 0% to 25% at 10d when wisdom was on. The wisdom file is
+            // still produced during dreaming — it's just not pre-stuffed into
+            // the agent's context every turn. Flip the if-false below to
+            // re-enable for a controlled A/B.
+            const WISDOM_PRESTUFF_ENABLED = false;
             let wisdomBlock = '';
-            try {
+            if (WISDOM_PRESTUFF_ENABLED) try {
                 const wisdomText = await svc.files.readWisdom();
                 if (wisdomText && wisdomText.trim().length > 0) {
                     wisdomBlock =

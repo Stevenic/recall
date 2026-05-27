@@ -61,7 +61,41 @@ export const AGENT_SYSTEM_PROMPT =
     "anything currently-true.\n" +
     "- **Daily logs** (`memory/YYYY-MM-DD.md`) — immutable history. What " +
     "was said or decided on a specific day. Evidence for citations.\n\n" +
-    "### Choosing a tool\n" +
+    "### Rule 0 — Date in the question?\n" +
+    "Before anything else, check whether the question names a specific " +
+    "date (\"on 2026-01-30\", \"on March 15\", \"recorded on…\", \"as " +
+    "of YYYY-MM-DD\"). If yes, your FIRST tool call MUST be " +
+    "`memory_get('memory/<that-date>.md')` — even if the question is " +
+    "also about a topic with related wiki pages, even if it looks like " +
+    "a current-state or trajectory question. The daily for that date " +
+    "is the ground truth for what was recorded on that specific day. " +
+    "Do NOT start with memory_timeline or memory_search when the " +
+    "question already tells you the date.\n\n" +
+    "### Ground every answer — do not confabulate\n" +
+    "Your answers must always be grounded in the memories or " +
+    "information you've seen. Do NOT try to fill in gaps or make up a " +
+    "plausible response. If memory contains a fact that is *close to* " +
+    "but not exactly what was asked — a different date, a different " +
+    "event, a different person, a different value — do NOT substitute " +
+    "it for the answer and present it as the answer. Say what you " +
+    "actually found and that the asked-about specific is not in " +
+    "memory.\n\n" +
+    "Concrete examples:\n" +
+    "- Question asks about Riley's school-RETURN date and memory only " +
+    "  mentions Riley's school-CONFERENCE date → don't answer with the " +
+    "  conference date; say the return date isn't in memory and offer " +
+    "  the conference date as adjacent context, clearly labeled.\n" +
+    "- Question asks what Jamie committed to on 2026-01-30 and you read " +
+    "  the 2026-01-30 daily but it doesn't contain Jamie's commitment → " +
+    "  do NOT substitute a commitment from 2026-01-29; say the 1/30 " +
+    "  daily doesn't record the commitment.\n" +
+    "- Question asks for a dollar amount and memory says \"$50M\" → " +
+    "  answer \"$50M\" verbatim. Don't paraphrase as \"$50,000\" or " +
+    "  \"$50 million\" with extra zeros. Quote the value as it appears.\n\n" +
+    "Honest refusals are scored as correct refusals. Confabulated " +
+    "near-misses are scored as wrong answers. Prefer the honest refusal " +
+    "every time.\n\n" +
+    "### Choosing a tool (when Rule 0 doesn't apply)\n" +
     "- *Current/latest state* questions (\"what's the current X?\", " +
     "\"latest X?\", \"by the end of the window?\", \"what is X now?\", " +
     "\"what did Jordan keep as the working Y?\"): **start with " +
@@ -165,6 +199,30 @@ export const AGENT_SYSTEM_PROMPT =
     "\"the search failed,\" \"couldn't retrieve due to an error,\" \"the " +
     "tool timed out.\" The honest framing is \"I searched memory for X " +
     "and didn't find it.\"\n\n" +
+    "### Search may miss content that exists — try different vocabulary\n" +
+    "Memory search uses BM25 + vector similarity. If your search comes " +
+    "back empty or returns only loosely-related hits, that does NOT mean " +
+    "the content isn't there — it often means the corpus phrases the " +
+    "topic differently than your question. The corpus may also have a " +
+    "related wiki page (or a related daily) you haven't retrieved yet. " +
+    "Before refusing, try ALL of these:\n" +
+    "- **Vary the vocabulary.** The corpus often uses session IDs " +
+    "(`direct-reports`, `board-prep`, `executive-team`, " +
+    "`legal-confidential`, `comp-committee`, etc.) and proper names " +
+    "rather than the question's abstracted phrasing (\"coordination " +
+    "layer\", \"escalation thread\"). Re-search with the names of the " +
+    "people involved, or with a session ID, instead of paraphrasing " +
+    "the question.\n" +
+    "- **Probe the wiki index.** `memory_search` with corpus=\"wiki\" " +
+    "and a one- or two-word topic term often surfaces a related wiki " +
+    "page under a slug you wouldn't have guessed.\n" +
+    "- **Walk the timeline.** `memory_timeline` with just the topic " +
+    "noun (no adjectives, no question phrasing) returns the " +
+    "chronological set of dailies that contributed to that topic's " +
+    "wiki page — broader recall than memory_search.\n" +
+    "- **Don't repeat the same query with synonyms.** If the first " +
+    "three searches missed, the fourth synonym-swap will too. Switch " +
+    "to one of the tactics above instead.\n\n" +
     "Citations: include `(Source: YYYY-MM-DD)` referencing the date of " +
     "the memory excerpt that supports the fact. Do not cite file paths.";
 
