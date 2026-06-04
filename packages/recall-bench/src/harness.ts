@@ -42,7 +42,7 @@ const DEFAULT_TIMEOUT = 30_000;
 const DEFAULT_ARCS_FILE = 'arcs-1000d.yaml';
 
 export class BenchmarkHarness {
-    private config: Required<Omit<HarnessConfig, 'modelLabels' | 'sample' | 'judgeMemoryWindow' | 'appellateJudge' | 'failureLogPath' | 'questionLogPath' | 'progressJsonlPath' | 'resumeFromJsonlPath' | 'dryRun'>> & Pick<HarnessConfig, 'modelLabels' | 'sample' | 'judgeMemoryWindow' | 'appellateJudge' | 'failureLogPath' | 'questionLogPath' | 'progressJsonlPath' | 'resumeFromJsonlPath' | 'dryRun'>;
+    private config: Required<Omit<HarnessConfig, 'modelLabels' | 'sample' | 'judgeMemoryWindow' | 'appellateJudge' | 'failureLogPath' | 'questionLogPath' | 'progressJsonlPath' | 'resumeFromJsonlPath' | 'skipCatchupIngest' | 'dryRun'>> & Pick<HarnessConfig, 'modelLabels' | 'sample' | 'judgeMemoryWindow' | 'appellateJudge' | 'failureLogPath' | 'questionLogPath' | 'progressJsonlPath' | 'resumeFromJsonlPath' | 'skipCatchupIngest' | 'dryRun'>;
     private static readonly GROUP_GATED_CATEGORIES: ReadonlySet<Category> = new Set([
         'group-session-attribution',
         'information-boundary',
@@ -72,6 +72,7 @@ export class BenchmarkHarness {
             dryRun: config.dryRun,
             progressJsonlPath: config.progressJsonlPath,
             resumeFromJsonlPath: config.resumeFromJsonlPath,
+            skipCatchupIngest: config.skipCatchupIngest,
             modelLabels: config.modelLabels,
         };
     }
@@ -190,27 +191,45 @@ export class BenchmarkHarness {
             // previouslyEligible from every question eligible by the catch-up
             // cutoff. Without this, the first uncached range would see those
             // prior-checkpoint questions as "new" instead of historical.
+            //
+            // skipCatchupIngest=true is for adapters that preserve their
+            // memory state across runs (e.g., Loki with WipeOnSetup=false).
+            // The partition already holds the cached checkpoints' ingest, so
+            // we just need to advance the cursor and seed previouslyEligible
+            // — re-ingesting would duplicate.
             if (resumeCutoffDay > 0) {
-                const catchUpStart = Date.now();
-                let catchUpCount = 0;
-                for (const day of dataset.days) {
-                    if (day.dayNumber > lastIngestedDay && day.dayNumber <= resumeCutoffDay) {
-                        await this.adapter.ingestDay(day.dayNumber, day.content, day.metadata);
-                        catchUpCount++;
+                if (this.config.skipCatchupIngest) {
+                    lastIngestedDay = resumeCutoffDay;
+                    const resumeRange: TimeRange = { label: `resume-${resumeCutoffDay}d`, days: resumeCutoffDay };
+                    for (const qa of filterQAByRange(dataset.qaPairs, resumeRange)) {
+                        previouslyEligible.add(qa.id);
                     }
+                    process.stderr.write(
+                        `  [bench] resume: skip-catchup mode — assuming adapter preserved state through day ${resumeCutoffDay}; ` +
+                            `eval starting at first range after that\n`,
+                    );
+                } else {
+                    const catchUpStart = Date.now();
+                    let catchUpCount = 0;
+                    for (const day of dataset.days) {
+                        if (day.dayNumber > lastIngestedDay && day.dayNumber <= resumeCutoffDay) {
+                            await this.adapter.ingestDay(day.dayNumber, day.content, day.metadata);
+                            catchUpCount++;
+                        }
+                    }
+                    await this.adapter.finalizeIngestion();
+                    const catchUpMs = Date.now() - catchUpStart;
+                    totalIngestionMs += catchUpMs;
+                    lastIngestedDay = resumeCutoffDay;
+                    const resumeRange: TimeRange = { label: `resume-${resumeCutoffDay}d`, days: resumeCutoffDay };
+                    for (const qa of filterQAByRange(dataset.qaPairs, resumeRange)) {
+                        previouslyEligible.add(qa.id);
+                    }
+                    process.stderr.write(
+                        `  [bench] resume: catch-up ingested ${catchUpCount} day(s) in ${(catchUpMs / 1000).toFixed(1)}s; ` +
+                            `eval starting at first range after day ${resumeCutoffDay}\n`,
+                    );
                 }
-                await this.adapter.finalizeIngestion();
-                const catchUpMs = Date.now() - catchUpStart;
-                totalIngestionMs += catchUpMs;
-                lastIngestedDay = resumeCutoffDay;
-                const resumeRange: TimeRange = { label: `resume-${resumeCutoffDay}d`, days: resumeCutoffDay };
-                for (const qa of filterQAByRange(dataset.qaPairs, resumeRange)) {
-                    previouslyEligible.add(qa.id);
-                }
-                process.stderr.write(
-                    `  [bench] resume: catch-up ingested ${catchUpCount} day(s) in ${(catchUpMs / 1000).toFixed(1)}s; ` +
-                        `eval starting at first range after day ${resumeCutoffDay}\n`,
-                );
             }
 
             const totalCheckpoints = orderedRanges.length;

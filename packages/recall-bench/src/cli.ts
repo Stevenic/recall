@@ -52,6 +52,7 @@ program
     .option('--no-question-log', 'Disable per-question logging entirely.')
     .option('--progress-jsonl <path>', 'Stream per-checkpoint progress (header + one record per checkpoint + summary) as JSON lines. Lets the heatmap script render an in-flight view. Default: <dir-of-json-out>/progress.jsonl.')
     .option('--resume <path>', 'Resume a previously-interrupted run by reading checkpoint records from this JSONL file. Cached ranges skip their eval phase; the adapter still re-ingests the corpus up to the cached cutoff so subsequent uncached ranges see the right state. Typically the same path as --progress-jsonl from the prior run.')
+    .option('--skip-catchup-ingest', "Skip the catch-up re-ingest on resume. Use when the adapter preserves memory state across runs (e.g., Loki with Recall:WipeOnSetup=false). Without this flag the harness re-ingests every day up to the resume cutoff, doubling data on adapters that don't wipe.")
     .option('--personas <ids...>', 'Persona IDs to benchmark (default: all)')
     .option('--arcs <filename>', 'Arcs file inside each persona dir; pairs memories/qa dirs to load. Default: arcs-1000d.yaml. Use arcs-180d.yaml for the 180-day variant.')
     .option('--ranges <ranges...>', 'Time-range checkpoints. Each entry is a day count or named alias: 30, 30d, 6mo, 1y, full. Pass several to build a multi-checkpoint heatmap (e.g. --ranges 6d,12d,18d,24d).', parseRanges)
@@ -188,6 +189,9 @@ program
         // Resume from a prior run's progress JSONL when --resume is given.
         if (opts.resume) {
             config.resumeFromJsonlPath = resolve(opts.resume);
+        }
+        if (opts.skipCatchupIngest) {
+            config.skipCatchupIngest = true;
         }
 
         const harness = new BenchmarkHarness(adapter, judge, dataDir, config);

@@ -622,6 +622,15 @@ export interface HarnessConfig {
      */
     resumeFromJsonlPath?: string;
     /**
+     * When true, skip the catch-up ingest phase on resume. Use this when
+     * the adapter preserves its memory state across runs (e.g., the Loki
+     * adapter with `Recall:WipeOnSetup=false`) so the partition already
+     * holds the cached checkpoints' ingest. Without this flag the harness
+     * re-ingests every day up to the resume cutoff, doubling data on
+     * adapters that don't wipe.
+     */
+    skipCatchupIngest?: boolean;
+    /**
      * When true, stop after the first checkpoint of the first persona —
      * a dry-run mode for catching startup / wiring errors without paying
      * for the full sweep. Useful as a quick sanity check after harness or
