@@ -149,3 +149,9 @@ vite.config.ts.timestamp-*
 # Bench draft runs — scratch/in-progress results not yet promoted to a
 # committed per-system folder under bench-results/<system>/.
 bench-results/drafts/
+
+# Loki — anything with "loki" in the path. Loki is Microsoft-internal;
+# nothing with that name should land in this public repo (profiles, run
+# outputs, adapter scratch, etc.).
+*loki*
+*Loki*
