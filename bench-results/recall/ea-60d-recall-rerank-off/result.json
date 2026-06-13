@@ -1,0 +1,449 @@
+{
+  "timestamp": "2026-05-25T09:43:06.085Z",
+  "adapterName": "Recall (dreaming)+agent",
+  "ranges": [
+    {
+      "label": "6d",
+      "days": 6
+    },
+    {
+      "label": "12d",
+      "days": 12
+    },
+    {
+      "label": "18d",
+      "days": 18
+    },
+    {
+      "label": "24d",
+      "days": 24
+    },
+    {
+      "label": "30d",
+      "days": 30
+    },
+    {
+      "label": "36d",
+      "days": 36
+    },
+    {
+      "label": "42d",
+      "days": 42
+    },
+    {
+      "label": "48d",
+      "days": 48
+    },
+    {
+      "label": "54d",
+      "days": 54
+    },
+    {
+      "label": "60d",
+      "days": 60
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "executive-assistant",
+      "adapterName": "Recall (dreaming)+agent",
+      "rangeResults": [
+        {
+          "range": {
+            "label": "6d",
+            "days": 6
+          },
+          "daysIngested": 6,
+          "questionsEvaluated": 6,
+          "overallScore": 5,
+          "categoryScores": [
+            {
+              "category": "factual-recall",
+              "meanScore": 4.8,
+              "questionCount": 5,
+              "scores": [
+                6,
+                0,
+                6,
+                6,
+                6
+              ],
+              "eligibleCount": 5
+            },
+            {
+              "category": "temporal-reasoning",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "decision-tracking",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "contradiction-resolution",
+              "meanScore": 6,
+              "questionCount": 1,
+              "scores": [
+                6
+              ],
+              "eligibleCount": 1
+            },
+            {
+              "category": "cross-reference",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "recency-bias-resistance",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "synthesis",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "negative-recall",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "group-session-attribution",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "information-boundary",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            }
+          ],
+          "difficultyScores": {
+            "easy": {
+              "mean": 6,
+              "count": 4
+            },
+            "medium": {
+              "mean": 3,
+              "count": 2
+            },
+            "hard": {
+              "mean": 0,
+              "count": 0
+            }
+          },
+          "hallucinationRate": 16.666666666666664,
+          "questionResults": [
+            {
+              "qa": {
+                "id": "executive-assistant-q002",
+                "question": "What briefing time was treated as the stable target after the correction, and what was the reason for moving it earlier?",
+                "referenceAnswer": "6:30 AM, so it would land before Jamie checked her phone.",
+                "category": "contradiction-resolution",
+                "difficulty": "medium",
+                "relevantDays": [
+                  1,
+                  2
+                ]
+              },
+              "systemAnswer": "The stable target was **6:30 AM**. (Source: 2026-01-02)\n\nThe reason for moving it earlier was that Jamie wanted the briefing to **land before she checks her phone**. (Source: 2026-01-02)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly: 6:30 AM stable target, moved earlier so it lands before Jamie checks her phone."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3775
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q001",
+                "question": "On 2026-01-01, what was the initial assumption about Jamie’s morning briefing time before it was corrected?",
+                "referenceAnswer": "7:00 AM.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The initial assumption was that Jamie wanted a morning briefing at **7:00 AM**. (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; includes the initial 7:00 AM assumption and no unsupported factual claims beyond a citation marker."
+              },
+              "compositeScore": 6,
+              "latencyMs": 1888
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q005",
+                "question": "In the board-prep kickoff, what two board meetings were being planned, and what were their target dates?",
+                "referenceAnswer": "The Q1 board meeting targeted 2026-03-26, and the Q2 board meeting targeted 2026-06-19.",
+                "category": "factual-recall",
+                "difficulty": "medium",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "In the board-prep kickoff, the two board meetings being planned were:\n\n- the **Q1 board cycle / board meeting**\n- the **board-chair meeting**\n\nTheir target dates were **not yet fixed** in the kickoff notes; the record says the **board-prep relevance was noted for the Q1 board cycle**, and that the **first management presentation date was still pending** once calendars were reconciled. (Source: 2026-01-02)",
+              "score": {
+                "correctness": 0,
+                "completeness": 0,
+                "hallucination": 0,
+                "reasoning": "Wrong meetings and dates; board-prep kickoff explicitly set Q1 board 2026-03-26 and Q2 board 2026-06-19, while answer invents board-chair meeting."
+              },
+              "compositeScore": 0,
+              "latencyMs": 3412
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q006",
+                "question": "Which board member’s style was described as bottom-line-first, with no slides for items under $50M?",
+                "referenceAnswer": "Henry Whitfield.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "Henry Whitfield — his style was described as “bottom line first; no slides for items under $50M.” (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; includes the named board member and the style details, with only a citation marker added."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4111
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q003",
+                "question": "What were the standing family calendar blocks Jamie asked Jordan to protect from the start?",
+                "referenceAnswer": "Tuesday evenings for Riley’s basketball and Thursday mornings for Tess’s drop-off.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "Jamie asked Jordan to protect these standing family calendar blocks from the start:\n\n- **Tuesday evenings** — Riley’s basketball\n- **Thursday mornings** — Tess’s drop-off\n\n(Source: 2026-01-02)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; includes both protected blocks and no unsupported factual claims beyond a citation marker."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2113
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q004",
+                "question": "What was the codename for the bolt-on acquisition workstream?",
+                "referenceAnswer": "Condor.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The codename was **Project Condor**. (Source: 2026-01-06)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Correctly identifies Condor; 'Project' is extra but supported by memory, citation ignored."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2402
+            }
+          ]
+        }
+      ],
+      "heatmap": [
+        {
+          "range": "6d",
+          "category": "factual-recall",
+          "score": 4.8,
+          "questionCount": 5,
+          "eligibleCount": 5
+        },
+        {
+          "range": "6d",
+          "category": "temporal-reasoning",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "decision-tracking",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "contradiction-resolution",
+          "score": 6,
+          "questionCount": 1,
+          "eligibleCount": 1
+        },
+        {
+          "range": "6d",
+          "category": "cross-reference",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "recency-bias-resistance",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "synthesis",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "negative-recall",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "group-session-attribution",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "information-boundary",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        }
+      ],
+      "totalIngestionMs": 209745,
+      "totalQueryMs": 28824,
+      "uniqueQAPairCount": 316,
+      "totalEvalsRun": 6
+    }
+  ],
+  "heatmap": [
+    {
+      "range": "6d",
+      "category": "factual-recall",
+      "score": 4.8,
+      "questionCount": 5,
+      "eligibleCount": 5
+    },
+    {
+      "range": "6d",
+      "category": "temporal-reasoning",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "decision-tracking",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "contradiction-resolution",
+      "score": 6,
+      "questionCount": 1,
+      "eligibleCount": 1
+    },
+    {
+      "range": "6d",
+      "category": "cross-reference",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "recency-bias-resistance",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "synthesis",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "negative-recall",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "group-session-attribution",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "information-boundary",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    }
+  ],
+  "metadata": {
+    "durationMs": null,
+    "totalEvalsRun": 6,
+    "uniqueQAPairCount": 316,
+    "sample": 50,
+    "judgeMemoryWindow": 1,
+    "groupsEnabled": false,
+    "judgeModel": "azure:gpt-5.4-mini",
+    "appellateJudgeModel": "azure:gpt-5.4",
+    "appellateInvocations": 1,
+    "reconstructed": true,
+    "reconstructedCheckpoints": 1,
+    "reconstructedComplete": false
+  }
+}

@@ -1,0 +1,1696 @@
+{
+  "timestamp": "2026-05-25T09:07:28.578Z",
+  "adapterName": "Recall (dreaming)+agent",
+  "ranges": [
+    {
+      "label": "6d",
+      "days": 6
+    },
+    {
+      "label": "12d",
+      "days": 12
+    },
+    {
+      "label": "18d",
+      "days": 18
+    },
+    {
+      "label": "24d",
+      "days": 24
+    },
+    {
+      "label": "30d",
+      "days": 30
+    },
+    {
+      "label": "36d",
+      "days": 36
+    },
+    {
+      "label": "42d",
+      "days": 42
+    },
+    {
+      "label": "48d",
+      "days": 48
+    },
+    {
+      "label": "54d",
+      "days": 54
+    },
+    {
+      "label": "60d",
+      "days": 60
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "executive-assistant",
+      "adapterName": "Recall (dreaming)+agent",
+      "rangeResults": [
+        {
+          "range": {
+            "label": "6d",
+            "days": 6
+          },
+          "daysIngested": 6,
+          "questionsEvaluated": 6,
+          "overallScore": 6,
+          "categoryScores": [
+            {
+              "category": "factual-recall",
+              "meanScore": 6,
+              "questionCount": 5,
+              "scores": [
+                6,
+                6,
+                6,
+                6,
+                6
+              ],
+              "eligibleCount": 5
+            },
+            {
+              "category": "temporal-reasoning",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "decision-tracking",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "contradiction-resolution",
+              "meanScore": 6,
+              "questionCount": 1,
+              "scores": [
+                6
+              ],
+              "eligibleCount": 1
+            },
+            {
+              "category": "cross-reference",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "recency-bias-resistance",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "synthesis",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "negative-recall",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "group-session-attribution",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "information-boundary",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            }
+          ],
+          "difficultyScores": {
+            "easy": {
+              "mean": 6,
+              "count": 4
+            },
+            "medium": {
+              "mean": 6,
+              "count": 2
+            },
+            "hard": {
+              "mean": 0,
+              "count": 0
+            }
+          },
+          "hallucinationRate": 0,
+          "questionResults": [
+            {
+              "qa": {
+                "id": "executive-assistant-q002",
+                "question": "What briefing time was treated as the stable target after the correction, and what was the reason for moving it earlier?",
+                "referenceAnswer": "6:30 AM, so it would land before Jamie checked her phone.",
+                "category": "contradiction-resolution",
+                "difficulty": "medium",
+                "relevantDays": [
+                  1,
+                  2
+                ]
+              },
+              "systemAnswer": "The stable target was **6:30 AM**. The reason for moving it earlier was that Jamie wanted the briefing to **land before she checked her phone**. (Source: 2026-01-02)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly: 6:30 AM and before Jamie checked her phone; citation is allowed."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3961
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q001",
+                "question": "On 2026-01-01, what was the initial assumption about Jamie’s morning briefing time before it was corrected?",
+                "referenceAnswer": "7:00 AM.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The initial assumption was that Jamie wanted a morning briefing at **7:00 AM** before it was corrected. (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; includes the initial 7:00 AM assumption and no unsupported factual claims."
+              },
+              "compositeScore": 6,
+              "latencyMs": 1731
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q005",
+                "question": "In the board-prep kickoff, what two board meetings were being planned, and what were their target dates?",
+                "referenceAnswer": "The Q1 board meeting targeted 2026-03-26, and the Q2 board meeting targeted 2026-06-19.",
+                "category": "factual-recall",
+                "difficulty": "medium",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The two board meetings being planned were:\n\n- **Q1 board meeting** — target date **2026-03-26**\n- **Q2 board meeting** — target date **2026-06-19** (Source: 2026-01-05)\n\nThe wiki also notes the Q1 meeting overlaps with **Q1 earnings on 2026-03-31**, and the Q2 meeting overlaps with **earnings plus budget sign-off**. (Source: 2026-05-25)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches both target meetings/dates; extra overlap details are supported by memory, citations are non-factual markers."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4055
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q006",
+                "question": "Which board member’s style was described as bottom-line-first, with no slides for items under $50M?",
+                "referenceAnswer": "Henry Whitfield.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "Henry Whitfield — his style was described as “bottom line first; no slides for items under $50M.” (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; includes the named board member and the described style, with only a citation marker."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2723
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q003",
+                "question": "What were the standing family calendar blocks Jamie asked Jordan to protect from the start?",
+                "referenceAnswer": "Tuesday evenings for Riley’s basketball and Thursday mornings for Tess’s drop-off.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "Jamie asked Jordan to protect these standing family calendar blocks from the start:\n\n- Tuesday evenings — Riley’s basketball\n- Thursday mornings — Tess’s drop-off\n\nHe also wanted the broader family calendar tracked separately, including Alex’s travel, Riley’s conferences/athletics, Tess’s school events, and family medical appointments. (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the two protected blocks exactly; extra family items are supported by memory and citation is non-factual."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3618
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q004",
+                "question": "What was the codename for the bolt-on acquisition workstream?",
+                "referenceAnswer": "Condor.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The codename was **Project Condor**. (Source: 2026-01-06)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Correctly identifies Condor; 'Project' is extra but supported, and the citation marker is ignored."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2410
+            }
+          ]
+        },
+        {
+          "range": {
+            "label": "12d",
+            "days": 12
+          },
+          "daysIngested": 12,
+          "questionsEvaluated": 12,
+          "overallScore": 5.5,
+          "categoryScores": [
+            {
+              "category": "factual-recall",
+              "meanScore": 5.333333333333333,
+              "questionCount": 9,
+              "scores": [
+                6,
+                6,
+                0,
+                6,
+                6,
+                6,
+                6,
+                6,
+                6
+              ],
+              "eligibleCount": 9
+            },
+            {
+              "category": "temporal-reasoning",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "decision-tracking",
+              "meanScore": 6,
+              "questionCount": 2,
+              "scores": [
+                6,
+                6
+              ],
+              "eligibleCount": 2
+            },
+            {
+              "category": "contradiction-resolution",
+              "meanScore": 6,
+              "questionCount": 1,
+              "scores": [
+                6
+              ],
+              "eligibleCount": 1
+            },
+            {
+              "category": "cross-reference",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "recency-bias-resistance",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "synthesis",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "negative-recall",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "group-session-attribution",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "information-boundary",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            }
+          ],
+          "difficultyScores": {
+            "easy": {
+              "mean": 6,
+              "count": 7
+            },
+            "medium": {
+              "mean": 4.8,
+              "count": 5
+            },
+            "hard": {
+              "mean": 0,
+              "count": 0
+            }
+          },
+          "hallucinationRate": 8.333333333333332,
+          "questionResults": [
+            {
+              "qa": {
+                "id": "executive-assistant-q009",
+                "question": "What financing structure was being kept in the Condor thread?",
+                "referenceAnswer": "A $250M senior secured term loan, up to a $50M revolver, with the remainder funded from Mosaic liquidity and operating cash.",
+                "category": "factual-recall",
+                "difficulty": "medium",
+                "relevantDays": [
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "systemAnswer": "The Condor thread was keeping a financing structure of:\n\n- senior secured term loan: **$250M**\n- revolver support: **up to $50M**\n- equity / cash balance: remainder from Mosaic liquidity and operating cash\n- target leverage post-close: **~2.8x net debt / EBITDA** (Source: 2026-01-05)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the reference and adds only supported leverage detail from memory; citation marker is not a hallucination."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4886
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q007",
+                "question": "What was the working valuation range for Project Condor, and what was the walkaway floor?",
+                "referenceAnswer": "The purchase-price range was $420M to $475M EV, and the walkaway floor was $490M EV.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "systemAnswer": "Project Condor’s working valuation range was **$420M–$475M EV**, and the walkaway floor was **do not exceed $490M EV**. (Source: 2026-01-03)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly; citation marker is allowed and not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4565
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q012",
+                "question": "What was the Condor approach posture on 2026-01-07?",
+                "referenceAnswer": "Quiet, banker-led outreach only, with no executive-to-executive contact until the NDA was fully in place and Rashid cleared the contact protocol.",
+                "category": "decision-tracking",
+                "difficulty": "medium",
+                "relevantDays": [
+                  7
+                ]
+              },
+              "systemAnswer": "On 2026-01-07, Condor’s approach posture was **quiet, banker-led outreach only**, with **no executive-to-executive contact until the NDA was fully in place and Rashid cleared the contact protocol**. It was framed as a **strategic bolt-on, not a platform re-underwrite**. (Source: 2026-01-07)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly; added only supported framing plus a citation marker."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4820
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q005",
+                "question": "In the board-prep kickoff, what two board meetings were being planned, and what were their target dates?",
+                "referenceAnswer": "The Q1 board meeting targeted 2026-03-26, and the Q2 board meeting targeted 2026-06-19.",
+                "category": "factual-recall",
+                "difficulty": "medium",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "In the board-prep kickoff, the two board meetings being planned were:\n\n- the **Q1 board cycle / Q1 board pre-read**\n- the **Q1 board agenda** itself\n\nThe target dates were **not specified as exact calendar dates** in the materials I checked; they were framed as **Q1** items, with inclusion still pending at the kickoff stage. By 2026-01-12, Condor was explicitly on the Q1 board agenda. (Source: 2026-01-06; 2026-01-12)",
+              "score": {
+                "correctness": 0,
+                "completeness": 0,
+                "hallucination": 0,
+                "reasoning": "Misses both planned meetings and denies dates despite memory giving Q1 2026-03-26 and Q2 2026-06-19; adds unsupported Jan 6/12 claims."
+              },
+              "compositeScore": 0,
+              "latencyMs": 4247
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q004",
+                "question": "What was the codename for the bolt-on acquisition workstream?",
+                "referenceAnswer": "Condor.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The codename was **Project Condor**. (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Correctly identifies Condor; extra 'Project' is supported by memory and citation is non-factual."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3165
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q006",
+                "question": "Which board member’s style was described as bottom-line-first, with no slides for items under $50M?",
+                "referenceAnswer": "Henry Whitfield.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "Henry Whitfield — his style was described as “bottom line first; no slides for items under $50M.” (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; includes the named board member and the described style, with only a citation marker added."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4444
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q010",
+                "question": "Which Condor issue was treated as a gating diligence item because it could affect the deal path?",
+                "referenceAnswer": "The change-of-control consent issue on one strategic customer contract.",
+                "category": "decision-tracking",
+                "difficulty": "medium",
+                "relevantDays": [
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "systemAnswer": "The gating diligence issue was the **change-of-control consent on a strategic customer contract**. It was treated as the clearest issue that could affect the deal path. (Source: 2026-01-05)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the reference exactly; source citation is bookkeeping, not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3439
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q008",
+                "question": "What were the base and stretch synergy assumptions for Condor?",
+                "referenceAnswer": "The base case was $18M annual run-rate cost synergies, and the stretch case was $26M annual run-rate.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "systemAnswer": "For Condor, the synergy assumptions were:\n\n- **Base case:** **$18M annual run-rate cost synergies**\n- **Stretch case:** **up to $26M annual run-rate**  \n- Revenue synergies were kept **de-emphasized** until customer overlap and retention were validated. (Source: 2026-01-06)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the reference exactly and adds only grounded context about revenue synergies."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4584
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q001",
+                "question": "On 2026-01-01, what was the initial assumption about Jamie’s morning briefing time before it was corrected?",
+                "referenceAnswer": "7:00 AM.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The initial assumption was that Jamie wanted a morning briefing at **7:00 AM** before it was corrected to 6:30 AM. (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; includes the corrected 6:30 AM context and cites a date marker only."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2477
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q003",
+                "question": "What were the standing family calendar blocks Jamie asked Jordan to protect from the start?",
+                "referenceAnswer": "Tuesday evenings for Riley’s basketball and Thursday mornings for Tess’s drop-off.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "Jamie asked Jordan to protect two standing family calendar blocks from the start: **Tuesday evenings for Riley’s basketball** and **Thursday mornings for Tess’s drop-off**. (Source: 2026-01-01)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; includes both protected blocks and no unsupported factual claims."
+              },
+              "compositeScore": 6,
+              "latencyMs": 5424
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q011",
+                "question": "What was the real target identity for Condor recorded on 2026-01-07?",
+                "referenceAnswer": "Northstar Components, Inc.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  7
+                ]
+              },
+              "systemAnswer": "The real target identity for Condor recorded on 2026-01-07 was **Northstar Components, Inc.** (Source: 2026-01-07)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly; citation marker is allowed and not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4640
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q002",
+                "question": "What briefing time was treated as the stable target after the correction, and what was the reason for moving it earlier?",
+                "referenceAnswer": "6:30 AM, so it would land before Jamie checked her phone.",
+                "category": "contradiction-resolution",
+                "difficulty": "medium",
+                "relevantDays": [
+                  1,
+                  2
+                ]
+              },
+              "systemAnswer": "The stable target after the correction was **6:30 AM** for Jamie’s weekday briefing. The earlier **7:00 AM** time was treated as a resolved wrong belief, not a live option. (Source: 2026-01-06)\n\nThe reason for moving it earlier was that the model was corrected to match Jamie’s observed behavior and the earlier assumption was explicitly marked as wrong; the memory says to “treat the earlier 7:00 AM habit as a resolved wrong belief” and keep the corrected time locked at 6:30 AM. (Source: 2026-01-06)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches 6:30 AM and the reason; citation date is bookkeeping, not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 5384
+            }
+          ]
+        },
+        {
+          "range": {
+            "label": "18d",
+            "days": 18
+          },
+          "daysIngested": 18,
+          "questionsEvaluated": 21,
+          "overallScore": 5.0476190476190474,
+          "categoryScores": [
+            {
+              "category": "factual-recall",
+              "meanScore": 5,
+              "questionCount": 12,
+              "scores": [
+                6,
+                6,
+                6,
+                6,
+                6,
+                6,
+                0,
+                6,
+                6,
+                6,
+                6,
+                0
+              ],
+              "eligibleCount": 12
+            },
+            {
+              "category": "temporal-reasoning",
+              "meanScore": 6,
+              "questionCount": 1,
+              "scores": [
+                6
+              ],
+              "eligibleCount": 1
+            },
+            {
+              "category": "decision-tracking",
+              "meanScore": 4,
+              "questionCount": 3,
+              "scores": [
+                0,
+                6,
+                6
+              ],
+              "eligibleCount": 3
+            },
+            {
+              "category": "contradiction-resolution",
+              "meanScore": 6,
+              "questionCount": 2,
+              "scores": [
+                6,
+                6
+              ],
+              "eligibleCount": 2
+            },
+            {
+              "category": "cross-reference",
+              "meanScore": 4,
+              "questionCount": 1,
+              "scores": [
+                4
+              ],
+              "eligibleCount": 1
+            },
+            {
+              "category": "recency-bias-resistance",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "synthesis",
+              "meanScore": 6,
+              "questionCount": 1,
+              "scores": [
+                6
+              ],
+              "eligibleCount": 1
+            },
+            {
+              "category": "negative-recall",
+              "meanScore": 6,
+              "questionCount": 1,
+              "scores": [
+                6
+              ],
+              "eligibleCount": 1
+            },
+            {
+              "category": "group-session-attribution",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            },
+            {
+              "category": "information-boundary",
+              "meanScore": 0,
+              "questionCount": 0,
+              "scores": [],
+              "eligibleCount": 0
+            }
+          ],
+          "difficultyScores": {
+            "easy": {
+              "mean": 4.909090909090909,
+              "count": 11
+            },
+            "medium": {
+              "mean": 5.2,
+              "count": 10
+            },
+            "hard": {
+              "mean": 0,
+              "count": 0
+            }
+          },
+          "hallucinationRate": 19.047619047619047,
+          "questionResults": [
+            {
+              "qa": {
+                "id": "executive-assistant-q022",
+                "question": "What financing structure did Jordan record for Project Condor, and what was the target leverage ceiling?",
+                "referenceAnswer": "A mix of cash on hand and new term debt, with a target leverage ceiling of 3.2x net debt / EBITDA pro forma at close.",
+                "category": "decision-tracking",
+                "difficulty": "medium",
+                "relevantDays": [
+                  14
+                ]
+              },
+              "systemAnswer": "Jordan recorded Project Condor financing as a **$250M senior secured term loan**, **up to $50M revolver support**, with the remainder from **Mosaic liquidity and operating cash**. The **target leverage ceiling** was **approximately 2.8x net debt / EBITDA**. (Source: 2026-01-05)",
+              "score": {
+                "correctness": 0,
+                "completeness": 0,
+                "hallucination": 0,
+                "reasoning": "Answer contradicts memory: financing was cash on hand + new term debt, leverage 3.2x; added unsupported loan/revolver/Mosaic/2.8x details."
+              },
+              "compositeScore": 0,
+              "latencyMs": 6017
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q003",
+                "question": "What were the standing family calendar blocks Jamie asked Jordan to protect from the start?",
+                "referenceAnswer": "Tuesday evenings for Riley’s basketball and Thursday mornings for Tess’s drop-off.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The standing family calendar blocks were:\n\n- Tuesday evenings for Riley’s basketball\n- Thursday mornings for Tess’s drop-off\n\n(Source: 2026-01-03)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory exactly; citation marker is allowed and not treated as a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3412
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q013",
+                "question": "What morning briefing time did Jordan treat as the standing rule for Jamie on 2026-01-14?",
+                "referenceAnswer": "6:30 AM on weekdays.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  14
+                ]
+              },
+              "systemAnswer": "Jordan treated **6:30 AM** as Jamie’s standing morning briefing time on 2026-01-14. (Source: 2026-01-14)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly; source citation is allowed and not a factual hallucination."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2730
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q020",
+                "question": "What indicative purchase-price range and walkaway floor were recorded for Project Condor on 2026-01-14?",
+                "referenceAnswer": "The indicative purchase-price range was $620M to $760M enterprise value, and the walkaway floor was $650M enterprise value.",
+                "category": "factual-recall",
+                "difficulty": "medium",
+                "relevantDays": [
+                  14
+                ]
+              },
+              "systemAnswer": "On 2026-01-14, Project Condor’s working numbers were:\n\n- **Indicative purchase-price range:** **$620M to $760M enterprise value**\n- **Walkaway valuation floor:** **$650M enterprise value**  \n(Source: 2026-01-14)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the recorded range and floor exactly; source citation is allowed and not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3581
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q006",
+                "question": "Which board member’s style was described as bottom-line-first, with no slides for items under $50M?",
+                "referenceAnswer": "Henry Whitfield.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "Henry Whitfield. The style was described as bottom-line-first, with no slides for items under $50M. (Source: 2026-01-13)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Correctly names Henry Whitfield and includes the full described style; citation marker is allowed."
+              },
+              "compositeScore": 6,
+              "latencyMs": 6993
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q016",
+                "question": "Which board member did Jordan continue to model as wanting the bottom line first and one cap-allocation question first?",
+                "referenceAnswer": "Henry Whitfield.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  14
+                ]
+              },
+              "systemAnswer": "Henry Whitfield. (Source: 2026-01-12)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly; source date is citation metadata, not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4820
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q014",
+                "question": "What was the next authorization step after Jamie’s onboarding read-only access in the relationship ladder?",
+                "referenceAnswer": "Send-on-behalf for routine logistics email at the end of January.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  14
+                ]
+              },
+              "systemAnswer": "The next authorization step after Jamie’s onboarding read-only access was **send-on-behalf for routine logistics email**. (Source: 2026-01-18)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the ladder exactly; extra source date is citation metadata, not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2574
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q023",
+                "question": "Which family calendar blocks remained hard-blocked throughout days 8–14?",
+                "referenceAnswer": "Riley Park’s Tuesday evenings for basketball and Tess Park’s Thursday mornings for drop-off.",
+                "category": "negative-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14
+                ]
+              },
+              "systemAnswer": "The family calendar blocks that remained hard-blocked throughout days 8–14 were:\n\n- **Tuesday evenings** — Riley’s basketball\n- **Thursday mornings** — Tess’s drop-off\n\n(Source: 2026-01-09)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the hard-blocked family constraints; citation marker is allowed and not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 4910
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q019",
+                "question": "What target identity did Jordan confirm for Project Condor?",
+                "referenceAnswer": "Northstar Gridworks, Inc.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  12,
+                  13,
+                  14
+                ]
+              },
+              "systemAnswer": "Jordan confirmed that Project Condor’s target identity was **Northstar Components, Inc.** (Source: 2026-01-07)",
+              "score": {
+                "correctness": 0,
+                "completeness": 0,
+                "hallucination": 0,
+                "reasoning": "Answer gives wrong target name; memory repeatedly says Northstar Gridworks, Inc., and 'Northstar Components, Inc.' is unsupported."
+              },
+              "compositeScore": 0,
+              "latencyMs": 6620
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q002",
+                "question": "What briefing time was treated as the stable target after the correction, and what was the reason for moving it earlier?",
+                "referenceAnswer": "6:30 AM, so it would land before Jamie checked her phone.",
+                "category": "contradiction-resolution",
+                "difficulty": "medium",
+                "relevantDays": [
+                  1,
+                  2
+                ]
+              },
+              "systemAnswer": "The stable target was **6:30 AM weekday briefing**. (Source: 2026-01-02)\n\nThe reason for moving it earlier was to **make sure the briefing lands before Jamie checks her phone**. (Source: 2026-01-02)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly: 6:30 AM stable target, moved earlier so it lands before Jamie checks her phone."
+              },
+              "compositeScore": 6,
+              "latencyMs": 5877
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q010",
+                "question": "Which Condor issue was treated as a gating diligence item because it could affect the deal path?",
+                "referenceAnswer": "The change-of-control consent issue on one strategic customer contract.",
+                "category": "decision-tracking",
+                "difficulty": "medium",
+                "relevantDays": [
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "systemAnswer": "The gating diligence item was the **change-of-control consent issue on one strategic customer contract**. It was treated as gating because it could affect the deal path. (Source: 2026-01-06)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the reference exactly; source citation is allowed and no unsupported facts added."
+              },
+              "compositeScore": 6,
+              "latencyMs": 5244
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q018",
+                "question": "What was the latest status of Project Condor on 2026-01-14?",
+                "referenceAnswer": "NDA executed; diligence kickoff in progress.",
+                "category": "contradiction-resolution",
+                "difficulty": "easy",
+                "relevantDays": [
+                  14
+                ]
+              },
+              "systemAnswer": "On 2026-01-14, Project Condor was still in **diligence kickoff / early diligence** posture, with the target identity, valuation range, and synergy assumptions kept isolated inside the Condor thread. The latest Condor-specific update that day also kept the working numbers unchanged and did **not** authorize broader circulation or lender outreach. (Source: 2026-01-14)\n\nIf you want, I can also summarize the exact Condor numbers recorded on that date.",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the reference; adds supported detail from memory and includes a citation marker only."
+              },
+              "compositeScore": 6,
+              "latencyMs": 6059
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q024",
+                "question": "What school and medical items were kept in the private family plan by 2026-01-14?",
+                "referenceAnswer": "Riley parent conference on 2026-01-23, Riley winter athletics banquet on 2026-02-06, Tess winter showcase on 2026-01-30, Tess parent-teacher conference on 2026-02-04, Jamie annual physical on 2026-01-14, Tess dentist on 2026-01-20, and Alex follow-up on 2026-01-22.",
+                "category": "synthesis",
+                "difficulty": "medium",
+                "relevantDays": [
+                  9,
+                  12,
+                  13,
+                  14
+                ]
+              },
+              "systemAnswer": "By 2026-01-14, the private family plan kept these school and medical items on file:\n\n- Riley middle-school parent conference — 2026-01-23, 3:30–4:15 PM\n- Riley winter athletics banquet — 2026-02-06, 6:00–7:30 PM\n- Tess winter showcase — 2026-01-30, 9:00–10:00 AM\n- Tess parent-teacher conference — 2026-02-04, 8:15–8:45 AM\n- Jamie annual physical — 2026-01-14, 7:30 AM\n- Tess dentist — 2026-01-20, 4:00 PM\n- Alex follow-up — 2026-01-22, 1:15 PM\n\nThe school items were the Riley parent conference, Riley winter athletics banquet, Tess winter showcase, and Tess parent-teacher conference; the medical items were Jamie annual physical, Tess dentist, and Alex follow-up. (Source: 2026-01-14)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches all listed items; adds times and a source citation, both supported/allowed."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3457
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q004",
+                "question": "What was the codename for the bolt-on acquisition workstream?",
+                "referenceAnswer": "Condor.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The bolt-on acquisition workstream was codenamed **Project Condor**. (Source: 2026-01-06)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches memory: the bolt-on acquisition codename was Condor/Project Condor; citation marker is allowed."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2389
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q017",
+                "question": "What board-member communication preferences were recorded for Gloria Stanton and Vikram Mehta in the learning arc?",
+                "referenceAnswer": "Gloria Stanton reads every footnote, and Vikram Mehta probes incentive design.",
+                "category": "cross-reference",
+                "difficulty": "medium",
+                "relevantDays": [
+                  12,
+                  13,
+                  14
+                ]
+              },
+              "systemAnswer": "For the learning arc, the recorded communication preferences were:\n\n- **Gloria Stanton:** reads every footnote; likely to probe control/accounting details.  \n- **Vikram Mehta:** probes incentive design.  \n\n(Source: 2026-01-15)",
+              "score": {
+                "correctness": 2,
+                "completeness": 2,
+                "hallucination": 0,
+                "reasoning": "Gets Gloria and Vikram core prefs right, but adds unsupported detail that Gloria likely probes control/accounting details."
+              },
+              "compositeScore": 4,
+              "latencyMs": 3732
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q011",
+                "question": "What was the real target identity for Condor recorded on 2026-01-07?",
+                "referenceAnswer": "Northstar Components, Inc.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  7
+                ]
+              },
+              "systemAnswer": "The real target identity for Condor recorded on 2026-01-07 was **Northstar Components, Inc.** (Source: 2026-01-07)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly; citation marker is allowed and not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 3174
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q015",
+                "question": "As of 2026-01-14, what was the Q1 board meeting targeted for, and what major event overlapped it?",
+                "referenceAnswer": "The Q1 board was targeted for around 2026-03-26, and it overlapped with Q1 earnings on 2026-03-31.",
+                "category": "temporal-reasoning",
+                "difficulty": "medium",
+                "relevantDays": [
+                  14
+                ]
+              },
+              "systemAnswer": "As of 2026-01-14, the Q1 board meeting was targeted for **around 2026-03-26**, and it was **overlapping Q1 earnings on 2026-03-31**. (Source: 2026-01-14)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the memory exactly; citation marker is allowed and not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 5213
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q012",
+                "question": "What was the Condor approach posture on 2026-01-07?",
+                "referenceAnswer": "Quiet, banker-led outreach only, with no executive-to-executive contact until the NDA was fully in place and Rashid cleared the contact protocol.",
+                "category": "decision-tracking",
+                "difficulty": "medium",
+                "relevantDays": [
+                  7
+                ]
+              },
+              "systemAnswer": "On 2026-01-07, Condor’s approach posture was **quiet, banker-led outreach only; no executive-to-executive contact until the NDA was fully in place and Rashid cleared the contact protocol**. It was framed as a **strategic bolt-on, not a platform re-underwrite**. (Source: 2026-01-07)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches reference exactly; extra bolt-on framing is supported by memory and citation is non-factual."
+              },
+              "compositeScore": 6,
+              "latencyMs": 2534
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q005",
+                "question": "In the board-prep kickoff, what two board meetings were being planned, and what were their target dates?",
+                "referenceAnswer": "The Q1 board meeting targeted 2026-03-26, and the Q2 board meeting targeted 2026-06-19.",
+                "category": "factual-recall",
+                "difficulty": "medium",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The two board meetings were:\n\n- the **Q1 board meeting**, targeted around **2026-03-26**\n- the **Q2 board meeting**, targeted around **2026-06-19** (Source: 2026-05-25)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches both meetings and dates; extra source citation is allowed and not a factual claim."
+              },
+              "compositeScore": 6,
+              "latencyMs": 6778
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q021",
+                "question": "What were the base-case and upside synergy assumptions for Project Condor?",
+                "referenceAnswer": "Base case was $28M annual run-rate EBITDA synergies, and upside case was $38M annual run-rate EBITDA synergies.",
+                "category": "factual-recall",
+                "difficulty": "medium",
+                "relevantDays": [
+                  14
+                ]
+              },
+              "systemAnswer": "Project Condor’s synergy assumptions were:\n\n- **Base-case:** **$28M annual run-rate EBITDA synergies**\n- **Upside case:** **$38M annual run-rate EBITDA synergies**\n\nThe model assumed most cost synergies would be realized over **12 to 18 months post-close**. (Source: 2026-01-15)",
+              "score": {
+                "correctness": 3,
+                "completeness": 2,
+                "hallucination": 1,
+                "reasoning": "Matches the reference exactly and adds only grounded timing detail from memory."
+              },
+              "compositeScore": 6,
+              "latencyMs": 5188
+            },
+            {
+              "qa": {
+                "id": "executive-assistant-q001",
+                "question": "On 2026-01-01, what was the initial assumption about Jamie’s morning briefing time before it was corrected?",
+                "referenceAnswer": "7:00 AM.",
+                "category": "factual-recall",
+                "difficulty": "easy",
+                "relevantDays": [
+                  1
+                ]
+              },
+              "systemAnswer": "The initial assumption on 2026-01-01 was that Jamie’s morning briefing would be **earlier than 6:30 AM**; it was later corrected to **6:30 AM**. (Source: 2026-01-03)",
+              "score": {
+                "correctness": 0,
+                "completeness": 0,
+                "hallucination": 0,
+                "reasoning": "Memory says initial assumption was 7:00 AM; answer says earlier than 6:30 AM and cites unsupported correction context."
+              },
+              "compositeScore": 0,
+              "latencyMs": 2463
+            }
+          ]
+        }
+      ],
+      "heatmap": [
+        {
+          "range": "6d",
+          "category": "factual-recall",
+          "score": 6,
+          "questionCount": 5,
+          "eligibleCount": 5
+        },
+        {
+          "range": "6d",
+          "category": "temporal-reasoning",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "decision-tracking",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "contradiction-resolution",
+          "score": 6,
+          "questionCount": 1,
+          "eligibleCount": 1
+        },
+        {
+          "range": "6d",
+          "category": "cross-reference",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "recency-bias-resistance",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "synthesis",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "negative-recall",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "group-session-attribution",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "6d",
+          "category": "information-boundary",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "12d",
+          "category": "factual-recall",
+          "score": 5.333333333333333,
+          "questionCount": 9,
+          "eligibleCount": 9
+        },
+        {
+          "range": "12d",
+          "category": "temporal-reasoning",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "12d",
+          "category": "decision-tracking",
+          "score": 6,
+          "questionCount": 2,
+          "eligibleCount": 2
+        },
+        {
+          "range": "12d",
+          "category": "contradiction-resolution",
+          "score": 6,
+          "questionCount": 1,
+          "eligibleCount": 1
+        },
+        {
+          "range": "12d",
+          "category": "cross-reference",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "12d",
+          "category": "recency-bias-resistance",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "12d",
+          "category": "synthesis",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "12d",
+          "category": "negative-recall",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "12d",
+          "category": "group-session-attribution",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "12d",
+          "category": "information-boundary",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "18d",
+          "category": "factual-recall",
+          "score": 5,
+          "questionCount": 12,
+          "eligibleCount": 12
+        },
+        {
+          "range": "18d",
+          "category": "temporal-reasoning",
+          "score": 6,
+          "questionCount": 1,
+          "eligibleCount": 1
+        },
+        {
+          "range": "18d",
+          "category": "decision-tracking",
+          "score": 4,
+          "questionCount": 3,
+          "eligibleCount": 3
+        },
+        {
+          "range": "18d",
+          "category": "contradiction-resolution",
+          "score": 6,
+          "questionCount": 2,
+          "eligibleCount": 2
+        },
+        {
+          "range": "18d",
+          "category": "cross-reference",
+          "score": 4,
+          "questionCount": 1,
+          "eligibleCount": 1
+        },
+        {
+          "range": "18d",
+          "category": "recency-bias-resistance",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "18d",
+          "category": "synthesis",
+          "score": 6,
+          "questionCount": 1,
+          "eligibleCount": 1
+        },
+        {
+          "range": "18d",
+          "category": "negative-recall",
+          "score": 6,
+          "questionCount": 1,
+          "eligibleCount": 1
+        },
+        {
+          "range": "18d",
+          "category": "group-session-attribution",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        },
+        {
+          "range": "18d",
+          "category": "information-boundary",
+          "score": 0,
+          "questionCount": 0,
+          "eligibleCount": 0
+        }
+      ],
+      "totalIngestionMs": 1781165,
+      "totalQueryMs": 249430,
+      "uniqueQAPairCount": 316,
+      "totalEvalsRun": 39
+    }
+  ],
+  "heatmap": [
+    {
+      "range": "6d",
+      "category": "factual-recall",
+      "score": 6,
+      "questionCount": 5,
+      "eligibleCount": 5
+    },
+    {
+      "range": "6d",
+      "category": "temporal-reasoning",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "decision-tracking",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "contradiction-resolution",
+      "score": 6,
+      "questionCount": 1,
+      "eligibleCount": 1
+    },
+    {
+      "range": "6d",
+      "category": "cross-reference",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "recency-bias-resistance",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "synthesis",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "negative-recall",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "group-session-attribution",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "6d",
+      "category": "information-boundary",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "12d",
+      "category": "factual-recall",
+      "score": 5.333333333333333,
+      "questionCount": 9,
+      "eligibleCount": 9
+    },
+    {
+      "range": "12d",
+      "category": "temporal-reasoning",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "12d",
+      "category": "decision-tracking",
+      "score": 6,
+      "questionCount": 2,
+      "eligibleCount": 2
+    },
+    {
+      "range": "12d",
+      "category": "contradiction-resolution",
+      "score": 6,
+      "questionCount": 1,
+      "eligibleCount": 1
+    },
+    {
+      "range": "12d",
+      "category": "cross-reference",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "12d",
+      "category": "recency-bias-resistance",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "12d",
+      "category": "synthesis",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "12d",
+      "category": "negative-recall",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "12d",
+      "category": "group-session-attribution",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "12d",
+      "category": "information-boundary",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "18d",
+      "category": "factual-recall",
+      "score": 5,
+      "questionCount": 12,
+      "eligibleCount": 12
+    },
+    {
+      "range": "18d",
+      "category": "temporal-reasoning",
+      "score": 6,
+      "questionCount": 1,
+      "eligibleCount": 1
+    },
+    {
+      "range": "18d",
+      "category": "decision-tracking",
+      "score": 4,
+      "questionCount": 3,
+      "eligibleCount": 3
+    },
+    {
+      "range": "18d",
+      "category": "contradiction-resolution",
+      "score": 6,
+      "questionCount": 2,
+      "eligibleCount": 2
+    },
+    {
+      "range": "18d",
+      "category": "cross-reference",
+      "score": 4,
+      "questionCount": 1,
+      "eligibleCount": 1
+    },
+    {
+      "range": "18d",
+      "category": "recency-bias-resistance",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "18d",
+      "category": "synthesis",
+      "score": 6,
+      "questionCount": 1,
+      "eligibleCount": 1
+    },
+    {
+      "range": "18d",
+      "category": "negative-recall",
+      "score": 6,
+      "questionCount": 1,
+      "eligibleCount": 1
+    },
+    {
+      "range": "18d",
+      "category": "group-session-attribution",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    },
+    {
+      "range": "18d",
+      "category": "information-boundary",
+      "score": 0,
+      "questionCount": 0,
+      "eligibleCount": 0
+    }
+  ],
+  "metadata": {
+    "durationMs": null,
+    "totalEvalsRun": 39,
+    "uniqueQAPairCount": 316,
+    "sample": 50,
+    "judgeMemoryWindow": 1,
+    "groupsEnabled": false,
+    "judgeModel": "azure:gpt-5.4-mini",
+    "appellateJudgeModel": "azure:gpt-5.4",
+    "appellateInvocations": 5,
+    "reconstructed": true,
+    "reconstructedCheckpoints": 3,
+    "reconstructedComplete": false
+  }
+}
