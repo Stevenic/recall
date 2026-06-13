@@ -38,22 +38,22 @@ Recall Bench follows a three-phase evaluation loop:
 
 **Phase 2 — Querying.** The harness poses natural-language questions grounded in specific days. Questions are filtered per time-range so the system is only asked about information it has actually seen.
 
-**Phase 3 — Scoring.** A judge model compares each answer against a reference answer and scores it across the **8+1 dimensions** described in the next section.
+**Phase 3 — Scoring.** A judge model compares each answer against a reference answer, scores it along the **three judged dimensions**, and tags it with one of the **recall categories** described in the next section.
 
-## The 8+1 Dimensions
+## Scoring & Recall Categories
 
-Recall Bench measures memory quality along **eight recall dimensions** plus **one independent dimension** for hallucination. The eight dimensions describe *what kind of memory work* the question demands; the +1 describes *whether the answer is grounded in real memories at all*.
+Every answer is scored on three judged dimensions, which split into two independent axes: **recall quality** (was the answer right and complete?) and **hallucination** (was it grounded in real memories at all?). Each question is also tagged with exactly one **recall category** describing *what kind* of memory work it demands.
 
 ```
                 ┌─────────────────────────────────────┐
-                │   8 Recall Dimensions (per Q&A)     │
+                │   Recall quality (per Q&A)          │
                 │   correctness (0–3)                 │
                 │ + completeness (0–2)                │
                 │ → composite recall score (0–5)      │
                 └─────────────────────────────────────┘
                                   +
                 ┌─────────────────────────────────────┐
-                │   1 Hallucination Dimension         │
+                │   Hallucination (independent)       │
                 │   hallucination (0–1)               │
                 │   1 = grounded, 0 = fabricated      │
                 └─────────────────────────────────────┘
@@ -63,11 +63,13 @@ Recall Bench measures memory quality along **eight recall dimensions** plus **on
 
 Hallucination is scored on every question, regardless of category. Holding it apart from the recall score lets you read each in isolation — a system can be confidently wrong (high recall score, low hallucination score) or accurately silent (low recall score, high hallucination score). Mixing them into one number hides which failure mode dominates.
 
-### The 8 Recall Dimensions
+### The recall categories
 
-Each question is tagged with exactly one of these categories. The harness reports per-category scores so you can see *which kind* of memory work degrades first as the corpus grows.
+Each question is tagged with exactly one category. The harness reports per-category scores so you can see *which kind* of memory work degrades first as the corpus grows. There are **eight core categories** (always evaluated) plus **two group-aware categories** that require multi-session personas and are enabled with `--groups-enabled`.
 
-| Dimension | What It Measures | Example Question |
+**Core categories (8):**
+
+| Category | What It Measures | Example Question |
 |---|---|---|
 | `factual-recall` | Retrieving a specific fact stated on a specific day. Tests basic storage and retrieval fidelity — can the system find a needle in 1,000 days of hay? | "What database engine did the team choose for the analytics service on day 247?" |
 | `temporal-reasoning` | Understanding *when* things happened and in what order. Requires the system to maintain or reconstruct chronological relationships between events. | "Did the load balancer migration finish before or after the Q3 security audit?" |
@@ -78,7 +80,18 @@ Each question is tagged with exactly one of these categories. The harness report
 | `synthesis` | Combining information from multiple separate memories into an answer that doesn't exist in any single entry. Requires aggregation, comparison, or pattern recognition across days. | "How did the team's approach to database migrations evolve over the first year?" |
 | `negative-recall` | Correctly identifying that something was *not* mentioned or did not happen. Tests whether the system fabricates plausible-sounding answers when the truthful response is "no evidence found." | "Did the team ever discuss migrating to GraphQL?" (when they didn't) |
 
-### The +1: Hallucination
+**Group-aware categories (2, opt-in via `--groups-enabled`):**
+
+These exercise personas whose days are split across multiple **sessions** (e.g. a principal plus separate, isolated conversation threads), testing whether the system attributes statements correctly and respects information boundaries between sessions.
+
+| Category | What It Measures | Example Question |
+|---|---|---|
+| `group-session-attribution` | Attributing a statement to the right participant in a multi-party session — who said or decided what. | "In the Q3 planning session, who pushed back on the hiring freeze?" |
+| `information-boundary` | Refusing to leak content from a session the query has no access to. Each pair carries a `querySession`, the `forbiddenSessions` whose content must not be echoed, and an `expectedDisclosure` of `refuse`, `partial`, or `answer`. | "What did the CEO discuss in the board-only session?" (asked from a session that shouldn't see it → expected: `refuse`) |
+
+For `information-boundary` pairs the judge uses a boundary-aware prompt and scores against the **expected disclosure behavior** — a clean refusal is the *correct* answer, not a recall failure.
+
+### Hallucination
 
 Hallucination is a **binary** judgement on every answer: was anything in this answer *not* supported by memories the system actually has?
 
@@ -90,9 +103,9 @@ Hallucination is a **binary** judgement on every answer: was anything in this an
 Two design choices matter here:
 
 - **Hallucination is independent of correctness.** A system can hallucinate while still being correct (lucky guess) or be wrong without hallucinating (it retrieved the wrong real memory). The judge prompt is structured to score these separately so neither masks the other.
-- **`negative-recall` is the canary.** When the truthful answer is "no evidence found," any plausible-sounding answer is by definition a hallucination. This category is the cleanest direct test of the +1 dimension; the other seven test it indirectly.
+- **`negative-recall` is the canary.** When the truthful answer is "no evidence found," any plausible-sounding answer is by definition a hallucination. This category is the cleanest direct test of the hallucination dimension; the other categories test it indirectly.
 
-The aggregate **hallucination rate** for a run is the percentage of questions scored `0` on this dimension. It is reported separately from the recall composite — you'll see it as a dedicated row beneath the heatmap, not as one of the eight category rows.
+The aggregate **hallucination rate** for a run is the percentage of questions scored `0` on this dimension. It is reported separately from the recall composite — you'll see it as a dedicated row beneath the heatmap, not as one of the per-category rows.
 
 ### Tracking Hallucinations Over Time
 
@@ -110,20 +123,22 @@ Hallucination tends to *increase* with corpus size — the more memories a syste
 
 **6. Per-persona splits.** Different domains exercise different fabrication tendencies — a system trained heavily on tech vocabulary may invent plausible-sounding legal precedents but balk at fabricating medical diagnoses (or vice versa). Always report hallucination broken out by persona, not just aggregated, so domain-specific weaknesses don't get averaged away.
 
-## Evaluation Periods
+## Evaluation Checkpoints
 
-Performance is measured at regular intervals across the corpus to reveal how the system degrades as memory grows. The evaluation period is configurable — the default is **1 week** (7 days).
+Performance is measured at a set of **checkpoints** across the corpus to reveal how the system degrades as memory grows. You choose the checkpoints with `--ranges`: each entry is a day count or a named alias (`30d`, `90d`, `6mo`, `1y`, `full`), and passing several builds a multi-column heatmap (e.g. `--ranges 6d,12d,18d,24d`).
 
-For a 1,000-day corpus at weekly intervals, this produces **143 evaluation points**, each representing a fresh ingest-and-query cycle up to that day. The heatmap renders each point as a colored cell, creating a continuous gradient that exposes degradation patterns more precisely than a handful of fixed ranges.
+The spacing is a resolution/cost tradeoff — a finer sweep exposes degradation patterns more precisely but multiplies the work, since **each checkpoint gets a completely fresh adapter lifecycle** (setup → ingest → finalize → query → teardown):
 
-| Interval | Evaluation Points (1000d) | Best for |
+| Checkpoint spacing | Checkpoints (1000d) | Best for |
 |---|---|---|
-| `1` (daily) | 1000 | Fine-grained analysis (slow) |
-| `7` (weekly, default) | 143 | Standard benchmark runs |
-| `14` (biweekly) | 72 | Faster iteration |
-| `30` (monthly) | 34 | Quick smoke tests |
+| every 7 days | ~143 | Fine-grained heatmaps |
+| every 14 days | ~72 | Standard benchmark runs |
+| every 30 days | ~34 | Faster iteration |
+| named ranges only | 5 | Quick smoke tests |
 
-Each evaluation point gets a **completely fresh** adapter lifecycle. Q&A pairs are filtered so only questions whose `relevant_days` all fall within the cutoff day are included.
+At each checkpoint, Q&A pairs are filtered so only questions whose `relevant_days` all fall within the cutoff day are included. Use `--sample <n>` to cap how many *historical* questions are re-asked per checkpoint (newly-eligible questions are always evaluated); this keeps a fine-grained sweep affordable.
+
+> The separate `--interval` flag belongs to **`generate-qa`** (default 7 days) and controls how densely Q&A pairs are *authored* across the corpus — not how the `run` command evaluates them.
 
 ## The Persona System
 
@@ -136,7 +151,7 @@ Recall Bench uses **personas** — synthetic identities with realistic professio
 
 ### Shipped Personas
 
-The benchmark ships with 5 cross-domain personas to ensure the evaluation isn't biased toward any single profession:
+The benchmark ships with 6 cross-domain personas to ensure the evaluation isn't biased toward any single profession:
 
 | Persona | Role | Domain |
 |---|---|---|
@@ -145,6 +160,9 @@ The benchmark ships with 5 cross-domain personas to ensure the evaluation isn't 
 | `litigation-attorney` | Litigation Attorney | Mid-size law firm |
 | `research-scientist` | Research Scientist | University biology lab |
 | `financial-advisor` | Financial Advisor | Wealth management firm |
+| `executive-assistant` | Executive Assistant to a CFO | Corporate finance |
+
+`executive-assistant` ships both a full `arcs-1000d.yaml` and a shorter `arcs-180d.yaml`, and is the primary test bed for the **group-aware** categories — its days are split across multiple sessions, which is what `information-boundary` and `group-session-attribution` probe. Select an arcs variant for any generation or run command with `--arcs <filename>`.
 
 ### Story Arcs
 
@@ -157,17 +175,18 @@ Arcs create realistic complexity:
 
 ## Dataset Generation Pipeline
 
-Datasets are generated using a **two-pass LLM pipeline**:
+Datasets are generated by a **three-pass LLM pipeline**, with Q&A pairs authored on top:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 1: create-persona                                         │
-│  Prompt → persona.yaml + arcs-1000d.yaml                              │
+│  Prompt → persona.yaml + arcs-Nd.yaml                           │
 ├─────────────────────────────────────────────────────────────────┤
 │  Step 2: generate  (Pass 1)                                     │
 │  Process arcs in order → generate day-by-day logs               │
 │  • Arc-driven: each arc selects its active days                 │
-│  • Merge: if two arcs overlap on the same day, content merges   │
+│  • Per-session: each active session renders under its own       │
+│    `# session: <id>` heading on the day                         │
 │  • Context: sliding window of recent days + arc summaries       │
 │  • Density hints: quiet / normal / busy / dense                 │
 ├─────────────────────────────────────────────────────────────────┤
@@ -177,12 +196,19 @@ Datasets are generated using a **two-pass LLM pipeline**:
 │  Step 3: generate-conversations  (Pass 2, optional)             │
 │  Convert daily logs → user/assistant conversation turns         │
 ├─────────────────────────────────────────────────────────────────┤
-│  Step 4: Create Q&A pairs  (manual or LLM-assisted)             │
-│  questions.yaml with reference answers + metadata               │
+│  Step 4: generate-tool-calls  (Pass 3, optional)               │
+│  Convert daily logs → memory-save tool-call traces (YAML)       │
+│  for systems benchmarked through an agent tool loop             │
+├─────────────────────────────────────────────────────────────────┤
+│  Step 5: generate-qa  (standard | boundary mode)               │
+│  Walk the corpus in checkpoints → questions.yaml with           │
+│  reference answers, categories, difficulty, relevant_days       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Pass 1** separates "what happened" from how it was communicated. **Pass 2** optionally reconstructs the conversations that would have produced those logs.
+**Pass 1** separates "what happened" from how it was communicated. **Pass 2** optionally reconstructs the conversations that would have produced those logs. **Pass 3** optionally emits the tool-call trace an agent would have made to save those memories — used when a system under test is driven through a tool loop rather than fed raw markdown.
+
+**Q&A generation** (`generate-qa`) walks the corpus in checkpoint windows (default every 7 days), generating pairs grounded only in days at or before each checkpoint so a question never depends on information the system hasn't seen yet. Its `--mode boundary` variant authors `information-boundary` probes for multi-session personas instead of standard recall questions.
 
 ### Creating a Cast
 
@@ -309,7 +335,7 @@ The primary output is a **category × time-range heatmap** showing mean composit
 
 ```
 ═══════════════════════════════════════════════════════════════════════════════
-  AGGREGATE HEATMAP — Recall System v0.4 (5 personas, 1-week intervals)
+  AGGREGATE HEATMAP — Recall System (6 personas, 7-day checkpoints)
 ═══════════════════════════════════════════════════════════════════════════════
                              7d   14d   21d   28d  ...   980d  987d  994d 1000d
 ───────────────────────────────────────────────────────────────────────────────
@@ -334,7 +360,7 @@ The primary output is a **category × time-range heatmap** showing mean composit
 
 **Columns** represent evaluation points at each interval. Reading left to right shows how performance degrades as the corpus grows. A system with good long-term recall will show a gentle color transition; a system that relies heavily on recency will show a sharp green-to-red shift.
 
-**Rows** represent evaluation categories. Each cell's color reflects the mean composite score (0.0–6.0) across all personas and eligible questions for that category at that evaluation point. Green = strong performance, amber = moderate, red = poor.
+**Rows** represent evaluation categories — the eight core categories above, plus the two group-aware categories (`group-session-attribution`, `information-boundary`) as additional rows when the run uses `--groups-enabled`. Each cell's color reflects the mean composite score (0.0–6.0) across all personas and eligible questions for that category at that evaluation point. Green = strong performance, amber = moderate, red = poor.
 
 Key patterns to look for:
 
@@ -362,26 +388,59 @@ The characteristic "cooling gradient" from left to right is expected — all mem
 npx recall-bench run \
   --adapter grpc://127.0.0.1:50052 \
   --data ./personas \
-  --judge ./my-judge.js \
+  --judge anthropic:claude-opus-4-8 \
   --personas backend-eng-saas er-physician \
-  --ranges 30d,full \
-  --json
+  --ranges 30d,90d,full \
+  --json-out bench-results/drafts/my-run/result.json
 ```
+
+**Adapter & data**
 
 | Flag | Default | Description |
 |---|---|---|
-| `--adapter <url\|path>` | required | gRPC URL or JS adapter module |
-| `--data <dir>` | required | Dataset directory |
-| `--judge <path>` | stub (zeros) | JS judge module |
+| `--adapter <url\|path>` | required | gRPC URL (`grpc://host:port`) or path to a JS adapter module |
+| `--data <dir>` | required | Dataset directory containing persona folders |
+| `--profile <path>` | — | YAML profile supplying adapter/data/models/run settings; explicit flags override it |
+
+**Judging**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--judge <spec>` | stub (zeros) | CLI agent name, model spec (`openai:…`, `anthropic:…`, `azure:…`), or JS module path |
+| `--appellate-judge <spec>` | — | Optional second judge invoked only on primary-judge failures; its verdict is final and both scores are recorded |
+| `--judge-memory-window <n>` | 0 | Days of memory context around the relevant day the judge sees (0 = reference-only) |
+
+**Selection**
+
+| Flag | Default | Description |
+|---|---|---|
 | `--personas <ids...>` | all | Subset of personas to run |
-| `--interval <days>` | 7 | Evaluation period in days |
-| `--ranges <ranges...>` | all | Time ranges to evaluate (legacy) |
-| `--seed <n>` | 42 | Shuffle seed for question order |
+| `--ranges <ranges...>` | named ranges | Checkpoints: day counts or aliases (`30d`, `90d`, `6mo`, `1y`, `full`) |
+| `--arcs <filename>` | `arcs-1000d.yaml` | Arcs file inside each persona dir (pairs the memories/qa dirs); use `arcs-180d.yaml` for the 180-day variant |
+| `--sample <n>` | full | Per-checkpoint cap on re-asked historical questions |
+| `--groups-enabled` | off | Enable the group-aware categories (`group-session-attribution`, `information-boundary`) |
+| `--seed <n>` | 42 | Shuffle seed (0 = no shuffle) |
+
+**Execution**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--parallelism <n>` | 1 | Max concurrent queries |
 | `--timeout <ms>` | 30000 | Per-question timeout |
-| `--grpc-timeout <ms>` | 120000 | Per-RPC timeout |
-| `--parallelism <n>` | 1 | Concurrent queries |
-| `--json` | false | Full JSON output |
-| `--heatmap` | false | Heatmap grid only (JSON) |
+| `--grpc-timeout <ms>` | 120000 | Per-RPC timeout (gRPC adapter) |
+| `--dry-run` | off | Stop after the first checkpoint — catches config errors fast |
+| `--skip-preflight` | off | Skip startup validation of profile / persona files / Q&A loads |
+
+**Output & resume**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--json` / `--heatmap` | text | Emit full JSON / heatmap grid only |
+| `--json-out <path>` | — | Write the full `BenchmarkResult`; siblings `heatmap.png`, `progress.jsonl`, `questions.jsonl`, `failures.jsonl` are written alongside it |
+| `--no-heatmap-png` | off | Skip the automatic PNG render that accompanies `--json-out` |
+| `--question-log <path>` | `questions.jsonl` | One JSONL record per evaluated question (Q, ref, answer, score, retrieval, latency); `--no-question-log` disables |
+| `--progress-jsonl <path>` | `progress.jsonl` | Stream per-checkpoint progress as JSON lines |
+| `--resume <path>` | — | Resume an interrupted run from a prior `progress.jsonl`; `--skip-catchup-ingest` avoids re-ingesting when the adapter preserves state |
 
 ### Generating Datasets
 
@@ -391,13 +450,24 @@ npx recall-bench create-persona \
   --prompt "A backend engineer at a B2B SaaS company" \
   --model claude --persona ./dataset/my-persona
 
-# Step 2: Generate 1,000 days
+# Step 2: Generate 1,000 days (Pass 1)
 npx recall-bench generate \
   --persona ./dataset/my-persona --model claude
 
-# Step 3: (Optional) Generate conversations
+# Step 3: (Optional) Conversation transcripts (Pass 2)
 npx recall-bench generate-conversations \
   --persona ./dataset/my-persona --model claude --format markdown
+
+# Step 4: (Optional) Tool-call traces for agent-loop systems (Pass 3)
+npx recall-bench generate-tool-calls \
+  --persona ./dataset/my-persona --model claude
+
+# Step 5: Author Q&A pairs across the corpus
+npx recall-bench generate-qa \
+  --persona ./dataset/my-persona --model claude
+# ...and boundary probes for multi-session personas:
+npx recall-bench generate-qa \
+  --persona ./dataset/my-persona --model claude --mode boundary
 ```
 
 ### Utility Commands
@@ -422,7 +492,8 @@ npx recall-bench ranges
 │ cli.ts        │ harness.ts       │ persona-creator.ts         │
 │               │ types.ts         │ generator.ts               │
 │               │ report.ts        │ conversation-generator.ts  │
-│               │ dataset.ts       │ generator-types.ts         │
+│               │ dataset.ts       │ tool-call-generator.ts     │
+│               │ llm-judge.ts     │ qa-generator.ts            │
 ├───────────────┴──────────────────┴────────────────────────────┤
 │                     Adapter Layer                             │
 │  ┌─────────────────────┐    ┌──────────────────────────────┐  │

@@ -14,26 +14,30 @@ Local-first agent memory service that manages the full lifecycle of AI agent mem
 ## System Layers
 
 ```
-┌──────────────────────────────┐
-│        CLI  (recall)         │
-├──────────────────────────────┤
-│      MemoryService API       │
-├──────────┬──────────┬────────┤
-│  Files   │  Search  │Compact │
-├──────────┴──────────┴────────┤
-│     Abstraction Layer        │
-│  Storage · Embeddings ·      │
-│  Index   · Model             │
-└──────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│                 CLI  (recall)               │
+├─────────────────────────────────────────────┤
+│              MemoryService API              │
+├────────┬────────┬─────────┬───────┬─────────┤
+│ Files  │ Search │ Compact │ Wiki  │  Dream  │
+├────────┴────────┴─────────┴───────┴─────────┤
+│              Abstraction Layer              │
+│     Storage · Embeddings · Index · Model    │
+└─────────────────────────────────────────────┘
 ```
+
+Recall manages two parallel views of memory: a **temporal stream** (daily logs rolled up by compaction) and a **topical [wiki](wiki.html)** of cross-linked pages. Compaction maintains the first; the wiki and dreaming maintain the second.
 
 | Layer | Responsibility | Source |
 |-------|----------------|--------|
 | **CLI** | Command parsing, output formatting | `packages/core/src/cli.ts` |
 | **MemoryService** | Top-level orchestrator, composes all subsystems | `packages/core/src/service.ts` |
-| **MemoryFiles** | CRUD for daily, weekly, monthly, typed, and wisdom files | `packages/core/src/files.ts` |
+| **MemoryFiles** | CRUD for daily, weekly, monthly, wiki, and wisdom files | `packages/core/src/files.ts` |
 | **SearchService** | Two-phase hierarchical search with BM25 + vector fusion | `packages/core/src/search.ts` |
 | **Compactor** | Daily→weekly→monthly→wisdom compression pipeline | `packages/core/src/compactor.ts` |
+| **WikiEngine** | Topical knowledge pages — stub/append/synthesize/lint/merge/supersede | `packages/core/src/wiki-engine.ts` |
+| **DreamEngine** | Asynchronous cross-temporal synthesis; writes wiki pages and supersessions | `packages/core/src/dream-engine.ts` |
+| **IdentityLoader** | Agent identity frame (role/voice) used to steer synthesis | `packages/core/src/identity.ts` |
 | **Abstractions** | Pluggable interfaces for storage, embeddings, indexing, and LLM | `packages/core/src/interfaces/` |
 
 ---
@@ -42,21 +46,27 @@ Local-first agent memory service that manages the full lifecycle of AI agent mem
 
 ```
 <memory-root>/
-├── WISDOM.md                    # Distilled principles (permanent)
+├── WISDOM.md                    # Distilled principles + Knowledge Map (permanent)
+├── DREAMS.md                    # Dream diary (append-only)
+├── IDENTITY.md                  # Agent identity frame (role, voice)
 ├── memory/
 │   ├── 2026-04-01.md            # Daily logs (raw, never deleted)
 │   ├── 2026-04-02.md
-│   ├── type_topic.md            # Typed memories (user, feedback, project, reference)
 │   ├── weekly/
 │   │   ├── 2026-W13.md          # Weekly summaries (with pointers to dailies)
 │   │   └── 2026-W14.md
-│   └── monthly/
-│       ├── 2026-03.md           # Monthly summaries (with pointers to weeklies)
-│       └── 2026-04.md
+│   ├── monthly/
+│   │   ├── 2026-03.md           # Monthly summaries (with pointers to weeklies)
+│   │   └── 2026-04.md
+│   └── wiki/                    # Topical knowledge pages (one per subject)
+│       ├── index.md
+│       └── auth-middleware.md
 └── .index/                      # Vectra vector index
 ```
 
 All memory files use YAML frontmatter for metadata. Parent nodes (weekly/monthly) include a `pointers` array referencing their children and a `salience` map of per-child weights.
+
+The earlier *typed memory* files (`user_*.md`, `feedback_*.md`, `project_*.md`, `reference_*.md`) have been folded into the [wiki](wiki.html): their four types became wiki **categories**, and `wiki migrate-typed-memories` converts any legacy files in place.
 
 ---
 
@@ -86,16 +96,19 @@ Daily logs  ──(7+ days)──►  Weekly summary  ──(4+ weeks)──► 
 
 3. **Wisdom Distillation:** Merges insights from monthlies and typed memories into `WISDOM.md`. Deduplicates, removes stale entries, caps at configurable max entries (default 20).
 
-### Typed Memories
+### Topical Knowledge → the Wiki
 
-Short, durable knowledge extracted during compaction or written directly by agents:
+Durable knowledge that isn't tied to a single day — rules, decisions, facts about people and systems — lives in the **[wiki](wiki.html)** rather than the temporal hierarchy. The agent writes short *stub* pages in real time; dreaming synthesizes them into richer pages as sources accumulate, and keeps them current via [supersession](wiki.html#supersession). The four former *typed memory* types are now wiki **categories**:
 
-| Type | Purpose | Example |
-|------|---------|---------|
-| `user` | Role, preferences, knowledge | "Senior Go engineer, new to React" |
-| `feedback` | Behavioral guidance | "Don't mock the database in integration tests" |
-| `project` | Ongoing work context | "Merge freeze begins 2026-03-05 for mobile release" |
-| `reference` | Pointers to external systems | "Pipeline bugs tracked in Linear project INGEST" |
+| Category | Purpose | Example |
+|----------|---------|---------|
+| `entity` | People, teams, systems, organizations | "Northstar Gridworks — primary infra vendor" |
+| `concept` | Rules / behavioral guidance (was `feedback`) | "Don't mock the database in integration tests" |
+| `project` | Ongoing work context (was `project`) | "Auth middleware: cookie→JWT migration, compliance-driven" |
+| `reference` | Pointers to external systems (was `reference`) | "Pipeline bugs tracked in Linear project INGEST" |
+| `theme` | Cross-cutting patterns synthesized by dreaming | "Migrations consistently slip when compliance gates them" |
+
+See **[The LLM Wiki](wiki.html)** for the full page anatomy, the stub→synthesis lifecycle, and supersession.
 
 ---
 
@@ -148,7 +161,10 @@ Temporal references are extracted via regex patterns (explicit dates, relative r
 
 ### Supporting Search Features
 
-- **Catalog matching** (`catalog.ts`): Frontmatter keyword overlap on typed memories — fast, no embeddings, catches exact-name hits.
+- **Hybrid retrieval**: Vectra's combined semantic + BM25 retrieval is enabled, so dense and lexical matches are fused at the index level before reranking.
+- **Catalog matching** (`catalog.ts`): Frontmatter keyword overlap on wiki pages and any remaining typed memories — fast, no embeddings, catches exact-name hits.
+- **Temporal embeddings**: Chunk text is prefixed with `[as of YYYY-MM-DD]` before embedding, so a memory's date is part of its vector — sharpening time-sensitive retrieval without relying on regex extraction alone.
+- **Wiki score boost** (`wiki.scoreBoost`, default `0.9`): A multiplier applied to wiki-page retrieval scores. The default is a deliberate *de-boost* so a synthesized page can't outrank the immutable daily that holds a specific fact — see [The LLM Wiki](wiki.html#retrieval-and-the-score-boost).
 - **Query expansion** (`query-expansion.ts`): Generates 1–3 query variations (original, keyword-only, noun phrases) and merges results by URI. No LLM needed.
 
 ---
@@ -226,15 +242,17 @@ recall [--dir <path>] [--json] [--verbose] <command>
 
 | Command | Description |
 |---------|-------------|
-| `search <query>` | Search memories (all options: `--results`, `--max-chunks`, `--max-tokens`, `--no-sync`) |
+| `search <query>` | Search memories (`--results`, `--max-chunks`, `--max-tokens`, `--recency-depth`, `--typed-memory-boost`, `--wiki-boost`, `--wiki-only`, `--no-wiki`, `--no-sync`) |
 | `index` | Full rebuild of vector index |
 | `sync` | Incremental index sync |
 | `status` | Memory file counts and index health |
 | `compact [level]` | Compact to level (`weekly` / `monthly` / `wisdom`) with `--dry-run` and `--agent` |
+| `dream` | Run an asynchronous synthesis session; `dream status` shows the last run and pending signals |
+| `wiki <subcommand>` | Manage topical knowledge pages — `list`, `show`, `stub`, `append`, `rebuild`, `merge`, `rename`, `lint`, `status` (see [The LLM Wiki](wiki.html#cli)) |
 | `log <entry>` | Append entry to today's daily log |
 | `list [type]` | List memory files |
 | `read <file>` | Read a memory file |
-| `watch` | Watch for changes and auto-sync/compact |
+| `watch` | Watch for changes and auto-sync, with optional `--compact` / `--dream` |
 | `migrate` | Migrate existing memories to hierarchical architecture |
 
 ---
@@ -266,31 +284,30 @@ Dreaming is an **asynchronous knowledge synthesis** engine that runs alongside c
 |--|-----------|----------|
 | **Trigger** | Temporal boundaries (week/month end) | Scheduled (cron) or on-demand |
 | **Scope** | Within one time window | Across all time windows |
-| **Input** | Raw memories for a period | Search signals, entity scans, wisdom drift |
-| **Output** | Summary files in hierarchy | Insights, typed memory promotions, contradiction flags |
-| **LLM usage** | Summarization | Cross-reference analysis, gap analysis, theme synthesis |
+| **Input** | Raw memories for a period | Search signals, entity scans, decision markers, wisdom drift |
+| **Output** | Summary files in hierarchy | Wiki pages (stubs + synthesized rewrites), supersessions, contradiction flags |
+| **LLM usage** | Summarization | Cross-reference analysis, gap analysis, contradiction detection, theme synthesis |
 
 ### Three Phases
 
 ```
-Search signals + Entity scans + Staleness checks + Wisdom drift
+Search signals + Entity scans + Decision markers + Staleness + Wisdom drift
     │
     ▼
 Phase 1: Gather ──► Phase 2: Analyze ──► Phase 3: Write
  (signals)           (LLM synthesis)       (persist)
     │                     │                    │
     ▼                     ▼                    ▼
-candidates.json     insight drafts       memory/dreams/insights/
-                    contradiction flags   memory/dreams/contradictions/
-                    typed memory candidates  memory/<type>_<topic>.md
-                                          DREAMS.md (diary)
+candidates.json     wiki ops (create/update)  memory/wiki/<slug>.md
+                    supersession proposals     (+ supersedes frontmatter)
+                    contradiction flags        DREAMS.md (diary)
 ```
 
-**Phase 1 — Gather:** Collects signals from search logs (query patterns, hit frequency, null queries), entity frequency scans, typed memory staleness checks, and wisdom-vs-behavior drift analysis. Produces a scored candidate list.
+**Phase 1 — Gather:** Collects signals from search logs (query patterns, hit frequency, null queries), entity frequency scans, decision-marker scans (for [supersession](wiki.html#supersession)), wiki staleness checks, and wisdom-vs-behavior drift analysis. Produces a scored candidate list.
 
-**Phase 2 — Analyze:** Sends candidate clusters to the LLM via `MemoryModel` for cross-reference analysis, gap analysis, contradiction detection, typed memory extraction, and theme synthesis. Each analysis type has a dedicated prompt template.
+**Phase 2 — Analyze:** Sends candidate clusters to the LLM via `MemoryModel` for cross-reference analysis, gap analysis, contradiction detection, and theme synthesis. Each analysis type has a dedicated prompt template; the output is a set of **wiki operations** (create a stub, synthesize a page, supersede a prior claim).
 
-**Phase 3 — Write:** Persists results as insight files, typed memory promotions, contradiction reports, and dream diary entries. All output files are indexed in Vectra and become searchable.
+**Phase 3 — Write:** Applies the wiki operations — creating or rewriting `memory/wiki/<slug>.md` pages, recording superseded claims in their `supersedes` frontmatter, flagging contradictions, and appending a `DREAMS.md` diary entry. All output is indexed in Vectra and becomes searchable. (Legacy `memory/dreams/insights/` files from earlier versions are converted to wiki pages by `wiki migrate-insights`.)
 
 ### Signal Collection
 
@@ -307,11 +324,9 @@ The search service logs every query + result set to `.dreams/search-log.jsonl` w
 <memory-root>/
 ├── DREAMS.md                              # Dream diary (append-only)
 ├── memory/
-│   └── dreams/
-│       ├── insights/
-│       │   └── 2026-04-11-auth-evolution.md
-│       └── contradictions/
-│           └── 2026-04-11.md
+│   └── wiki/                              # Where dreaming writes its synthesis
+│       ├── auth-middleware.md             #   (pages + supersedes frontmatter)
+│       └── auth-middleware-trajectory.md  #   (auto-built once a page has ≥2 supersessions)
 └── .dreams/                               # Machine state (gitignored)
     ├── search-log.jsonl
     ├── candidates.json
@@ -327,7 +342,7 @@ recall dream status             # Last run, pending candidates, signal stats
 recall watch --dream            # Enable scheduled dreaming in watch mode
 ```
 
-For full design details, see [`specs/dreaming.md`](../specs/dreaming.md).
+For full design details, see [`specs/dreaming.md`](https://github.com/Stevenic/recall/blob/main/specs/dreaming.md).
 
 ---
 
@@ -347,7 +362,9 @@ For full design details, see [`specs/dreaming.md`](../specs/dreaming.md).
 
 For full details, see:
 
-- [`specs/memory-service.md`](../specs/memory-service.md) — Service architecture, abstractions, compaction, CLI (v0.3)
-- [`specs/hierarchical-memory.md`](../specs/hierarchical-memory.md) — Eidetic storage, pointers, two-phase search, salience (v0.4)
-- [`specs/dreaming.md`](../specs/dreaming.md) — Asynchronous knowledge synthesis, signal collection, cross-temporal analysis (v0.1)
-- [`docs/prompts/`](prompts/) — Compaction prompt templates (daily→weekly, weekly→monthly, wisdom distillation)
+- [`specs/memory-service.md`](https://github.com/Stevenic/recall/blob/main/specs/memory-service.md) — Service architecture, abstractions, compaction, CLI (v0.4)
+- [`specs/hierarchical-memory.md`](https://github.com/Stevenic/recall/blob/main/specs/hierarchical-memory.md) — Eidetic storage, pointers, two-phase search, salience (v0.4)
+- [`specs/dreaming.md`](https://github.com/Stevenic/recall/blob/main/specs/dreaming.md) — Asynchronous knowledge synthesis, signal collection, cross-temporal analysis (v0.2)
+- [`specs/wiki.md`](https://github.com/Stevenic/recall/blob/main/specs/wiki.md) — Topical knowledge graph: stubs, synthesis, supersession, shared wikis (v0.4)
+- [**The LLM Wiki**](wiki.html) — Operator guide to the wiki layer and supersession
+- [Prompts](prompts/) — Compaction prompt templates (daily→weekly, weekly→monthly, wisdom distillation)
