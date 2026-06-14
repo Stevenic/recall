@@ -412,7 +412,7 @@ export class WikiEngine {
             }));
             for (const ref of [...links, ...relatedRefs]) {
                 let resolvedTarget: WikiTarget;
-                let resolvedSlug = ref.slug;
+                const resolvedSlug = ref.slug;
                 if (ref.target === null) {
                     resolvedTarget = sourceTarget;
                 } else if (ref.target === "private") {

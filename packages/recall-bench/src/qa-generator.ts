@@ -114,7 +114,7 @@ export async function generateQa(args: {
     // Load any existing Q&A pairs (resume support)
     const qaDir = join(args.personaDir, args.qaDirName);
     const qaFile = join(qaDir, 'questions.yaml');
-    let pairs: QAPair[] = await loadExistingQa(qaFile);
+    const pairs: QAPair[] = await loadExistingQa(qaFile);
     let nextId = computeNextId(args.persona.id, pairs);
 
     let totalInputTokens = 0;
