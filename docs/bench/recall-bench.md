@@ -6,8 +6,16 @@ nav_order: 1
 ---
 
 # Recall Bench
+{: .no_toc }
 
 Recall Bench is a benchmark harness for evaluating agent memory systems. It measures how well a memory system can **ingest**, **organize**, and **retrieve** information over long time horizons — up to 1,000 days of synthetic daily logs per persona.
+
+<details markdown="block">
+<summary>Table of contents</summary>
+
+- TOC
+{:toc}
+</details>
 
 ## Why Recall Bench?
 

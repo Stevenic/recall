@@ -13,16 +13,16 @@ Local-first agent memory — from raw logs to distilled wisdom, with semantic se
 This site is organized into two sections so you can dive into the one you care about and ignore the other:
 
 ## [Recall Memory System →](./memory-system/)
-Architecture, the four-level compaction pipeline (daily → weekly → monthly → wisdom), the two-phase hierarchical search, dreaming and contradiction detection, and the prompts that drive it.
+Architecture, the four-level compaction pipeline (daily → weekly → monthly → wisdom), the two-phase hierarchical search, dreaming and contradiction detection, and the prompts that drive it. *(Recall is an in-progress, experimental system — see the note inside.)*
 
 ## [Recall Bench →](./bench/)
-The benchmark itself — the 8+1 scoring dimensions, the persona corpus, harness adapters, published runs and heatmaps for each memory system tested, and a head-to-head comparison of Recall vs. OpenClaw.
+The benchmark itself — the scoring dimensions and ten recall categories, the persona corpus, harness adapters, how to run it with a coding agent, and published runs and heatmaps for each memory system tested.
 
 ---
 
 ## Quick links
 
-- **For developers picking a memory system:** [Recall vs. OpenClaw comparison](./bench/comparison-recall-vs-openclaw.html)
+- **For developers picking a memory system:** [Recall vs. OpenClaw comparison](./memory-system/comparison-recall-vs-openclaw.html)
 - **For developers evaluating a memory system:** [Recall Bench overview](./bench/recall-bench.html) and the [OpenClaw EA benchmark report](./bench/results/openclaw-ea.html)
 - **For developers building on Recall:** [Memory system architecture](./memory-system/architecture.html)
 

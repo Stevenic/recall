@@ -1,8 +1,8 @@
 ---
-title: Recall vs. OpenClaw
+title: vs. OpenClaw
 layout: default
-parent: Recall Bench
-nav_order: 2
+parent: Recall Memory System
+nav_order: 3
 ---
 
 # Memory System Comparison: Recall vs OpenClaw

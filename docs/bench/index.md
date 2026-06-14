@@ -13,8 +13,10 @@ A benchmark harness for evaluating agent memory systems on long-horizon recall (
 ## What's in this section
 
 - **[Recall Bench overview](./recall-bench.html)** — The scoring dimensions, the ten recall categories, the persona corpus, the three-phase evaluation loop, and what each category measures.
-- **[Recall vs. OpenClaw comparison](./comparison-recall-vs-openclaw.html)** — Side-by-side architectural and design comparison of the two memory systems Recall Bench currently scores.
+- **[Running with a coding agent](./running-with-a-coding-agent.html)** — How to drive the full pipeline (create persona → generate corpus → run → analyze) with a coding agent like Claude, Codex, or Copilot.
+- **[vs. MemoryBench](./memorybench-vs-recall-bench.html)** — How Recall Bench (long-horizon recall fidelity) compares to MemoryBench (continual learning from user feedback).
 - **Published results:**
+  - **[Published Runs — Postmortem](./results/postmortem-ea.html)** — Cross-system retrospective of all nine published runs, with failure triage and code-level findings.
   - **[OpenClaw EA benchmark — 180d + 500d](./results/openclaw-ea.html)** — Combined report covering both Executive-Assistant runs, with issue analysis pulled from the failure logs.
 
 ## What gets measured

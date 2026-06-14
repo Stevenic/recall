@@ -190,7 +190,7 @@ The 500d-vector run uses this 750ms-then-non-force pattern in its incremental in
 
 Both runs explicitly leave `groupsEnabled: false` in the profile (`packages/recall-bench/profiles/ea-180d-openclaw.yaml` and `ea-500d-vector.yaml`). The `group-session-attribution` and `information-boundary` categories therefore have **zero questions scored** at any checkpoint, and any session-isolation behavior of OpenClaw's default backend is untested by these runs.
 
-This is intentional: OpenClaw's built-in memory has no per-session ACL concept (see [comparison](../comparison-recall-vs-openclaw.html#7-context-loading--integration)), so scoring those categories would just confirm "all content is visible to all queries." Future work would either build an isolated-workspace variant of the adapter or flip the groups flag and report the expected zero scores as documentation.
+This is intentional: OpenClaw's built-in memory has no per-session ACL concept (see [comparison](../../memory-system/comparison-recall-vs-openclaw.html#7-context-loading--integration)), so scoring those categories would just confirm "all content is visible to all queries." Future work would either build an isolated-workspace variant of the adapter or flip the groups flag and report the expected zero scores as documentation.
 
 ---
 
